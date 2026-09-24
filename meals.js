@@ -326,6 +326,15 @@ const DIET_GUIDE = [
     "Weigh yourself before and after a hot practice: drink 16–24 oz for every pound you lost.",
     "Hot days and doubleheaders: add a sports drink or a salty snack to replace the salt you sweat out."
   ] },
+  { title: "Eating out & tournaments", points: [
+    "Burrito-bowl places: chicken or steak, rice, beans, fajita veggies and salsa. Go light on cheese and sour cream before games.",
+    "Sub shops: turkey or chicken on wheat (double the meat), lots of veggies, mustard instead of mayo, plus fruit or baked chips.",
+    "Chicken places: grilled nuggets or a grilled chicken sandwich with fruit and a milk. Save fried food for after the game.",
+    "Burger places: a single burger or grilled chicken sandwich with milk or water. Get the small fries — or skip them before you play.",
+    "Pizza night: 2–3 slices plus a salad; thin crust with chicken or veggies beats extra cheese and pepperoni before a game.",
+    "Tournament weekend? Pack a cooler: sandwiches or wraps, fruit, string cheese, chocolate milk, PB&Js, pretzels, trail mix, water and sports drinks.",
+    "Skip energy drinks — the caffeine and sugar hit hard and don't help you recover. Water, milk and sports drinks do the job."
+  ] },
   { title: "Grocery list staples", points: [
     "Protein: chicken breast, 93% lean ground beef or turkey, eggs, Greek yogurt, cottage cheese, milk, tuna, deli turkey, protein powder.",
     "Carbs: rice, oats, pasta, bagels, whole-wheat bread, tortillas, potatoes, sweet potatoes, pretzels.",

@@ -2137,7 +2137,8 @@ function waterCard(date = ymd()) {
       <span class="macro-name"><i class="key water"></i>Water</span>
       <span class="macro-left">${oz >= goal ? 'Goal hit' : `${waterText(goal - oz)} to go`}</span>
     </div>
-    <div class="macro-val">${waterText(oz)} <small>/ ${waterText(goal)}</small></div>
+    <div class="spread"><div class="macro-val">${waterText(oz)} <small>/ ${waterText(goal)}</small></div>
+      <button class="btn-link" data-action="sweatTest">Sweat test</button></div>
     <div class="meter water" role="progressbar" aria-label="Water" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span style="width:${pct}%"></span></div>
     <div class="water-btns">
       ${adds.map(([v, l]) => `<button class="btn btn-sm btn-ghost" data-action="addWater" data-oz="${v}" data-date="${date}">${icon('drop', 'sm')} ${l}</button>`).join('')}
@@ -2145,6 +2146,39 @@ function waterCard(date = ymd()) {
     </div>
   </section>`;
 }
+// ----- Sweat test: weigh in before and after practice to learn how much to drink -----
+actions.sweatTest = () => {
+  const kg = metricWater(), u = S.settings.unit;
+  openSheet('Sweat test', `<form class="form" novalidate data-submit="sweatTest">
+    <p class="text-2 small">Weigh yourself right before and right after a practice — same clothes, towel off first. The difference is mostly sweat, so you'll know how much to drink next time.</p>
+    <div class="form-grid">
+      <label class="field"><span>Weight before (${u})</span><input name="before" inputmode="decimal" autocomplete="off"></label>
+      <label class="field"><span>Weight after (${u})</span><input name="after" inputmode="decimal" autocomplete="off"></label>
+      <label class="field"><span>Drank during (${kg ? 'ml' : 'oz'})</span><input name="drank" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+      <label class="field"><span>Practice (minutes)</span><input name="min" inputmode="numeric" autocomplete="off" placeholder="90"></label>
+    </div>
+    <div class="sweat-out stack-sm"></div>
+    <button class="btn btn-primary btn-block" type="submit">Calculate</button>
+  </form>`);
+};
+submits.sweatTest = f => {
+  const d = formData(f), kg = metricWater(), before = num(d.before), after = num(d.after), drank = num(d.drank) || 0, min = num(d.min);
+  if (!(before > 0 && after > 0 && min >= 10)) { toast('Fill in both weights and how long you practiced'); return; }
+  if (after > before + (kg ? 1 : 2)) { toast('The after weight looks higher than before — check the numbers'); return; }
+  const lost = Math.max(0, before - after);                                   // in lb or kg
+  const lostOz = kg ? (lost * 1000 + drank) / 29.5735 : lost * 16 + drank;   // 1 lb of sweat ≈ 16 oz; 1 kg ≈ 1 liter
+  const perHour = lostOz / (min / 60), per15 = Math.min(perHour, 34) / 4, pct = (lost / before) * 100;
+  const catchUp = kg ? (lost * 1500) / 29.5735 : lost * 20;                   // drink ~150% of what you lost, over a few hours
+  $('.sweat-out', f).innerHTML = `
+    <div class="tiles two">
+      <div class="tile"><div class="tile-label">Sweat rate</div><div class="tile-value">${waterText(perHour)}<small> / hour</small></div></div>
+      <div class="tile"><div class="tile-label">Body weight lost</div><div class="tile-value">${fmt(pct, 1)}<small>%</small></div></div>
+    </div>
+    <p class="small text-2">Next practice, drink about <b>${waterText(per15)} every 15 minutes</b>. Add a sports drink when it's hot or you practice longer than an hour.</p>
+    ${catchUp ? `<p class="small text-2">To catch up now, drink about <b>${waterText(catchUp)}</b> over the next 2–3 hours.</p>` : ''}
+    ${pct >= 2 ? `<div class="banner warn">${icon('info')}<div>Losing 2% or more of your body weight in sweat is enough to slow you down. Drink more during practice next time.</div></div>` : ''}`;
+};
+
 actions.addWater = el => {
   const date = el.dataset.date || ymd(), cur = S.logs.find(x => x.kind === 'water' && x.date === date);
   const before = cur ? cur.oz : 0, oz = Math.max(0, Math.round((before + (num(el.dataset.oz) || 0)) * 10) / 10);
