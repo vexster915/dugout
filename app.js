@@ -231,6 +231,7 @@ const S = {
   progMetric: null,
   progRange: 'all',
   progView: 'lifts',   // Progress tab: lifts, body or baseball
+  editCheckin: false,  // Today: daily check-in form open
   histLimit: 15,
   openEx: null         // which exercise card is open during a workout (null = automatic)
 };
@@ -476,6 +477,7 @@ function renderToday() {
     ${installBanner()}
     ${backupBanner()}
     ${todayCard(dayPlan(di), di, doneToday)}
+    ${checkinCard()}
     ${nutritionCard()}
     ${waterCard()}
     ${logsOf('throw').some(l => l.date >= ymd(addDays(now, -14))) ? armCard() : ''}
@@ -511,6 +513,51 @@ function todayCard(day, di, doneToday) {
     <button class="btn-link" data-action="pickDay">Do a different day's workout</button>
   </section>`;
 }
+
+// ----- Daily check-in: sleep, energy, soreness → readiness score -----
+const checkinOf = date => S.logs.find(l => l.kind === 'checkin' && l.date === date) || null;
+function readiness(c) {
+  const sleep = c.sleep >= 9 ? 100 : c.sleep >= 8 ? 95 : c.sleep >= 7 ? 80 : c.sleep >= 6 ? 55 : 25;
+  return Math.round(sleep * 0.4 + ((c.energy - 1) / 4) * 30 + ((5 - c.sore) / 4) * 30);
+}
+const READY = [
+  [75, 'good', 'Green light', 'You recovered well — go after it today.'],
+  [50, 'ok', 'Train smart', "Warm up well. If you still feel flat, drop one set from each exercise."],
+  [0, 'low', 'Take it easy', 'Your body is asking for recovery. Do the mobility day or cut your sets in half, then focus on sleep, food and water tonight.']
+];
+const readyInfo = r => READY.find(([min]) => r >= min);
+function checkinCard() {
+  const c = checkinOf(ymd());
+  if (c && !S.editCheckin) {
+    const r = readiness(c), [, cls, label, tip] = readyInfo(r);
+    return `<section class="card stack-sm">
+      <div class="spread"><div class="card-title row"><span class="ready-dot ${cls}">${r}</span>${label}</div>
+        <button class="btn btn-sm btn-ghost" data-action="editCheckin">${icon('edit', 'sm')} Edit</button></div>
+      <p class="small text-2">${tip}</p>
+      <div class="small muted">Slept ${c.sleep >= 9 ? '9+' : c.sleep <= 5 ? '5 or less' : c.sleep} hours · energy ${c.energy}/5 · soreness ${c.sore}/5</div>
+    </section>`;
+  }
+  if (!S.editCheckin) return `<section class="card spread">
+    <div><div class="card-title">How do you feel today?</div><div class="small muted">Sleep, energy, soreness → your readiness score</div></div>
+    <button class="btn btn-sm btn-primary" data-action="editCheckin">Check in</button></section>`;
+  const v = c || { sleep: 8, energy: 3, sore: 2 };
+  return `<section class="card"><form class="form" novalidate data-submit="saveCheckin">
+    <div class="card-title">How do you feel today?</div>
+    <div class="field"><span>Sleep last night (hours)</span>${choice('sleep', [[5, '≤5'], [6, '6'], [7, '7'], [8, '8'], [9, '9+']], v.sleep)}</div>
+    <div class="field"><span>Energy <small>1 = drained · 5 = great</small></span>${choice('energy', [1, 2, 3, 4, 5].map(n => [n, String(n)]), v.energy)}</div>
+    <div class="field"><span>Soreness <small>1 = none · 5 = very sore</small></span>${choice('sore', [1, 2, 3, 4, 5].map(n => [n, String(n)]), v.sore)}</div>
+    <button class="btn btn-primary btn-block" type="submit">Save check-in</button>
+  </form></section>`;
+}
+submits.saveCheckin = f => {
+  const d = formData(f), n = (k, lo, hi, def) => clamp(parseInt(d[k], 10) || def, lo, hi);
+  const c = { id: 'check-' + ymd(), kind: 'checkin', date: ymd(), sleep: n('sleep', 5, 9, 8), energy: n('energy', 1, 5, 3), sore: n('sore', 1, 5, 2), at: Date.now() };
+  putLog(c);
+  S.editCheckin = false;
+  render();
+  toast(`Readiness ${readiness(c)} — ${readyInfo(readiness(c))[2].toLowerCase()}`);
+};
+actions.editCheckin = () => { S.editCheckin = true; render(); };
 
 function countdown(skip) {
   if (skip) return '';
@@ -2499,6 +2546,22 @@ function weekStreak(ws) {
 
 const PROG_VIEWS = [['lifts', 'Lifts'], ['body', 'Body'], ['baseball', 'Baseball']];
 actions.progView = el => { S.progView = el.dataset.v; render({ keepScroll: false }); };
+function recoveryCard() {
+  const list = logsOf('checkin'), today = checkinOf(ymd());
+  if (!list.length) return '';
+  const week = list.filter(l => l.date >= ymd(addDays(new Date(), -6)));
+  const avgSleep = week.length ? sum(week, l => l.sleep) / week.length : null;
+  if (list.length > 1) later(() => lineChart('#chart-ready', list.slice(-45).map(l => logPoint(l, readiness(l))), { fmtV: v => `${Math.round(v)} / 100` }));
+  return `<section class="card stack">
+    <div class="card-title">Recovery</div>
+    <div class="grid2">
+      <div class="tile"><div class="tile-label">Average sleep, last 7 days</div><div class="tile-value">${avgSleep == null ? '–' : fmt(avgSleep, 1)}<small> h</small></div></div>
+      <div class="tile"><div class="tile-label">Readiness today</div><div class="tile-value">${today ? readiness(today) : '–'}<small>${today ? ' / 100' : ''}</small></div></div>
+    </div>
+    ${list.length > 1 ? '<div class="chart" id="chart-ready"></div>' : ''}
+    <p class="hint">Teen athletes need 8–10 hours of sleep a night. It's the cheapest performance booster there is.</p>
+  </section>`;
+}
 function goalsCard() {
   const st = S.settings;
   return `<section class="card stack-sm">
@@ -2510,7 +2573,7 @@ function goalsCard() {
 function renderProgress() {
   const head = `<div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
     <div class="seg" role="group" aria-label="What to show">${PROG_VIEWS.map(([k, l]) => `<button class="${S.progView === k ? 'on' : ''}" data-action="progView" data-v="${k}" aria-pressed="${S.progView === k}">${l}</button>`).join('')}</div>`;
-  if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${goalsCard()}</div>`;
+  if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${recoveryCard()}${goalsCard()}</div>`;
   if (S.progView === 'baseball') return `<div class="page">${head}${testsCard()}${armCard()}${throwCard()}</div>`;
   const mode = S.settings.mode, m = MODES[mode];
   const ws = S.workouts.filter(w => w.mode === mode);
