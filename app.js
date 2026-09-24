@@ -2388,6 +2388,39 @@ changes.gameTime = el => {
   render();
 };
 
+// ----- The week ahead: planned meals for the next 7 days + one shopping list -----
+function planForDate(date) {
+  if (date === ymd()) return buildMealPlan(mealPlanToday());
+  return buildMealPlan({ date, kind: dayPlan(dayIdx(parseYmd(date))).type === 'rest' ? 'rest' : 'training', seed: 0, swaps: {} });
+}
+const nextWeek = () => Array.from({ length: 7 }, (_, i) => ymd(addDays(new Date(), i)));
+actions.weekMeals = () => openSheet('The week ahead', `${nextWeek().map((d, i) => `
+  <div class="section-title">${i ? fmtDate(parseYmd(d), { weekday: 'long', month: 'short', day: 'numeric' }) : 'Today'}</div>
+  <div>${planForDate(d).map(x => `<button class="lib-row" data-action="openRecipe" data-id="${x.r.id}" data-slot="${x.slot}" data-servings="${x.servings}">
+    <span class="grow"><b>${esc(x.r.name)}</b><small>${MEAL_LABEL[x.slot]} · ${servingsText(x.servings)} · ${fmt(x.r.cal * x.servings)} cal</small></span>${icon('right', 'sm')}</button>`).join('')}</div>`).join('')}
+  <p class="hint">Days follow your workout plan (training or rest). Game days and swaps are set day by day in the Meals view.</p>
+  <button class="btn btn-primary btn-block" data-action="shopList">${icon('check', 'sm')} Shopping list for the week</button>`);
+function weekShopping() {
+  const need = {};
+  for (const d of nextWeek()) for (const x of planForDate(d)) need[x.r.id] = (need[x.r.id] || 0) + x.servings;
+  return Object.entries(need).map(([id, servings]) => { const r = RECIPE_BY_ID[id]; return { r, servings, batches: Math.max(1, Math.ceil(servings / r.makes)) }; });
+}
+actions.shopList = () => {
+  const list = weekShopping();
+  openSheet('Shopping list', `<p class="text-2 small">Everything for the next 7 days of your meal plan, recipe by recipe. Check things off as you shop.</p>
+    ${list.map(({ r, servings, batches }) => `<div class="shop-recipe">
+      <div class="bold">${esc(r.name)}</div>
+      <div class="small muted">${fmt(servings, 1)} serving${servings === 1 ? '' : 's'} this week${r.makes > 1 ? ` · recipe makes ${r.makes}${batches > 1 ? ` — make it ${batches} times` : ''}` : batches > 1 ? ` — buy for ${batches}` : ''}</div>
+      ${r.ing.map(g => `<label class="check-line shop-item"><input type="checkbox"> <span>${esc(g)}</span></label>`).join('')}
+    </div>`).join('')}
+    <button class="btn btn-ghost btn-block" data-action="copyShopList">${icon('copy', 'sm')} Copy list (paste into Notes)</button>`);
+};
+actions.copyShopList = async () => {
+  const text = weekShopping().map(({ r, batches }) => `${r.name}${batches > 1 ? ` (×${batches})` : ''}\n${r.ing.map(g => `- ${g}`).join('\n')}`).join('\n\n');
+  try { await navigator.clipboard.writeText(text); toast('Shopping list copied'); }
+  catch (e) { toast("Couldn't copy — take a screenshot instead"); }
+};
+
 const servingsText = n => `${fmt(n, 1)} serving${n === 1 ? '' : 's'}`;
 const loggedToday = (slot, name) => S.meals.some(m => m.date === ymd() && m.meal === slot && normName(m.name) === normName(name));
 
@@ -2421,6 +2454,7 @@ function dietMeals() {
       <div class="stack-sm">${rows}</div>
       ${mp.kind === 'game' ? gameTimeline(mp, items) : ''}
       <div class="plan-total"><span>Plan total</span><span><b>${fmt(cal)}</b> cal · <b>${fmt(pro)}</b> g protein</span></div>
+      <button class="btn btn-ghost btn-block" data-action="weekMeals">${icon('plan', 'sm')} The week ahead + shopping list</button>
       <p class="hint">Sized to your goal of ${fmt(calGoal)} cal · ${fmt(proteinGoal)} g protein.${pro < proteinGoal - 15 ? ' Short on protein? Add a shake or a Greek yogurt bowl.' : ''} Tap a meal for the recipe and to log it; tap ${icon('refresh', 'sm')} to swap it.</p>
     </section>
 

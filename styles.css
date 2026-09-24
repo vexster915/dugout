@@ -422,6 +422,12 @@ i.t-rest { background: var(--muted); }
 .tl-row b { color: var(--text); }
 .tl-row small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
 
+/* Shopping list */
+.shop-recipe { display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-top: 1px solid var(--line); }
+.shop-item { min-height: 36px; font-weight: 600; font-size: 15px; color: var(--text-2); align-items: flex-start; gap: 10px; padding-top: 6px; }
+.shop-item input { margin-top: 1px; flex: none; }
+.shop-item input:checked + span { text-decoration: line-through; opacity: 0.5; }
+
 /* Programs sheet */
 .program.current { border-color: var(--accent); }
 
