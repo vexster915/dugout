@@ -207,7 +207,8 @@ const DEFAULT_SETTINGS = {
   program: 'offseason',   // which starting plan (plan.js PROGRAMS) resets go back to
   profile: null,          // goal calculator answers: { sex, age, ft, inch, cm, weight, activity, goal }
   badges: null,           // badge ids already celebrated
-  reviewSeen: ''          // week (Monday "YYYY-MM-DD") whose review card you closed
+  reviewSeen: '',         // week (Monday "YYYY-MM-DD") whose review card you closed
+  seenVersion: ''         // last "What's new" shown
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -3806,6 +3807,27 @@ async function openApp(newUsername) {
   S.tab = 'today';
   render({ keepScroll: false });
   if (S.active) keepAwake(true);
+  if (S.settings.seenVersion !== WHATS_NEW) {                 // after an update: show what's new (once)
+    const hadData = S.workouts.length || S.meals.length;
+    S.settings.seenVersion = WHATS_NEW;
+    await DB.set('settings', S.settings);
+    if (hadData && !S.active) whatsNew();
+  }
+}
+
+// ----- What's new (shown once after an update to people who already use the app) -----
+const WHATS_NEW = '2.0';
+function whatsNew() {
+  const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
+  openSheet("What's new in Dugout 2.0", `
+    ${item('diet', 'Easier food logging', 'Search 142 foods, pick servings, and track carbs and fat. Recent foods and "copy yesterday" save taps.')}
+    ${item('flame', 'Goals made for you', 'Calculate calories, protein and water from your size and training. Track water and body weight.')}
+    ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 35 recipes, a game-day timeline, the week ahead and a shopping list.')}
+    ${item('dumbbell', 'Smarter workouts', 'How-tos for every exercise, a library, swaps, next-weight tips, warm-up sets, a plate calculator and effort notes.')}
+    ${item('plan', 'In-season program', 'Switch programs on the Plan tab: two short lifts a week to stay strong during the season.')}
+    ${item('timer', 'Baseball tests and arm care', 'Progress → Baseball: 60-yard, exit velo and more, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
+    ${item('trophy', 'Stay on track', 'Daily readiness check-in, a weekly review, a training calendar, badges and spreadsheet export.')}
+    <button class="btn btn-primary btn-block" data-action="closeSheet">Let's go</button>`);
 }
 
 submits.createLogin = async f => {

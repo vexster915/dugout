@@ -428,6 +428,11 @@ i.t-rest { background: var(--muted); }
 .shop-item input { margin-top: 1px; flex: none; }
 .shop-item input:checked + span { text-decoration: line-through; opacity: 0.5; }
 
+/* What's new */
+.new-item { display: flex; gap: 14px; align-items: flex-start; }
+.new-item > .i { color: var(--accent); margin-top: 2px; }
+.new-item b { display: block; margin-bottom: 2px; }
+
 /* Programs sheet */
 .program.current { border-color: var(--accent); }
 
