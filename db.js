@@ -14,13 +14,15 @@
                + "vault" (the locked key) and "lockout" (wrong-password counter)
      workouts  finished workouts (encrypted)
      meals     food log entries (encrypted)
-     foods     saved favorite foods (encrypted) */
+     foods     saved favorite foods (encrypted)
+     logs      everything else you track by date (encrypted): body weight, water, test results,
+               throwing sessions… each record has a "kind" */
 
 const DB = (() => {
   const NAME = 'dugout';
-  const VERSION = 1;
-  const STORES = ['kv', 'workouts', 'meals', 'foods'];
-  const DATA_STORES = ['workouts', 'meals', 'foods'];
+  const VERSION = 2;                              // 2 = added the "logs" store
+  const STORES = ['kv', 'workouts', 'meals', 'foods', 'logs'];
+  const DATA_STORES = ['workouts', 'meals', 'foods', 'logs'];
   const RAW_KEYS = ['vault', 'lockout'];          // kv entries that are not encrypted (no personal data)
   const ITERATIONS = 600000;
   const enc = new TextEncoder(), dec = new TextDecoder();

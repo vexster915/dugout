@@ -1,7 +1,7 @@
 {
   "name": "Dugout — Baseball Training",
   "short_name": "Dugout",
-  "description": "Baseball strength, power, agility and diet tracker. Works offline.",
+  "description": "Baseball training: workouts, arm care, meal plans, recipes and progress tracking. Works offline.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
