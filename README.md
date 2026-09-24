@@ -12,7 +12,7 @@ Everything is stored only on your phone, encrypted with your login, and it works
 - Daily readiness check-in (sleep, energy, soreness)
 
 **Eat**
-- Food log with a built-in list of 142 common foods, favorites, servings, calories, protein, carbs and fat
+- Food log with a built-in list of 169 common foods, favorites, servings, calories, protein, carbs and fat
 - Goal calculator for calories, protein, carbs, fat and water
 - Daily meal plan sized to your goals (training, rest and game days) and 45 athlete recipes
 - Water tracker and "eating for baseball" tips

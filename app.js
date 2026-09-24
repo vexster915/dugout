@@ -3758,7 +3758,7 @@ const HELP = [
   ['Your day in Dugout', ['Open the Today tab: it shows today\'s workout, a quick check-in, your nutrition, water and what to eat next.',
     'Tap Start to begin a workout. Check off each set — the rest timer starts on its own, and your weights from last time are filled in.',
     'Tap ▶ on any exercise for a form video, step-by-step how-to, common mistakes and easier or harder versions.']],
-  ['Logging food fast', ['Type a few letters to search 142 common foods, your favorites and anything you logged before. Change Servings and the numbers update.',
+  ['Logging food fast', ['Type a few letters to search 169 common foods, your favorites and anything you logged before. Change Servings and the numbers update.',
     'Use the Recent row, Favorites, the + on a meal, or "Copy yesterday\'s food" to log in one tap.',
     'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
   ['Setting your goals', ['Settings → Calculate my goals turns your age, size, training and goal into calories, protein, carbs, fat and water.',
@@ -4028,7 +4028,7 @@ const WHATS_NEW = '2.0';
 function whatsNew() {
   const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
   openSheet("What's new in Dugout 2.0", `
-    ${item('diet', 'Easier food logging', 'Search 142 foods, pick servings, and track carbs and fat. Recent foods and "copy yesterday" save taps.')}
+    ${item('diet', 'Easier food logging', 'Search 169 foods, pick servings, and track carbs and fat. Recent foods and "copy yesterday" save taps.')}
     ${item('flame', 'Goals made for you', 'Calculate calories, protein and water from your size and training. Track water and body weight.')}
     ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 45 recipes, a game-day timeline, the week ahead and a shopping list.')}
     ${item('dumbbell', 'Smarter workouts', 'How-tos for every exercise, a library, swaps, next-weight tips, warm-up sets, a plate calculator and effort notes.')}
