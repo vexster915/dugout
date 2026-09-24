@@ -132,7 +132,8 @@ h1, h2, h3, h4, p { margin: 0; }
 .spread { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .stack-sm { display: flex; flex-direction: column; gap: 6px; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.grid2 > .btn, .sheet-actions > .btn { white-space: normal; text-align: center; line-height: 1.2; padding: 6px 10px; }
 .wrap { flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 .center { text-align: center; }
