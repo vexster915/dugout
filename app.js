@@ -732,6 +732,9 @@ function renderWorkout() {
       <div class="wo-bar"><span id="wo-bar" style="width:${total ? (done / total) * 100 : 0}%"></span></div>
     </div>
     <div class="wo-list">
+      ${Date.now() - (a.lastAt || a.startedAt) > 4 * 3600000 ? `<div class="banner warn">${icon('clock')}
+        <div class="grow">Started ${fmtDate(new Date(a.startedAt), { weekday: 'short', hour: 'numeric', minute: '2-digit' })}. Forgot to finish? Your time is saved up to your last set.</div>
+        <button class="btn btn-sm btn-primary" data-action="finishWorkout">Finish</button></div>` : ''}
       ${a.exercises.map((e, i) => woExercise(e, i, i === open)).join('')}
       <button class="btn btn-ghost btn-block" data-action="addWorkoutExercise">${icon('plus')} Add exercise</button>
       <button class="btn btn-primary btn-xl" data-action="finishWorkout">${icon('check')} Finish workout</button>
@@ -919,6 +922,7 @@ actions.toggleSet = el => {
   const row = document.getElementById(`set-${i}-${j}`);
   if (row) $$('[data-f]', row).forEach(inp => { s[inp.dataset.f] = num(inp.value); });
   s.done = !s.done;
+  if (s.done) S.active.lastAt = Date.now();     // when you really finished (for workouts you forget to close)
   if (s.done && s.r == null) {
     // Nothing typed? Log the grey hint (last time / target). Sprint times are never guessed.
     const autoFill = e.track === 'weight' || e.track === 'reps' || (e.track === 'time' && repSeconds(e.reps) != null);
@@ -1063,6 +1067,8 @@ async function endWorkout(keep) {
   let prs = [];
   if (keep) {
     a.finishedAt = Date.now();
+    // Forgot to tap Finish? End the workout a minute after your last checked set instead of now.
+    if (a.lastAt && a.finishedAt - a.lastAt > 3 * 3600000) a.finishedAt = a.lastAt + 60000;
     prs = findPRs(a);
     S.workouts.unshift(a);
     await save(() => DB.put('workouts', a));
@@ -1644,7 +1650,8 @@ function dietDay() {
       ${list.map(mealRow).join('')}
     </div>`;
   }).join('');
-  const favs = sortedFavs();
+  const favs = sortedFavs(), recent = recentFoods();
+  const prevKey = ymd(addDays(d, -1)), prev = meals.length ? [] : S.meals.filter(m => m.date === prevKey);
   return `
     <div class="date-nav">
       <button class="btn btn-icon btn-ghost" data-action="dietStep" data-d="-1" aria-label="Previous day">${icon('left')}</button>
@@ -1666,8 +1673,10 @@ function dietDay() {
     </div>
     ${favs.length ? `<div class="fav-row">${favs.map(favCard).join('')}</div>`
       : `<p class="hint" style="margin:0 4px">Save foods you eat often as favorites, then log them with one tap.</p>`}
+    ${recent.length ? `<div class="section-title">Recent</div><div class="fav-row">${recent.map(recentCard).join('')}</div>` : ''}
     <div class="section-title">${isToday ? "Today's food" : 'Food log'}</div>
-    ${groups || `<div class="empty">Nothing logged ${isToday ? 'yet today' : 'on this day'}.</div>`}`;
+    ${groups || `<div class="empty">Nothing logged ${isToday ? 'yet today' : 'on this day'}.</div>`}
+    ${prev.length ? `<button class="btn btn-ghost btn-block" data-action="copyDay" data-from="${prevKey}">${icon('copy', 'sm')} Copy ${fmtDate(parseYmd(prevKey), { weekday: 'long' })}'s food (${prev.length} item${prev.length === 1 ? '' : 's'})</button>` : ''}`;
 }
 
 // "1.5 × 1 cup", "2 servings" or nothing for a single plain serving
@@ -1685,6 +1694,48 @@ const favCard = f => `<div class="fav">
   </div>
   <button class="btn btn-sm btn-primary" data-action="favLog" data-id="${f.id}" aria-label="Log ${esc(f.name)}">${icon('plus', 'sm')} Log</button>
 </div>`;
+
+// Foods you logged recently that aren't favorites — tap + to log the same thing again.
+function recentFoods() {
+  const seen = new Set(sortedFavs().map(f => normName(f.name))), out = [];
+  for (const m of [...S.meals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) {
+    const k = normName(m.name);
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(m);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+const recentCard = m => `<div class="fav">
+  <div data-action="editMeal" data-id="${m.id}" role="button" tabindex="0" aria-label="See ${esc(m.name)}">
+    <div class="fav-name">${esc(m.name)}</div>
+    <div class="fav-meta">${fmt(m.cal)} cal · ${fmt(m.pro, 1)} g${servingText(m) ? ` · ${esc(servingText(m))}` : ''}</div>
+  </div>
+  <button class="btn btn-sm btn-ghost" data-action="relog" data-id="${m.id}" aria-label="Log ${esc(m.name)} again">${icon('plus', 'sm')} Log</button>
+</div>`;
+const copyMeal = (m, date) => ({ ...m, id: uid(), date, createdAt: Date.now() });
+actions.relog = el => {
+  const src = S.meals.find(x => x.id === el.dataset.id);
+  if (!src) return;
+  const m = { ...copyMeal(src, S.dietDate), time: nowHHMM(), meal: guessMeal() };
+  S.meals.push(m);
+  save(() => DB.put('meals', m));
+  render();
+  toast(`Logged ${m.name}`, { action: () => removeMeal(m.id) });
+};
+actions.copyDay = el => {
+  const copies = S.meals.filter(m => m.date === el.dataset.from).map(m => copyMeal(m, S.dietDate));
+  if (!copies.length) return;
+  S.meals.push(...copies);
+  save(() => DB.putMany('meals', copies));
+  render();
+  toast(`Copied ${copies.length} item${copies.length === 1 ? '' : 's'}`, { action: () => {
+    const ids = new Set(copies.map(c => c.id));
+    S.meals = S.meals.filter(m => !ids.has(m.id));
+    copies.forEach(c => save(() => DB.remove('meals', c.id)));
+    render();
+  } });
+};
 
 actions.dietStep = el => {
   const d = ymd(addDays(parseYmd(S.dietDate), Number(el.dataset.d)));
