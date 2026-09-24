@@ -11,7 +11,7 @@
 
 'use strict';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -169,11 +169,15 @@ const DEFAULT_SETTINGS = {
   sound: true,
   keepAwake: true,
   lastBackup: null,
-  installHintDismissed: false
+  installHintDismissed: false,
+  username: '',
+  autoLock: 5             // minutes in the background before Dugout locks itself
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
 const S = {
+  locked: true,        // nothing is shown or loaded until you sign in
+  vault: null,         // your saved (locked) login, or null if none has been created yet
   tab: 'today',
   settings: { ...DEFAULT_SETTINGS },
   plan: null,          // { gym: [7 days], home: [7 days] }
@@ -194,8 +198,9 @@ const S = {
 };
 
 async function save(work) {
+  if (S.locked) return;
   try { await work(); }
-  catch (err) { console.error(err); toast('Could not save: ' + (err.message || err)); }
+  catch (err) { if (S.locked) return; console.error(err); toast('Could not save: ' + (err.message || err)); }
 }
 const saveSettings = () => save(() => DB.set('settings', S.settings));
 const savePlan = () => save(() => DB.set('plan', S.plan));
@@ -248,8 +253,16 @@ function renderTabbar() {
 }
 
 function render({ keepScroll = true } = {}) {
-  document.body.dataset.mode = S.active ? S.active.mode : S.settings.mode;
   const view = $('#view');
+  if (S.locked) {                        // signed out: show only the login screen
+    document.body.dataset.mode = 'gym';
+    $('#tabbar').hidden = true;
+    view.innerHTML = renderAuth();
+    view.scrollTop = 0;
+    return;
+  }
+  $('#tabbar').hidden = false;
+  document.body.dataset.mode = S.active ? S.active.mode : S.settings.mode;
   const top = view.scrollTop;
   const views = { today: renderToday, plan: renderPlan, diet: renderDiet, progress: renderProgress, settings: renderSettings };
   view.innerHTML = views[S.tab]();
@@ -1084,8 +1097,14 @@ async function keepAwake(on) {
   } catch (e) { /* not supported here — that's fine */ }
 }
 
+// Auto-lock: if Dugout sat in the background longer than your Auto-lock setting, sign out.
+let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') return;
+  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+  const away = hiddenAt ? Date.now() - hiddenAt : 0;
+  hiddenAt = 0;
+  if (S.locked) return;
+  if (away && away >= (S.settings.autoLock ?? 5) * 60000) { lockApp(); return; }
   if (S.active) keepAwake(true);
   try { if (audioCtx && audioCtx.state !== 'running') audioCtx.resume(); } catch (e) { /* ignore */ }
   timerTick();
@@ -1953,6 +1972,15 @@ function renderSettings() {
   return `<div class="page">
     <div class="page-head"><div><div class="eyebrow">Dugout ${APP_VERSION}</div><h1 class="page-title">Settings</h1></div></div>
 
+    <div class="section-title">Security</div>
+    <div class="set-list">
+      <div class="set-item"><div class="grow"><div>Signed in as ${esc(st.username || 'you')}</div><div class="hint">Everything on this phone is encrypted (AES-256)</div></div>${icon('shield')}</div>
+      <div class="set-item"><div class="grow"><div>Auto-lock</div><div class="hint">After Dugout has been in the background</div></div>
+        <div class="field" style="width:150px"><select data-change="setAutoLock" aria-label="Auto-lock">${AUTOLOCK.map(([v, l]) => `<option value="${v}" ${Number(st.autoLock) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+      <button class="set-item as-btn" data-action="changeLogin"><div class="grow"><div>Change username or password</div></div>${icon('edit')}</button>
+      <button class="set-item as-btn" data-action="lockNow"><div class="grow"><div>Lock now</div><div class="hint">Sign out until you enter your password again</div></div>${icon('shield')}</button>
+    </div>
+
     <div class="section-title">Training</div>
     <div class="set-list">
       <div class="set-item"><div class="grow"><div>Workout time</div><div class="hint">Shown on the Today screen</div></div>
@@ -1976,7 +2004,7 @@ function renderSettings() {
     <div class="card stack">
       <div class="row" style="align-items:flex-start">${icon('shield')}<div class="grow">
         <div class="bold">${last}</div>
-        <div class="hint">Everything is stored only on this phone. About once a week, tap Export and choose <b>Save to Files</b> (iCloud Drive) or email it to yourself. Import brings it all back — even on a new phone.</div>
+        <div class="hint">Everything is stored only on this phone. About once a week, tap Export and choose <b>Save to Files</b> (iCloud Drive) or email it to yourself. Backup files are encrypted — opening one needs your username and password. Import brings it all back, even on a new phone.</div>
       </div></div>
       <button class="btn btn-primary btn-block" data-action="exportBackup">${icon('download', 'sm')} Export backup</button>
       <label class="btn btn-ghost btn-block" for="import-file">${icon('upload', 'sm')} Import backup</label>
@@ -1999,7 +2027,7 @@ function renderSettings() {
 
     <div class="section-title">Danger zone</div>
     <button class="btn btn-danger btn-block" data-action="eraseAll">${icon('trash', 'sm')} Erase all data on this phone</button>
-    <p class="hint center">No account · no ads · works offline</p>
+    <p class="hint center">No ads · works offline · encrypted on this phone</p>
   </div>`;
 }
 
@@ -2047,7 +2075,9 @@ function markBackedUp() {
 }
 actions.exportBackup = async () => {
   const name = `dugout-backup-${ymd()}.json`;
-  const json = JSON.stringify(backupData());
+  let json;
+  try { json = JSON.stringify(await DB.sealBackup(backupData())); }      // encrypted with your login
+  catch (e) { toast('Backup failed: ' + (e.message || e)); return; }
   let file = null;
   try { file = new File([json], name, { type: 'application/json' }); } catch (e) { /* very old browser */ }
   // iPhone: opens the Share sheet → "Save to Files", AirDrop, Mail…
@@ -2072,26 +2102,61 @@ actions.exportBackup = async () => {
   markBackedUp();
 };
 
+let pendingBackup = null;
 changes.importFile = async el => {
   const file = el.files && el.files[0];
   if (!file) return;
   let data;
   try { data = JSON.parse(await file.text()); } catch (e) { data = null; }
   el.value = '';
-  if (!data || data.app !== 'dugout' || typeof data.kv !== 'object') { toast("That file isn't a Dugout backup"); return; }
+  if (!data || data.app !== 'dugout') { toast("That file isn't a Dugout backup"); return; }
+  if (data.format === 2) {
+    // Encrypted backup. Made on this phone? It opens with the key you're signed in with.
+    let plain = null;
+    try { plain = await DB.openBackup(data); } catch (e) { /* made with a different login */ }
+    if (plain) { confirmRestore(plain); return; }
+    pendingBackup = data;
+    openSheet('Backup login', `<form class="form" novalidate data-submit="backupLogin">
+      <p class="text-2">This backup was made with a different login (or on another phone). Enter the username and password that were used when it was made.</p>
+      <label class="field"><span>Username</span><input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="40"></label>
+      <label class="field"><span>Password</span><input name="password" type="password" autocomplete="current-password" maxlength="128" data-pw></label>
+      <div class="auth-error" role="alert"></div>
+      <button class="btn btn-primary btn-block" type="submit">Open backup</button>
+    </form>`);
+    return;
+  }
+  if (typeof data.kv !== 'object') { toast("That file isn't a Dugout backup"); return; }
+  confirmRestore(data);          // an older, unencrypted backup from version 1.0
+};
+submits.backupLogin = async f => {
+  const d = formData(f);
+  setBusy(f, true, 'Opening…');
+  try {
+    const plain = await DB.openBackup(pendingBackup, d.username || '', d.password || '');
+    pendingBackup = null;
+    confirmRestore(plain);
+  } catch (e) {
+    setBusy(f, false);
+    f.querySelector('.auth-error').textContent = e && e.name === 'OperationError' ? 'Wrong username or password for this backup.' : 'Could not open backup: ' + (e.message || e);
+  }
+};
+async function confirmRestore(data) {
   const when = data.exportedAt ? new Date(data.exportedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'an unknown date';
   const counts = `${(data.workouts || []).length} workouts and ${(data.meals || []).length} food entries`;
-  if (!(await confirmBox('Restore this backup?', `Backup from ${when} with ${counts}. It REPLACES everything currently in the app on this phone.`, { ok: 'Restore', danger: true }))) return;
+  if (!(await confirmBox('Restore this backup?', `Backup from ${when} with ${counts}. It REPLACES everything currently in the app on this phone. Your login stays the same.`, { ok: 'Restore', danger: true }))) return;
   try {
     stopTimer();
-    await DB.importAll(data);
+    const username = S.settings.username;
+    const kv = { ...(data.kv || {}) };
+    kv.settings = { ...(kv.settings || {}), username };      // keep this phone's login name
+    await DB.replaceAll({ ...data, kv });
     await loadAll();
     render({ keepScroll: false });
     toast('Backup restored');
   } catch (e) {
     toast('Restore failed: ' + (e.message || e));
   }
-};
+}
 
 actions.resetPlan = async el => {
   const mode = el.dataset.mode, label = MODES[mode].label;
@@ -2123,13 +2188,16 @@ actions.installHelp = () => openSheet('Install on iPhone', `
   <button class="btn btn-primary btn-block" data-action="closeSheet">Got it</button>`);
 
 actions.eraseAll = async () => {
-  if (!(await confirmBox('Erase everything?', 'Deletes all workouts, food logs, favorites, settings and plan changes from this phone. This cannot be undone — export a backup first if you might want it.', { ok: 'Erase', danger: true }))) return;
+  if (!(await confirmBox('Erase everything?', 'Deletes all workouts, food logs, favorites, settings and plan changes from this phone (your login stays). This cannot be undone — export a backup first if you might want it.', { ok: 'Erase', danger: true }))) return;
   if (!(await confirmBox('Are you sure?', 'Last chance. Everything will be erased.', { ok: 'Yes, erase all', danger: true }))) return;
   try {
     stopTimer();
     keepAwake(false);
-    await DB.eraseAll();
+    const username = S.settings.username;
+    await DB.eraseData();
     await loadAll();
+    S.settings.username = username;
+    await DB.set('settings', S.settings);
     S.tab = 'today';
     render({ keepScroll: false });
     toast('All data erased');
@@ -2161,8 +2229,10 @@ async function loadAll() {
 }
 
 async function boot() {
+  // Refuse to run inside another website's frame (blocks "clickjacking" tricks).
+  if (window.top !== window.self) { document.body.innerHTML = ''; return; }
   try {
-    await loadAll();
+    S.vault = await DB.getRaw('vault');
   } catch (err) {
     console.error(err);
     $('#view').innerHTML = `<div class="page"><div class="card stack">
@@ -2172,12 +2242,13 @@ async function boot() {
     </div></div>`;
     return;
   }
-  render({ keepScroll: false });
-  if (S.active) keepAwake(true);
+  S.locked = true;
+  render({ keepScroll: false });       // shows "Sign in" (or "Create your login" the first time)
 
   // Every second: tick the workout clock. Every 30 s: refresh Today's countdown (and the date after midnight).
   let ticks = 0, shownDay = ymd();
   setInterval(() => {
+    if (S.locked) return;
     ticks++;
     if (S.active) {
       const c = $('#wo-clock');
@@ -2201,5 +2272,185 @@ async function boot() {
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Offline mode unavailable:', err));
   }
 }
+
+/* ============================== 12. SIGN-IN ============================== */
+
+const AUTOLOCK = [[0, 'Immediately'], [1, '1 minute'], [5, '5 minutes'], [15, '15 minutes'], [60, '1 hour']];
+const MAX_TRIES = 5;
+
+function renderAuth() {
+  const setup = !S.vault;
+  return `<div class="auth">
+    <div class="auth-brand"><img class="auth-logo" src="icon-192.png" alt=""><div class="day-title">Dugout</div></div>
+    <form class="card form" novalidate data-submit="${setup ? 'createLogin' : 'signIn'}">
+      <div>
+        <h1 class="auth-title">${setup ? 'Create your login' : 'Sign in'}</h1>
+        <p class="hint">${setup
+          ? "Pick a username and password. You'll need them every time you open Dugout, and all your data gets encrypted with them."
+          : 'Your workouts and food log are locked and encrypted on this phone.'}</p>
+      </div>
+      <label class="field"><span>Username</span>
+        <input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="40"></label>
+      <label class="field"><span>Password</span>
+        <input name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" maxlength="128" data-pw></label>
+      ${setup ? `<label class="field"><span>Confirm password</span>
+        <input name="confirm" type="password" autocomplete="new-password" maxlength="128" data-pw></label>` : ''}
+      <label class="check-line"><input type="checkbox" data-change="showPw"> Show password</label>
+      <div class="auth-error" role="alert"></div>
+      <button class="btn btn-primary btn-xl" type="submit">${setup ? 'Create login' : 'Sign in'}</button>
+      ${setup
+        ? `<div class="banner warn">${icon('shield')}<div>There's no password reset — without your password, nobody (not even you) can unlock the data. Let your iPhone save it in Passwords, or write it down somewhere safe.</div></div>`
+        : `<button type="button" class="btn-link" data-action="forgotPw">Forgot password?</button>`}
+    </form>
+  </div>`;
+}
+
+changes.showPw = el => { $$('[data-pw]', el.form).forEach(i => { i.type = el.checked ? 'text' : 'password'; }); };
+
+function setBusy(f, busy, label) {
+  const b = f.querySelector('button[type="submit"]');
+  if (!b) return;
+  if (busy) { b.dataset.label = b.textContent; b.textContent = label; b.disabled = true; }
+  else { if (b.dataset.label) b.textContent = b.dataset.label; b.disabled = false; }
+}
+function authError(f, msg) { const e = f.querySelector('.auth-error'); if (e) e.textContent = msg; }
+const waitText = ms => { const s = Math.ceil(ms / 1000); return s < 90 ? `${s} seconds` : `${Math.ceil(s / 60)} minutes`; };
+
+function checkNewLogin(f, user, pass, confirm) {
+  if (user.length < 3) { authError(f, 'Username needs at least 3 characters.'); return false; }
+  if (pass.length < 8) { authError(f, 'Password needs at least 8 characters — longer is stronger.'); return false; }
+  if (pass !== confirm) { authError(f, "The two passwords don't match."); return false; }
+  return true;
+}
+
+// Unlocked: encrypt anything left over from version 1.0, load your data, show the app.
+async function openApp(newUsername) {
+  await DB.encryptOldData();
+  await loadAll();
+  if (newUsername) { S.settings.username = newUsername; await DB.set('settings', S.settings); }
+  S.locked = false;
+  S.tab = 'today';
+  render({ keepScroll: false });
+  if (S.active) keepAwake(true);
+}
+
+submits.createLogin = async f => {
+  const d = formData(f);
+  const user = String(d.username || '').trim(), pass = String(d.password || '');
+  if (!checkNewLogin(f, user, pass, String(d.confirm || ''))) return;
+  setBusy(f, true, 'Securing your data…');
+  try {
+    S.vault = await DB.createVault(user, pass);
+    await openApp(user);
+    toast('Login created — your data is encrypted');
+  } catch (e) {
+    setBusy(f, false);
+    authError(f, 'Could not create your login: ' + (e.message || e));
+  }
+};
+
+submits.signIn = async f => {
+  const d = formData(f);
+  if (!d.username || !d.password) { authError(f, 'Enter your username and password.'); return; }
+  const lock = await DB.getRaw('lockout');
+  if (lock && lock.until > Date.now()) { authError(f, `Too many wrong tries. Try again in ${waitText(lock.until - Date.now())}.`); return; }
+  setBusy(f, true, 'Unlocking…');
+  try {
+    await DB.unlock(d.username, d.password);
+  } catch (e) {
+    setBusy(f, false);
+    if (e && e.name === 'OperationError') {           // the key didn't unlock = wrong username or password
+      const next = await recordFailedSignIn(lock);
+      f.elements.password.value = '';
+      authError(f, next.until > Date.now()
+        ? `Wrong username or password. Too many tries — wait ${waitText(next.until - Date.now())}.`
+        : 'Wrong username or password.');
+    } else {
+      authError(f, 'Could not unlock: ' + (e.message || e));
+    }
+    return;
+  }
+  await DB.delRaw('lockout');
+  await openApp();
+};
+
+// After 5 wrong tries in a row, make people wait: 30 seconds, then doubling up to 1 hour.
+async function recordFailedSignIn(prev) {
+  const fails = ((prev && prev.fails) || 0) + 1;
+  const until = fails >= MAX_TRIES ? Date.now() + Math.min(3600, 30 * 2 ** (fails - MAX_TRIES)) * 1000 : 0;
+  const next = { fails, until };
+  await DB.setRaw('lockout', next);
+  return next;
+}
+
+// Sign out: forget the key and wipe everything from memory.
+async function lockApp(message) {
+  if (S.locked) return;
+  clearTimeout(saveActiveTimer);
+  if (S.active) { try { await DB.set('active', S.active); } catch (e) { /* ignore */ } }
+  stopTimer();
+  keepAwake(false);
+  closeSheet();
+  $('#toast').classList.remove('show');
+  toastAct = null;
+  DB.lock();
+  Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], openEx: null });
+  render();
+  if (message) toast(message);
+}
+actions.lockNow = () => lockApp('Locked');
+
+changes.setAutoLock = el => {
+  S.settings.autoLock = Number(el.value);
+  saveSettings();
+  toast(`Auto-lock: ${(AUTOLOCK.find(a => a[0] === S.settings.autoLock) || AUTOLOCK[2])[1].toLowerCase()}`);
+};
+
+actions.changeLogin = () => openSheet('Change login', `<form class="form" novalidate data-submit="changeLogin">
+  <label class="field"><span>Current password</span><input name="current" type="password" autocomplete="current-password" maxlength="128" data-pw></label>
+  <label class="field"><span>Username</span><input name="username" value="${esc(S.settings.username)}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="40"></label>
+  <label class="field"><span>New password</span><input name="password" type="password" autocomplete="new-password" maxlength="128" data-pw placeholder="Leave blank to keep your current one"></label>
+  <label class="field"><span>Confirm new password</span><input name="confirm" type="password" autocomplete="new-password" maxlength="128" data-pw></label>
+  <label class="check-line"><input type="checkbox" data-change="showPw"> Show passwords</label>
+  <div class="auth-error" role="alert"></div>
+  <button class="btn btn-primary btn-block" type="submit">Save new login</button>
+</form>`);
+submits.changeLogin = async f => {
+  const d = formData(f);
+  const user = String(d.username || '').trim(), cur = String(d.current || '');
+  const pass = d.password ? String(d.password) : cur;
+  if (!cur) { authError(f, 'Enter your current password.'); return; }
+  if (!checkNewLogin(f, user, pass, d.password ? String(d.confirm || '') : pass)) return;
+  setBusy(f, true, 'Saving…');
+  try {
+    S.vault = await DB.changeLogin(S.settings.username, cur, user, pass);
+  } catch (e) {
+    setBusy(f, false);
+    authError(f, e && e.name === 'OperationError' ? 'Your current password is wrong.' : 'Could not change your login: ' + (e.message || e));
+    return;
+  }
+  S.settings.username = user;
+  await save(() => DB.set('settings', S.settings));
+  closeSheet();
+  render();
+  toast('Login updated');
+};
+
+actions.forgotPw = () => openSheet('Forgot your password?', `
+  <p class="text-2">For your security, Dugout can't show or reset your password — your data is encrypted with it, and only it can unlock it.</p>
+  <ul class="steps">
+    <li>Check the <b>Passwords</b> app on your iPhone (or Settings → Passwords) — iOS may have saved it for you.</li>
+    <li>If it's really gone, you can erase everything on this phone and start again with a new login.</li>
+  </ul>
+  <button class="btn btn-danger btn-block" data-action="resetEverything">${icon('trash', 'sm')} Erase everything and start over</button>`);
+actions.resetEverything = async () => {
+  if (!(await confirmBox('Erase everything?', 'All workouts, food logs, favorites, settings and your login will be deleted from this phone. This cannot be undone.', { ok: 'Erase', danger: true }))) return;
+  if (!(await confirmBox('Are you sure?', 'Last chance — everything on this phone will be erased.', { ok: 'Yes, erase everything', danger: true }))) return;
+  await DB.eraseEverything();
+  DB.lock();
+  S.vault = null;
+  render();
+  toast('Erased — create a new login');
+};
 
 boot();
