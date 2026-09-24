@@ -16,6 +16,7 @@ const APP_VERSION = '1.3.0';
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
 if (typeof FOODS === 'undefined') self.FOODS = [];
+if (typeof EXERCISE_INFO === 'undefined') self.EXERCISE_INFO = {};
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -702,9 +703,88 @@ function videoCard(e, i) {
   }
   return `<button class="yt-card" data-action="video" data-src="wo" data-i="${i}" aria-label="Watch the ${esc(e.name)} tutorial">
     <span class="yt-thumb"><img src="${ytThumb(info.id)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="yt-play">${icon('play')}</span></span>
-    <span class="yt-text"><b>Watch form tutorial</b><small>Plays right here · YouTube</small></span>
+    <span class="yt-text"><b>Form video + how-to</b><small>Steps, mistakes, easier and harder versions</small></span>
   </button>`;
 }
+
+// ----- Coaching tips inside the workout -----
+const LOWER_BODY = /leg press|deadlift|squat|lunge|step-up|hip thrust|romanian|rdl|calf|sled|swing/i;
+const roundTo = (v, step) => Math.round(v / step) * step;
+// Beat the top of your rep range on every set at your top weight → time to go up.
+function nextWeight(e, last) {
+  if (e.track !== 'weight' || !last) return null;
+  const target = targetNum(e.reps), sets = last.sets.filter(st => st.w > 0);
+  if (!target || !sets.length) return null;
+  const top = Math.max(...sets.map(st => st.w)), atTop = sets.filter(st => st.w === top);
+  if (!atTop.every(st => (st.r || 0) >= target) || sets.length < Math.min(2, e.sets.length)) return null;
+  const kg = S.settings.unit === 'kg', lower = LOWER_BODY.test(e.name);
+  return { from: top, to: top + (kg ? (lower ? 5 : 2.5) : (lower ? 10 : 5)) };
+}
+// Warm-up ramp for heavy sets (8 reps or fewer): about 45% × 8, 65% × 5, 85% × 3.
+function warmupSets(e, work) {
+  const kg = S.settings.unit === 'kg', target = targetNum(e.reps);
+  if (e.track !== 'weight' || !work || !target || target > 8 || work < (kg ? 40 : 95)) return '';
+  const step = kg ? 2.5 : 5;
+  return [[0.45, 8], [0.65, 5], [0.85, 3]].map(([p, r]) => `${fmt(roundTo(work * p, step), 1)} × ${r}`).join(' · ');
+}
+function coachTips(e, i, last) {
+  if (e.track !== 'weight') return '';
+  const nw = nextWeight(e, last), u = S.settings.unit;
+  const firstW = (e.sets.find(st => st.w > 0) || {}).w;
+  const work = nw ? nw.to : firstW || (last ? Math.max(0, ...last.sets.map(st => st.w || 0)) : 0);
+  const warm = e.sets.some(st => st.done) ? '' : warmupSets(e, work);
+  return `${nw ? `<div class="wo-tip">${icon('up', 'sm')}<span class="grow">Every set hit ${targetNum(e.reps)}+ reps at ${fmt(nw.from, 1)} ${u} last time — try <b>${fmt(nw.to, 1)} ${u}</b> today.</span>
+      <button class="btn btn-sm btn-ghost" data-action="useWeight" data-i="${i}" data-w="${nw.to}">Use it</button></div>` : ''}
+    ${warm ? `<div class="wo-warm"><span class="grow">Warm-up first: <b>${warm}</b></span>
+      <button class="btn-link" data-action="plateCalc" data-w="${work}" data-bar="${barFor(e.name)}">Plates</button></div>` : ''}`;
+}
+// Which bar a lift usually uses (for the plate calculator): machines load plates only.
+const barFor = name => { const kg = S.settings.unit === 'kg'; return /leg press|sled/i.test(name) ? 0 : /trap bar/i.test(name) ? (kg ? 25 : 60) : (kg ? 20 : 45); };
+actions.useWeight = el => {
+  if (!S.active) return;
+  const i = +el.dataset.i, e = S.active.exercises[i], w = num(el.dataset.w);
+  if (!e || w == null) return;
+  e.sets.forEach(st => { if (!st.done) st.w = w; });
+  S.openEx = i; saveActive(); render();
+  toast(`Set to ${fmt(w, 1)} ${S.settings.unit}`);
+};
+
+// ----- Plate calculator -----
+const PLATES = { lb: [45, 35, 25, 10, 5, 2.5], kg: [25, 20, 15, 10, 5, 2.5, 1.25] };
+const BARS = {
+  lb: [[45, 'Barbell (45 lb)'], [35, 'Lighter bar (35 lb)'], [60, 'Trap bar (about 60 lb)'], [0, 'Plates only (leg press, sled)']],
+  kg: [[20, 'Barbell (20 kg)'], [15, 'Lighter bar (15 kg)'], [25, 'Trap bar (about 25 kg)'], [0, 'Plates only (leg press, sled)']]
+};
+function platesFor(total, bar, unit) {
+  let side = (total - bar) / 2;
+  if (!(side >= 0)) return null;
+  const plates = [];
+  for (const p of PLATES[unit]) while (side >= p - 1e-9) { plates.push(p); side -= p; }
+  return { plates, left: Math.round(side * 2 * 100) / 100 };
+}
+function plateOut(f) {
+  const u = S.settings.unit, total = num(f.elements.total.value), bar = num(f.elements.bar.value) || 0;
+  const r = total ? platesFor(total, bar, u) : null;
+  $('.plate-out', f).innerHTML = !total ? '<p class="hint">Enter the total weight you want to lift.</p>'
+    : !r ? `<p class="hint">That's less than the bar (${fmt(bar)} ${u}).</p>`
+    : `<div class="small text-2">On <b>each side</b>:</div>
+      <div class="plates">${r.plates.length ? r.plates.map(p => `<span class="plate" style="--h:${Math.round(40 + (p / PLATES[u][0]) * 44)}px">${fmt(p, 2)}</span>`).join('') : '<span class="hint">No plates — just the bar.</span>'}</div>
+      ${r.left ? `<p class="hint">Can't make exactly ${fmt(total, 1)} ${u} with standard plates — that's ${fmt(total - r.left, 2)} ${u}.</p>` : ''}`;
+}
+actions.plateCalc = el => {
+  const u = S.settings.unit, w = num(el && el.dataset.w), bar = el && el.dataset.bar != null ? num(el.dataset.bar) : null;
+  openSheet('Plate calculator', `<form class="form" novalidate data-submit="noop">
+    <div class="form-grid">
+      <label class="field"><span>Total weight (${u})</span><input name="total" inputmode="decimal" value="${w || ''}" autocomplete="off" data-input="plateCalc"></label>
+      <label class="field"><span>Bar</span><select name="bar" data-change="plateCalc">${BARS[u].map(([v, l]) => `<option value="${v}" ${v === bar ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+    </div>
+    <div class="plate-out"></div>
+  </form>`);
+  plateOut($('#sheet-root form'));
+};
+inputs.plateCalc = el => plateOut(el.form);
+changes.plateCalc = el => plateOut(el.form);
+submits.noop = () => {};
 
 function woExercise(e, i, open) {
   const doneN = e.sets.filter(s => s.done).length;
@@ -730,6 +810,7 @@ function woExercise(e, i, open) {
       ${videoCard(e, i)}
       ${secs && secs <= 600 ? `<div class="wo-tools"><button class="btn btn-sm btn-ghost" data-action="workTimer" data-i="${i}" data-sec="${secs}">${icon('timer', 'sm')} ${restLabel(secs)} timer</button></div>` : ''}
       ${last && e.track !== 'check' ? `<div class="wo-last">Last time (${shortDate(last.date)}): <b>${last.sets.map(s => setText(s, e.track)).join(' · ')}</b></div>` : ''}
+      ${coachTips(e, i, last)}
       <div class="set-grid">${labels}${e.sets.map((s, j) => setRow(e, i, s, j, last)).join('')}</div>
       <div class="row">
         <button class="btn btn-sm btn-ghost grow" data-action="addSet" data-i="${i}">${icon('plus', 'sm')} Add set</button>
@@ -863,6 +944,7 @@ actions.workTimer = el => {
 actions.workoutMenu = () => openSheet('Workout options', `<div class="stack">
   <button class="btn btn-primary btn-block" data-action="finishWorkout">${icon('check', 'sm')} Finish workout</button>
   <button class="btn btn-ghost btn-block" data-action="addWorkoutExercise">${icon('plus', 'sm')} Add an exercise</button>
+  <button class="btn btn-ghost btn-block" data-action="plateCalc">${icon('dumbbell', 'sm')} Plate calculator</button>
   <div class="field"><span>Quick timer</span>
     <div class="chips">${[30, 45, 60, 90, 120, 180].map(s => `<button class="chip" data-action="customTimer" data-s="${s}">${restLabel(s)}</button>`).join('')}</div>
   </div>
@@ -967,12 +1049,40 @@ function showSummary(w, prs) {
       <div class="tile"><div class="tile-label">Volume</div><div class="tile-value">${vol ? `${fmtK(vol)} <small>${S.settings.unit}</small>` : '–'}</div></div>
     </div>
     ${prs.length ? `<div class="card stack-sm"><div class="card-title row">${icon('trophy')} New personal records</div>${prs.map(p => `<div class="small text-2">${esc(p)}</div>`).join('')}</div>` : ''}
+    ${effortBlock(w)}
     <p class="text-2 small">Saved to your history on the Progress tab.</p>
     <div class="sheet-actions">
       <button class="btn btn-ghost" data-action="quickLog">Log a meal</button>
       <button class="btn btn-primary" data-action="closeSheet">Done</button>
     </div>`);
 }
+
+// ----- Effort rating + notes (on the summary and in history) -----
+const EFFORT = ['', 'Very easy', 'Easy', 'Easy', 'Moderate', 'Moderate', 'Hard', 'Hard', 'Very hard', 'Very hard', 'All-out'];
+const effortText = v => (v ? `${v}/10 · ${EFFORT[v]}` : '1 = very easy · 10 = all-out');
+function effortBlock(w) {
+  return `<div class="field"><span>How hard was it? <small class="effort-label">${effortText(w.rpe)}</small></span>
+      <div class="rpe">${Array.from({ length: 10 }, (_, k) => `<button class="rpe-btn ${w.rpe === k + 1 ? 'on' : ''}" data-action="rateWorkout" data-id="${w.id}" data-v="${k + 1}" aria-pressed="${w.rpe === k + 1}">${k + 1}</button>`).join('')}</div></div>
+    <label class="field"><span>Notes</span><textarea data-input="workoutNote" data-id="${w.id}" maxlength="1000" placeholder="How you felt, what to change next time…">${esc(w.notes || '')}</textarea></label>`;
+}
+actions.rateWorkout = el => {
+  const w = S.workouts.find(x => x.id === el.dataset.id);
+  if (!w) return;
+  const v = +el.dataset.v;
+  w.rpe = w.rpe === v ? null : v;
+  save(() => DB.put('workouts', w));
+  const box = el.closest('.field');
+  $$('.rpe-btn', box).forEach(b => { const on = +b.dataset.v === w.rpe; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  $('.effort-label', box).textContent = effortText(w.rpe);
+};
+let noteTimer = null;
+inputs.workoutNote = el => {
+  const w = S.workouts.find(x => x.id === el.dataset.id);
+  if (!w) return;
+  w.notes = el.value.trim();
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => save(() => DB.put('workouts', w)), 400);
+};
 
 // ----- Form videos -----
 let videoRef = null;
@@ -1011,9 +1121,7 @@ function openVideo(ex) {
       <a class="btn btn-primary" href="${esc(link || placeholderVideo(ex.name))}" target="_blank" rel="noopener" data-external>${icon('video', 'sm')} Find a video</a>
     </div>`;
   }
-  openSheet(ex.name, `${top}
-    ${ex.cues ? `<p class="wo-cues">${esc(ex.cues)}</p>` : ''}
-    <form class="form" novalidate data-submit="saveVideo">
+  const form = `<form class="form" novalidate data-submit="saveVideo">
       <label class="field"><span>${info ? 'Swap for a different video' : 'YouTube link'}</span>
         <input name="video" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://youtu.be/…" value="${info ? esc(ex.video) : ''}"></label>
       <div class="sheet-actions">
@@ -1021,8 +1129,56 @@ function openVideo(ex) {
         <button type="submit" class="btn btn-primary">Save link</button>
       </div>
       ${info ? `<a class="btn-link center" href="${esc(link)}" target="_blank" rel="noopener" data-external>Open in YouTube</a>` : ''}
-    </form>`);
+    </form>`;
+  openSheet(ex.name, `${top}
+    ${ex.cues ? `<p class="wo-cues">${esc(ex.cues)}</p>` : ''}
+    ${infoBlock(ex.name)}
+    ${videoRef && videoRef.src === 'wo' ? swapBlock(ex) : ''}
+    ${info ? `<details class="table-toggle"><summary>Use a different video</summary>${form}</details>` : form}`);
 }
+
+// How-to details from exercises.js. A renamed exercise like "Push-ups (weighted)" falls back to "Push-ups".
+const exerciseInfo = name => EXERCISE_INFO[name] || EXERCISE_INFO[String(name || '').replace(/\s*\(.*\)\s*$/, '')] || null;
+function infoBlock(name) {
+  const x = exerciseInfo(name);
+  if (!x) return '';
+  const list = (tag, items) => `<${tag} class="steps">${items.map(t => `<li>${esc(t)}</li>`).join('')}</${tag}>`;
+  return `<div class="ex-info">
+    <div><span class="badge">${icon('dumbbell')} ${esc(x.muscles)}</span></div>
+    <p class="text-2 small"><b>Why it matters:</b> ${esc(x.why)}</p>
+    <div class="section-title">How to do it</div>${list('ol', x.steps)}
+    <div class="section-title">Watch out for</div>${list('ul', x.mistakes)}
+    <div class="grid2">
+      <div class="tile"><div class="tile-label">Easier version</div><div class="small">${esc(x.easier)}</div></div>
+      <div class="tile"><div class="tile-label">Harder version</div><div class="small">${esc(x.harder)}</div></div>
+    </div>
+  </div>`;
+}
+
+// During a workout: swap an exercise for a similar one when the equipment is taken (today only).
+function swapBlock(ex) {
+  const x = exerciseInfo(ex.name);
+  if (!x || !x.swap || !x.swap.length) return '';
+  const started = ex.sets.some(st => st.done);
+  return `<div class="section-title">Equipment taken? Swap it for today</div>
+    <div class="chips">${x.swap.map(n => `<button class="chip" data-action="swapEx" data-name="${esc(n)}" ${started ? 'disabled' : ''}>${esc(n)}</button>`).join('')}</div>
+    <p class="hint">${started ? 'Swapping works before you check off any sets of this exercise.' : "Only changes today's workout — your plan stays the same."}</p>`;
+}
+// How the starting plan sets up an exercise (cues, reps, what to log).
+function planTemplate(name) {
+  for (const mode of ['gym', 'home']) for (const d of DEFAULT_PLAN[mode]) { const e = d.exercises.find(x => x.name === name); if (e) return e; }
+  return null;
+}
+actions.swapEx = el => {
+  if (!S.active || !videoRef || videoRef.src !== 'wo') return;
+  const e = S.active.exercises[videoRef.i], name = el.dataset.name;
+  if (!e || e.sets.some(st => st.done)) return;
+  const t = planTemplate(name), from = e.name;
+  Object.assign(e, { name, planId: null, video: defaultVideo(name), cues: t ? t.cues : '', reps: t ? t.reps : e.reps, rest: t ? t.rest : e.rest, track: t ? t.track : e.track });
+  e.sets = makeSets(e.sets.length, e.track, lastSetsFor(name, S.active.mode));
+  saveActive(); closeSheet(); render();
+  toast(`Swapped ${from} for ${name} (today only)`);
+};
 
 submits.saveVideo = f => {
   const ref = videoRef;
@@ -2464,7 +2620,7 @@ function historyList(ws) {
   return `<div class="stack">${shown.map(w => {
     const vol = volumeOf(w);
     return `<button class="hist" data-action="showWorkout" data-id="${w.id}">
-      <div><div class="hist-title">${esc(w.title)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}</div></div>
+      <div><div class="hist-title">${esc(w.title)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.rpe ? ` · effort ${w.rpe}/10` : ''}${w.notes ? ' · notes' : ''}</div></div>
       <div class="hist-right">${setsDone(w)} sets<small>${vol ? `${fmtK(vol)} ${S.settings.unit}` : ''}</small></div>
     </button>`;
   }).join('')}</div>
@@ -2487,6 +2643,7 @@ actions.showWorkout = el => {
       <div class="bold">${esc(e.name)}</div>
       <div class="detail-sets">${e.sets.map(s => `<span class="${s.done ? '' : 'skip'}">${esc(setText(s, e.track))}</span>`).join('')}</div>
     </div>`).join('')}</div>
+    ${effortBlock(w)}
     <button class="btn btn-danger btn-block" data-action="deleteWorkout" data-id="${w.id}">${icon('trash', 'sm')} Delete this workout</button>`);
 };
 actions.deleteWorkout = async el => {
