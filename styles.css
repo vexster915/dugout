@@ -261,6 +261,12 @@ h1, h2, h3, h4, p { margin: 0; }
 .macro-extra { display: flex; gap: 18px; margin-top: 14px; font-size: 14px; color: var(--text-2); font-weight: 600; }
 .macro-extra span { display: inline-flex; align-items: center; gap: 7px; }
 .macro-extra b { color: var(--text); font-variant-numeric: tabular-nums; }
+.split { display: flex; height: 8px; border-radius: 99px; overflow: hidden; margin-top: 12px; background: var(--surface-3); }
+.split span { display: block; height: 100%; }
+.split .pro { background: var(--pro); }
+.split .carb { background: var(--carb); }
+.split .fat { background: var(--fat); }
+.split-key { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .meter { height: 12px; border-radius: 99px; overflow: hidden; }
 .meter > span { display: block; height: 100%; border-radius: 99px; transition: width 0.4s ease; }
 .meter.cal { background: rgba(217, 89, 38, 0.2); }

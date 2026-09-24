@@ -648,10 +648,14 @@ function macroBlock(t) {
       <div class="macro-val">${fmt(v)}${u ? `<small>${u}</small>` : ''} <small>/ ${fmt(g)}${u}</small></div>
       <div class="meter ${cls}" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct(v, g))}"><span style="width:${pct(v, g)}%"></span></div>
     </div>`;
+  const kc = { pro: t.pro * 4, carb: t.carb * 4, fat: t.fat * 9 }, tot = kc.pro + kc.carb + kc.fat;
+  const split = t.carb || t.fat ? `<div class="split" role="img" aria-label="Calories from protein ${Math.round(kc.pro / tot * 100)}%, carbs ${Math.round(kc.carb / tot * 100)}%, fat ${Math.round(kc.fat / tot * 100)}%">
+      ${['pro', 'carb', 'fat'].map(k => `<span class="${k}" style="width:${(kc[k] / tot) * 100}%"></span>`).join('')}</div>
+    <div class="split-key">${[['pro', 'Protein'], ['carb', 'Carbs'], ['fat', 'Fat']].map(([k, l]) => `<span>${l} ${Math.round((kc[k] / tot) * 100)}%</span>`).join('')}</div>` : '';
   const extra = t.carb || t.fat ? `<div class="macro-extra">
       <span><i class="key carb"></i>Carbs <b>${fmt(t.carb)}${S.settings.carbGoal ? ` / ${fmt(S.settings.carbGoal)}` : ''} g</b></span>
       <span><i class="key fat"></i>Fat <b>${fmt(t.fat)}${S.settings.fatGoal ? ` / ${fmt(S.settings.fatGoal)}` : ''} g</b></span></div>` : '';
-  return row('cal', 'Calories', t.cal, calGoal, '') + row('pro', 'Protein', t.pro, proteinGoal, ' g') + extra;
+  return row('cal', 'Calories', t.cal, calGoal, '') + row('pro', 'Protein', t.pro, proteinGoal, ' g') + extra + split;
 }
 
 function weekCard() {
@@ -2960,7 +2964,7 @@ function bodyCard() {
     const cut = ymd(addDays(new Date(), -days)), old = list.filter(l => l.date <= cut).pop() || list[0];
     return last && old && old !== last ? last.w - old.w : null;
   };
-  const ch = change(30);
+  const ch = change(30), pace = weightPace(list);
   if (list.length > 1) later(() => lineChart('#chart-body', list.map(l => logPoint(l, l.w)), { fmtV: v => `${fmt(v, 1)} ${u}` }));
   return `<section class="card stack">
     <div class="spread"><div class="card-title row">${icon('scale')} Body weight</div>
@@ -2969,10 +2973,32 @@ function bodyCard() {
         <div class="tile"><div class="tile-label">Latest · ${shortDate(last.date)}</div><div class="tile-value">${fmt(last.w, 1)}<small> ${u}</small></div></div>
         <div class="tile"><div class="tile-label">Last 30 days</div><div class="tile-value">${ch == null ? '–' : `${ch > 0 ? '+' : ''}${fmt(ch, 1)}<small> ${u}</small>`}</div></div>
       </div>
+      ${pace ? `<div class="banner ${pace.ok ? '' : 'warn'}">${icon(pace.ok ? 'check' : 'info')}<div>${pace.text}</div></div>` : ''}
       ${list.length > 1 ? '<div class="chart" id="chart-body"></div>' : ''}
       <button class="btn-link" data-action="weightHistory">All weigh-ins (${list.length})</button>`
       : `<p class="hint">Weigh in once or twice a week — same time of day, before eating — to see if you're gaining the way you want.</p>`}
   </section>`;
+}
+// Weekly rate over the last ~4 weeks compared with a healthy pace for your goal.
+function weightPace(list) {
+  const cut = ymd(addDays(new Date(), -28)), recent = list.filter(l => l.date >= cut);
+  if (recent.length < 2) return null;
+  const a = recent[0], b = recent[recent.length - 1], days = (parseYmd(b.date) - parseYmd(a.date)) / 86400000;
+  if (days < 10) return null;
+  const kg = S.settings.unit === 'kg', perWeek = ((b.w - a.w) / days) * 7, lbWeek = kg ? perWeek / LB : perWeek;
+  const goal = (S.settings.profile && S.settings.profile.goal) || 'gain', u = S.settings.unit;
+  const rate = `${perWeek > 0 ? '+' : ''}${fmt(perWeek, 2)} ${u} a week over the last ${Math.round(days / 7)} weeks`;
+  if (goal === 'gain') {
+    if (lbWeek < 0.2) return { ok: false, text: `${rate}. For steady muscle gain aim for about ${kg ? '0.1–0.35 kg' : '0.25–0.75 lb'} a week — add 200–300 calories a day.` };
+    if (lbWeek > 1) return { ok: false, text: `${rate} — faster than muscle can be built. Trim 200–300 calories a day to keep the gain lean.` };
+    return { ok: true, text: `${rate} — right on pace for lean muscle gain.` };
+  }
+  if (goal === 'lose') {
+    if (lbWeek > -0.2) return { ok: false, text: `${rate}. To lose fat slowly, aim for about ${kg ? '0.25–0.5 kg' : '0.5–1 lb'} a week.` };
+    if (lbWeek < -1.5) return { ok: false, text: `${rate} — that's fast enough to cost strength and speed. Eat a bit more.` };
+    return { ok: true, text: `${rate} — a steady, healthy pace.` };
+  }
+  return Math.abs(lbWeek) <= 0.3 ? { ok: true, text: `${rate} — holding steady.` } : { ok: false, text: `${rate}. To stay the same, adjust your calories a little.` };
 }
 actions.logWeight = () => openSheet('Log body weight', `<form class="form" novalidate data-submit="saveWeight">
   <div class="form-grid">
@@ -3038,7 +3064,22 @@ actions.showWorkout = el => {
       <div class="detail-sets">${e.sets.map(s => `<span class="${s.done ? '' : 'skip'}">${esc(setText(s, e.track))}</span>`).join('')}</div>
     </div>`).join('')}</div>
     ${effortBlock(w)}
+    <button class="btn btn-ghost btn-block" data-action="repeatWorkout" data-id="${w.id}" ${S.active ? 'disabled' : ''}>${icon('refresh', 'sm')} Do this workout again</button>
     <button class="btn btn-danger btn-block" data-action="deleteWorkout" data-id="${w.id}">${icon('trash', 'sm')} Delete this workout</button>`);
+};
+// Start a new workout with the same exercises as one in your history (weights from last time are filled in).
+actions.repeatWorkout = el => {
+  const w = S.workouts.find(x => x.id === el.dataset.id);
+  if (!w || S.active) return;
+  closeSheet();
+  S.active = {
+    id: uid(), mode: w.mode, dayIndex: dayIdx(), title: w.title, type: w.type, date: ymd(), startedAt: Date.now(), finishedAt: null,
+    exercises: w.exercises.map(e => ({ planId: null, name: e.name, reps: e.reps || '10', rest: e.rest ?? 60, track: e.track, cues: e.cues || '', video: e.video || defaultVideo(e.name),
+      sets: makeSets(e.sets.length, e.track, lastSetsFor(e.name, w.mode)) }))
+  };
+  if (S.settings.mode !== w.mode) S.settings.mode = w.mode;
+  S.openEx = null; S.tab = 'today';
+  saveActive(); saveSettings(); render({ keepScroll: false }); unlockAudio(); keepAwake(true);
 };
 actions.deleteWorkout = async el => {
   const id = el.dataset.id;
