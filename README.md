@@ -20,6 +20,7 @@ Everything is stored only on your phone, encrypted with your login, and it works
 **Track**
 - Lift charts, personal records, training calendar and badges
 - Body weight trend and recovery trends
+- Game log with season AVG / OBP / SLG / OPS and ERA / WHIP / K/9
 - Baseball tests: 60-yard dash, exit velocity, throwing velocity, pop time and more
 - Arm care: throwing log, live pitch counter and Pitch Smart rest days by age, sprint stopwatch
 - Encrypted backups, plus CSV spreadsheets for your coach

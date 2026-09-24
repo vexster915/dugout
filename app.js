@@ -3711,6 +3711,8 @@ const HELP = [
     'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
   ['Setting your goals', ['Settings → Calculate my goals turns your age, size, training and goal into calories, protein, carbs, fat and water.',
     'Weigh in once or twice a week (Progress → Body) and recalculate every month or so. If you\'re trying to gain and your weight stalls for 2–3 weeks, add about 250 calories.']],
+  ['Games and stats', ['Log each game in Progress → Baseball: your batting line and, if you pitched, innings (5.2 = 5⅔), hits, runs, walks and strikeouts.',
+    'Your season AVG, OBP, SLG, OPS, ERA and WHIP update automatically, and pitches can go straight into the arm-care log.']],
   ['Testing the right way', ['Warm up fully first. Take 2–3 tries and log your best.', 'Test the same way each time — same surface, same timer, same time of day — so the numbers are fair.',
     'Re-test every 4–6 weeks. The stopwatch (Progress → Baseball) lets a partner time your sprints.']],
   ['Arm care and pitch counts', ['Log every throwing session with how your arm feels. Big week-to-week jumps in throwing are a common cause of arm trouble.',
@@ -3979,7 +3981,7 @@ function whatsNew() {
     ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 45 recipes, a game-day timeline, the week ahead and a shopping list.')}
     ${item('dumbbell', 'Smarter workouts', 'How-tos for every exercise, a library, swaps, next-weight tips, warm-up sets, a plate calculator and effort notes.')}
     ${item('plan', 'In-season program', 'Switch programs on the Plan tab: two short lifts a week to stay strong during the season.')}
-    ${item('timer', 'Baseball tests and arm care', 'Progress → Baseball: 60-yard, exit velo and more, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
+    ${item('timer', 'Baseball tests, stats and arm care', 'Progress → Baseball: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
     ${item('trophy', 'Stay on track', 'Daily readiness check-in, a weekly review, a training calendar, badges and spreadsheet export.')}
     <button class="btn btn-primary btn-block" data-action="closeSheet">Let's go</button>`);
 }
