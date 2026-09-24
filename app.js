@@ -1582,6 +1582,7 @@ let hiddenAt = 0, externalAt = 0;
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-external]')) externalAt = Date.now(); }, true);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+  checkForUpdate();
   const wentAt = hiddenAt, away = hiddenAt ? Date.now() - hiddenAt : 0;
   hiddenAt = 0;
   if (S.locked) return;
@@ -3742,7 +3743,7 @@ function renderSettings() {
     <div class="section-title">App</div>
     <div class="set-list">
       <div class="set-item"><div class="grow"><div>Storage</div><div class="hint">${storageText()}</div></div></div>
-      <button class="set-item as-btn" data-action="checkUpdate"><div class="grow"><div>Check for updates</div><div class="hint">Loads the newest app files from GitHub (needs internet)</div></div>${icon('refresh')}</button>
+      <button class="set-item as-btn" data-action="checkUpdate"><div class="grow"><div>Check for updates</div><div class="hint">Dugout updates itself whenever it opens with internet — this does it right now</div></div>${icon('refresh')}</button>
       <button class="set-item as-btn" data-action="help"><div class="grow"><div>How to use Dugout</div><div class="hint">Tips for every part of the app</div></div>${icon('info')}</button>
       <button class="set-item as-btn" data-action="installHelp"><div class="grow"><div>How to install on iPhone</div></div>${icon('info')}</button>
     </div>
@@ -4255,14 +4256,44 @@ async function boot() {
     }
   } catch (e) { /* not supported */ }
 
-  // Offline support
+  // Offline support + updates (see "Updates" below)
   if ('serviceWorker' in navigator) {
-    const updating = !!navigator.serviceWorker.controller;     // no controller yet = first install, not an update
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (updating && !S.locked) toast('A new version of Dugout is ready', { action: () => location.reload(), label: 'Reload' });
-    });
-    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Offline mode unavailable:', err));
+    const sw = navigator.serviceWorker, ask = () => { if (sw.controller) sw.controller.postMessage('version?'); };
+    sw.addEventListener('message', e => { if (e.data && e.data.type === 'dugout-version') newVersionSeen(e.data.version); });
+    sw.addEventListener('controllerchange', ask);
+    sw.register('./sw.js', { updateViaCache: 'none' }).then(reg => { swReg = reg; ask(); }).catch(err => console.warn('Offline mode unavailable:', err));
   }
+}
+
+// ----- Updates: always the newest version -----
+// sw.js loads the newest files from GitHub every time Dugout opens with internet. If a newer version
+// comes out while Dugout is open, switch to it right away when that's harmless (signed out, nothing
+// typed, no workout going). Otherwise offer a Reload button, and switch the next time Dugout locks.
+let swReg = null, updateReady = '', lastUpdateCheck = 0;
+function checkForUpdate() {
+  if (!swReg || Date.now() - lastUpdateCheck < 60000) return;
+  lastUpdateCheck = Date.now();
+  swReg.update().catch(() => { /* offline — try again later */ });
+}
+// "2.10.0" is newer than "2.9.1"
+const isNewer = (a, b) => {
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+function newVersionSeen(v) {
+  if (!v || !isNewer(v, APP_VERSION) || v === updateReady) return;
+  let tried = '';
+  try { tried = sessionStorage.getItem('dugout-updated-to') || ''; } catch (e) { /* private mode */ }
+  if (tried === v) return;                                  // already reloaded once for it: don't loop
+  const typed = $$('#view input').some(i => i.type !== 'checkbox' && i.value), busy = !!S.active || $('#sheet-root').classList.contains('open');
+  if (S.locked && !typed && !busy) { reloadForUpdate(v); return; }
+  updateReady = v;
+  toast('A new version of Dugout is ready', { action: () => reloadForUpdate(v), label: 'Reload' });
+}
+function reloadForUpdate(v) {
+  try { sessionStorage.setItem('dugout-updated-to', v); } catch (e) { /* private mode */ }
+  location.reload();
 }
 
 /* ============================== 12. SIGN-IN ============================== */
@@ -4426,6 +4457,7 @@ async function lockApp(message) {
   Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null });
   render();
   if (message) toast(message);
+  if (updateReady) reloadForUpdate(updateReady);        // a new version was waiting: switch to it now
 }
 actions.lockNow = () => lockApp('Locked');
 

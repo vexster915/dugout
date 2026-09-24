@@ -40,8 +40,18 @@ Everything is stored only on your phone, encrypted with your login, and it works
 | `meals.js` | Recipes and eating tips |
 | `foods.js` | Built-in food list |
 | `db.js` | Encrypted on-phone storage |
-| `sw.js` | Offline support (bump `CACHE` when files change) |
+| `sw.js` | Offline support and updates: loads the newest version whenever there's internet |
 | `styles.css` | The look of the app |
+
+## Updates
+
+Every time the app opens with internet it loads the newest files straight from GitHub, so it always jumps to the
+latest version — it never shows an older one or steps through updates one at a time. Offline, it uses the copy
+saved on the phone. If a new version comes out while the app is open, it switches over by itself on the sign-in
+screen, or shows a **Reload** button (and switches the next time it locks) if you're in the middle of something.
+
+**Releasing a new version:** set the same version number in all three places —
+`APP_VERSION` in `app.js`, `VERSION` in `sw.js`, and every `?v=` in `index.html`.
 
 Nutrition numbers and training guidance are general information for healthy athletes — check with a doctor,
 athletic trainer or sports dietitian for anything specific to you.
