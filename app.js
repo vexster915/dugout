@@ -2772,7 +2772,7 @@ function renderProgress() {
   const head = `<div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
     <div class="seg" role="group" aria-label="What to show">${PROG_VIEWS.map(([k, l]) => `<button class="${S.progView === k ? 'on' : ''}" data-action="progView" data-v="${k}" aria-pressed="${S.progView === k}">${l}</button>`).join('')}</div>`;
   if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${recoveryCard()}${goalsCard()}</div>`;
-  if (S.progView === 'baseball') return `<div class="page">${head}${toolsCard()}${testsCard()}${armCard()}${throwCard()}</div>`;
+  if (S.progView === 'baseball') return `<div class="page">${head}${toolsCard()}${gamesCard()}${testsCard()}${armCard()}${throwCard()}</div>`;
   const mode = S.settings.mode, m = MODES[mode];
   const ws = S.workouts.filter(w => w.mode === mode);
   const weekKey = ymd(weekStart()), monthKey = ymd().slice(0, 7);
@@ -3264,6 +3264,89 @@ submits.saveThrow = f => {
   else toast(l.feel === 1 ? 'Saved — please get that arm checked' : 'Throwing saved');
 };
 
+// ----- Games & season stats -----
+const BAT = [['ab', 'AB'], ['h', 'H'], ['d', '2B'], ['t', '3B'], ['hr', 'HR'], ['bb', 'BB'], ['hbp', 'HBP'], ['k', 'K'], ['rbi', 'RBI'], ['r', 'R'], ['sb', 'SB'], ['sf', 'SF']];
+const PITCH = [['h', 'H'], ['r', 'R'], ['er', 'ER'], ['bb', 'BB'], ['k', 'K'], ['pc', 'Pitches']];
+const ipText = outs => `${Math.floor(outs / 3)}${outs % 3 ? '.' + (outs % 3) : ''}`;         // 17 outs → "5.2"
+const ipOuts = v => { const m = String(v || '').trim().match(/^(\d+)(?:\.([012]))?$/); return m ? +m[1] * 3 + (+m[2] || 0) : null; };
+const avgText = v => (v == null ? '–' : v >= 1 ? v.toFixed(3) : v.toFixed(3).replace(/^0/, ''));   // baseball style: .312
+function seasonStats(games) {
+  const b = {}, p = {};
+  for (const [k] of BAT) b[k] = sum(games, g => (g.bat && g.bat[k]) || 0);
+  for (const [k] of PITCH) p[k] = sum(games, g => (g.pitch && g.pitch[k]) || 0);
+  p.outs = sum(games, g => (g.pitch && g.pitch.outs) || 0);
+  const tb = b.h + b.d + 2 * b.t + 3 * b.hr, pa = b.ab + b.bb + b.hbp + b.sf, ip = p.outs / 3;
+  return {
+    b, p, games: games.length, pitched: games.filter(g => g.pitch && g.pitch.outs).length,
+    avg: b.ab ? b.h / b.ab : null, obp: pa ? (b.h + b.bb + b.hbp) / pa : null, slg: b.ab ? tb / b.ab : null,
+    era: ip ? (9 * p.er) / ip : null, whip: ip ? (p.bb + p.h) / ip : null, k9: ip ? (9 * p.k) / ip : null, bb9: ip ? (9 * p.bb) / ip : null
+  };
+}
+function gamesCard() {
+  const year = String(new Date().getFullYear()), all = logsOf('game'), games = all.filter(g => g.date.startsWith(year)), st = seasonStats(games);
+  const tile = (label, v) => `<div class="stat"><b>${v}</b><small>${label}</small></div>`;
+  return `<section class="card stack">
+    <div class="spread"><div class="card-title row">${icon('trophy')} ${year} season</div>
+      <button class="btn btn-sm btn-ghost" data-action="logGame">${icon('plus', 'sm')} Log game</button></div>
+    ${games.length ? `
+      <div class="stats">${tile('AVG', avgText(st.avg))}${tile('OBP', avgText(st.obp))}${tile('SLG', avgText(st.slg))}${tile('OPS', st.obp == null ? '–' : avgText(st.obp + st.slg))}</div>
+      <div class="small muted center">${st.games} game${st.games === 1 ? '' : 's'} · ${st.b.h}-for-${st.b.ab} · ${st.b.hr} HR · ${st.b.rbi} RBI · ${st.b.r} R · ${st.b.sb} SB · ${st.b.bb} BB · ${st.b.k} K</div>
+      ${st.pitched ? `<div class="stats">${tile('ERA', st.era == null ? '–' : st.era.toFixed(2))}${tile('WHIP', st.whip == null ? '–' : st.whip.toFixed(2))}${tile('K/9', st.k9 == null ? '–' : st.k9.toFixed(1))}${tile('IP', ipText(st.p.outs))}</div>
+        <div class="small muted center">${st.pitched} outing${st.pitched === 1 ? '' : 's'} · ${st.p.k} K · ${st.p.bb} BB · ${st.p.h} H · ${st.p.er} ER</div>` : ''}
+      <div class="stack-sm">${games.slice(-6).reverse().map(g => `<button class="log-row as-btn" data-action="logGame" data-id="${g.id}">
+        <span class="grow small"><b>${shortDate(g.date)}${g.opp ? ` vs ${esc(g.opp)}` : ''}</b>${g.result ? ` · ${esc(g.result)}${g.score ? ' ' + esc(g.score) : ''}` : ''}<br>
+        <span class="muted">${g.bat && g.bat.ab + g.bat.bb + g.bat.hbp ? `${g.bat.h}-for-${g.bat.ab}${g.bat.hr ? `, ${g.bat.hr} HR` : ''}${g.bat.rbi ? `, ${g.bat.rbi} RBI` : ''}${g.bat.bb ? `, ${g.bat.bb} BB` : ''}` : 'Did not bat'}${g.pitch && g.pitch.outs ? ` · ${ipText(g.pitch.outs)} IP, ${g.pitch.k} K, ${g.pitch.er} ER` : ''}</span></span>${icon('edit', 'sm')}</button>`).join('')}</div>`
+    : '<p class="hint">Log your games to track your batting average, on-base and slugging — plus ERA and strikeouts if you pitch.</p>'}
+  </section>`;
+}
+actions.logGame = el => {
+  const g = (el && el.dataset.id && S.logs.find(l => l.id === el.dataset.id)) || { date: ymd(), opp: '', result: '', score: '', bat: {}, pitch: null, note: '' };
+  const n = (group, k, v) => `<label class="field mini"><span>${k}</span><input name="${group}.${v}" inputmode="numeric" value="${(g[group] && g[group][v]) || ''}" placeholder="0" autocomplete="off"></label>`;
+  openSheet(g.id ? 'Edit game' : 'Log a game', `<form class="form" novalidate data-submit="saveGame" data-id="${g.id || ''}">
+    <div class="form-grid">
+      <label class="field"><span>Date</span><input name="date" type="date" value="${g.date}" max="${ymd()}"></label>
+      <label class="field"><span>Opponent</span><input name="opp" value="${esc(g.opp)}" maxlength="40" autocomplete="off" placeholder="optional"></label>
+    </div>
+    <div class="form-grid">
+      <div class="field"><span>Result</span><div class="choice">${[['W', 'W'], ['L', 'L'], ['T', 'T']].map(([v, l]) => `<label class="feel-opt"><input type="radio" name="result" value="${v}" ${g.result === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
+      <label class="field"><span>Score</span><input name="score" value="${esc(g.score)}" maxlength="12" autocomplete="off" placeholder="e.g. 5-3"></label>
+    </div>
+    <div class="section-title">Batting</div>
+    <div class="mini-grid">${BAT.map(([v, k]) => n('bat', k, v)).join('')}</div>
+    <details class="table-toggle" ${g.pitch && g.pitch.outs ? 'open' : ''}><summary>I pitched</summary>
+      <div class="mini-grid"><label class="field mini"><span>IP</span><input name="pitch.ip" inputmode="decimal" value="${g.pitch && g.pitch.outs ? ipText(g.pitch.outs) : ''}" placeholder="5.2" autocomplete="off"></label>
+        ${PITCH.map(([v, k]) => n('pitch', k, v)).join('')}</div>
+      ${g.id ? '' : '<label class="check-line"><input type="checkbox" name="toArm" value="1" checked> Add my pitches to the arm-care log</label>'}
+      <p class="hint">Innings: .1 = one out, .2 = two outs (5.2 = 5⅔ innings).</p>
+    </details>
+    <label class="field"><span>Notes</span><input name="note" value="${esc(g.note || '')}" maxlength="140" autocomplete="off" placeholder="optional"></label>
+    <button class="btn btn-primary btn-block" type="submit">${g.id ? 'Save changes' : 'Save game'}</button>
+    ${g.id ? `<button type="button" class="btn btn-danger btn-block" data-action="deleteGame" data-id="${g.id}">${icon('trash', 'sm')} Delete game</button>` : ''}
+  </form>`);
+};
+submits.saveGame = f => {
+  const d = formData(f), int = v => Math.max(0, Math.round(num(v) || 0));
+  const bat = Object.fromEntries(BAT.map(([k]) => [k, int(d['bat.' + k])]));
+  if (bat.h > bat.ab) { toast("Hits can't be more than at-bats"); return; }
+  if (bat.d + bat.t + bat.hr > bat.h) { toast('Doubles + triples + homers can’t be more than hits'); return; }
+  const outs = ipOuts(d['pitch.ip']);
+  if (d['pitch.ip'] && outs == null) { toast('Innings look like 5, 5.1 or 5.2'); return; }
+  const pitch = outs ? { outs, ...Object.fromEntries(PITCH.map(([k]) => [k, int(d['pitch.' + k])])) } : null;
+  if (pitch && pitch.er > pitch.r) { toast("Earned runs can't be more than runs"); return; }
+  const old = f.dataset.id ? S.logs.find(l => l.id === f.dataset.id) : null;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(d.date) && d.date <= ymd() ? d.date : ymd();
+  const g = { id: old ? old.id : uid(), kind: 'game', date, opp: String(d.opp || '').trim(), result: ['W', 'L', 'T'].includes(d.result) ? d.result : '', score: String(d.score || '').trim(), bat, pitch, note: String(d.note || '').trim(), at: Date.now() };
+  putLog(g);
+  if (!old && pitch && pitch.pc && d.toArm) putLog({ id: uid(), kind: 'throw', date, type: 'game', count: pitch.pc, dist: null, feel: 4, note: `${ipText(outs)} IP${g.opp ? ` vs ${g.opp}` : ''}`, at: Date.now() });
+  closeSheet(); render();
+  toast(old ? 'Game updated' : bat.h >= 2 ? `Saved — ${bat.h}-for-${bat.ab}, nice game!` : 'Game saved');
+};
+actions.deleteGame = async el => {
+  const g = S.logs.find(l => l.id === el.dataset.id);
+  if (!g || !(await confirmBox('Delete this game?', 'It will be removed from your season stats.', { ok: 'Delete', danger: true }))) return;
+  removeLog(g.id); render(); toast('Game deleted');
+};
+
 // ----- Live pitch counter (kept in settings so it survives closing the app mid-game) -----
 function pitchState() {
   let p = S.settings.pitch;
@@ -3516,13 +3599,15 @@ const CSV = {
   food: ['Food log', () => [['Date', 'Time', 'Meal', 'Food', 'Servings', 'Serving size', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'],
     ...[...S.meals].sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1))
       .map(m => [m.date, m.time || '', MEAL_LABEL[m.meal] || '', m.name, m.servings || 1, m.serving || '', m.cal, m.pro, m.carb ?? '', m.fat ?? ''])]],
-  tracking: ['Weight, water, tests, throwing and check-ins', () => {
+  tracking: ['Weight, water, tests, games, throwing and check-ins', () => {
     const rows = [['Date', 'Type', 'What', 'Value', 'Unit', 'Details']];
     for (const l of [...S.logs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) {
       if (l.kind === 'weight') rows.push([l.date, 'Body weight', '', l.w, S.settings.unit, '']);
       else if (l.kind === 'water') rows.push([l.date, 'Water', '', l.oz, 'oz', '']);
       else if (l.kind === 'test') { const t = TEST_BY_ID[l.test]; if (t) rows.push([l.date, 'Test', t.name, l.v, t.unit, '']); }
       else if (l.kind === 'throw') rows.push([l.date, 'Throwing', THROW_LABEL[l.type] || l.type, l.count, PITCHING.includes(l.type) ? 'pitches' : 'throws', [l.dist ? `${l.dist} ft` : '', l.feel ? `arm ${FEEL[l.feel].toLowerCase()}` : '', l.note || ''].filter(Boolean).join('; ')]);
+      else if (l.kind === 'game') rows.push([l.date, 'Game', [l.opp && `vs ${l.opp}`, l.result, l.score].filter(Boolean).join(' '), '', '',
+        [`${l.bat.h}-for-${l.bat.ab}`, ...BAT.slice(2).filter(([k]) => l.bat[k]).map(([k, n]) => `${l.bat[k]} ${n}`), l.pitch ? `pitching ${ipText(l.pitch.outs)} IP ${PITCH.map(([k, n]) => `${l.pitch[k]} ${n}`).join(' ')}` : '', l.note].filter(Boolean).join('; ')]);
       else if (l.kind === 'checkin') rows.push([l.date, 'Check-in', 'Readiness', readiness(l), '/100', `sleep ${l.sleep} h; energy ${l.energy}/5; soreness ${l.sore}/5`]);
     }
     return rows;

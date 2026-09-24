@@ -439,6 +439,17 @@ i.t-rest { background: var(--muted); }
 .new-item > .i { color: var(--accent); margin-top: 2px; }
 .new-item b { display: block; margin-bottom: 2px; }
 
+/* Games & season stats */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.stat { background: var(--surface-2); border-radius: 12px; padding: 10px 4px; text-align: center; }
+.stat b { display: block; font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.stat small { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: var(--muted); }
+.mini-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.field.mini > span { font-size: 11px; letter-spacing: 0.06em; text-align: center; }
+.field.mini input { min-height: 44px; padding: 6px 4px; text-align: center; font-weight: 800; }
+.log-row.as-btn { width: 100%; border: 0; text-align: left; color: inherit; font: inherit; padding: 10px 14px; }
+.log-row.as-btn > .i { color: var(--muted); }
+
 /* Programs sheet */
 .program.current { border-color: var(--accent); }
 
