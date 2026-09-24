@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport-fit=cover lets the app use the whole iPhone screen (notch and home bar areas) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Dugout</title>
+  <meta name="description" content="Baseball strength, power, agility and diet tracker.">
+
+  <!-- These make it open full-screen (no Safari bars) when launched from the home screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dugout">
+  <meta name="theme-color" content="#07090d">
+  <meta name="format-detection" content="telephone=no">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-mode="gym">
+  <div id="app">
+    <div id="statusbar"></div>
+    <main id="view" tabindex="-1">
+      <div class="boot">Loading…</div>
+    </main>
+    <div id="timer" hidden></div>
+    <nav id="tabbar" aria-label="Main"></nav>
+  </div>
+  <div id="sheet-root"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <noscript><p style="padding:24px;color:#fff">Please turn on JavaScript to use Dugout.</p></noscript>
+
+  <!-- Order matters: plan.js and db.js must load before app.js -->
+  <script src="plan.js" defer></script>
+  <script src="db.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
