@@ -204,6 +204,7 @@ const DEFAULT_SETTINGS = {
   carbGoal: 0,            // optional (0 = not set)
   fatGoal: 0,
   waterGoal: 100,         // ounces
+  program: 'offseason',   // which starting plan (plan.js PROGRAMS) resets go back to
   profile: null           // goal calculator answers: { sex, age, ft, inch, cm, weight, activity, goal }
 };
 
@@ -263,6 +264,7 @@ function buildPlan(src) {
   return p;
 }
 const planFor = (mode = S.settings.mode) => S.plan[mode];
+const program = () => PROGRAMS[S.settings.program] || PROGRAMS.offseason;
 const dayPlan = (i, mode = S.settings.mode) => S.plan[mode][i];
 
 function findPlanEx(id) {
@@ -1367,7 +1369,8 @@ function renderPlan() {
       ${DAYS_SHORT[i]}<small>${TYPE_SHORT[d.type] || ''}</small>
     </button>`).join('');
   return `<div class="page">
-    <div class="page-head"><div><div class="eyebrow">Weekly plan</div><h1 class="page-title">Plan</h1></div></div>
+    <div class="page-head"><div><div class="eyebrow">Weekly plan</div><h1 class="page-title">Plan</h1></div>
+      <button class="btn btn-sm btn-ghost" data-action="programs">${icon('refresh', 'sm')} ${esc(program().name)}</button></div>
     ${modeToggle()}
     <div class="days">${chips}</div>
     <section class="card hero">
@@ -1416,6 +1419,25 @@ function planExCard(e, i, n) {
 }
 
 actions.planDay = el => { S.planDay = +el.dataset.i; render(); };
+
+// ----- Programs (plan.js PROGRAMS): switch between off-season and in-season plans -----
+actions.programs = () => openSheet('Programs', `<div class="stack">
+  ${Object.entries(PROGRAMS).map(([k, p]) => `<div class="card stack-sm program ${S.settings.program === k ? 'current' : ''}">
+    <div class="spread"><div class="card-title">${esc(p.name)}</div><span class="badge ${S.settings.program === k ? 'accent' : ''}">${S.settings.program === k ? 'Current' : esc(p.tag)}</span></div>
+    <p class="text-2 small">${esc(p.about)}</p>
+    ${S.settings.program === k ? '' : `<button class="btn btn-primary btn-block" data-action="useProgram" data-k="${k}">Switch to ${esc(p.name)}</button>`}
+  </div>`).join('')}
+  <p class="hint">Switching replaces both your gym and home weekly plans (including your edits). Your workout history, charts and records stay.</p>
+</div>`);
+actions.useProgram = async el => {
+  const k = el.dataset.k, p = PROGRAMS[k];
+  if (!p) return;
+  if (!(await confirmBox(`Switch to ${p.name}?`, 'Your gym and home weekly plans will be replaced with this program. Workout history is kept.', { ok: 'Switch' }))) return;
+  S.plan = buildPlan(p.plan);
+  S.settings.program = k;
+  savePlan(); saveSettings(); render({ keepScroll: false });
+  toast(`${p.name} program ready`);
+};
 actions.toggleReorder = () => { S.planReorder = !S.planReorder; render(); };
 actions.moveEx = el => {
   const list = dayPlan(S.planDay).exercises, i = +el.dataset.i, j = i + Number(el.dataset.d);
@@ -1511,7 +1533,7 @@ submits.saveDay = f => {
 actions.resetDay = async () => {
   const mode = S.settings.mode, di = S.planDay;
   if (!(await confirmBox('Reset this day?', `${DAYS[di]} (${MODES[mode].label}) goes back to the starting exercises and videos. Your workout history is kept.`, { ok: 'Reset', danger: true }))) return;
-  S.plan[mode][di] = buildPlan(DEFAULT_PLAN)[mode][di];
+  S.plan[mode][di] = buildPlan(program().plan)[mode][di];
   savePlan(); render(); toast('Day reset');
 };
 
@@ -2899,8 +2921,9 @@ function renderSettings() {
 
     <div class="section-title">Plan</div>
     <div class="set-list">
-      <button class="set-item as-btn" data-action="resetPlan" data-mode="gym"><div class="grow"><div>Reset Gym plan</div><div class="hint">Back to the starting 7-day gym plan</div></div>${icon('refresh')}</button>
-      <button class="set-item as-btn" data-action="resetPlan" data-mode="home"><div class="grow"><div>Reset Home plan</div><div class="hint">Back to the starting 7-day home plan</div></div>${icon('refresh')}</button>
+      <button class="set-item as-btn" data-action="programs"><div class="grow"><div>Program: ${esc(program().name)}</div><div class="hint">Switch between off-season and in-season plans</div></div>${icon('plan')}</button>
+      <button class="set-item as-btn" data-action="resetPlan" data-mode="gym"><div class="grow"><div>Reset Gym plan</div><div class="hint">Back to the ${esc(program().name)} gym plan</div></div>${icon('refresh')}</button>
+      <button class="set-item as-btn" data-action="resetPlan" data-mode="home"><div class="grow"><div>Reset Home plan</div><div class="hint">Back to the ${esc(program().name)} home plan</div></div>${icon('refresh')}</button>
     </div>
 
     <div class="section-title">App</div>
@@ -3036,7 +3059,7 @@ async function confirmRestore(data) {
 actions.resetPlan = async el => {
   const mode = el.dataset.mode, label = MODES[mode].label;
   if (!(await confirmBox(`Reset ${label} plan?`, `All 7 ${label.toLowerCase()} days go back to the starting plan, replacing your ${label.toLowerCase()} edits and video links. Workout history is kept.`, { ok: 'Reset', danger: true }))) return;
-  S.plan[mode] = buildPlan(DEFAULT_PLAN)[mode];
+  S.plan[mode] = buildPlan(program().plan)[mode];
   savePlan(); render(); toast(`${label} plan reset`);
 };
 
@@ -3105,6 +3128,7 @@ function cleanSettings(st) {
   if (!/^\d{2}:\d{2}$/.test(out.workoutTime)) out.workoutTime = DEFAULT_SETTINGS.workoutTime;
   if (!MODES[out.mode]) out.mode = 'gym';
   if (!['lb', 'kg'].includes(out.unit)) out.unit = 'lb';
+  if (!PROGRAMS[out.program]) out.program = 'offseason';
   out.calGoal = clamp(Math.round(out.calGoal) || DEFAULT_SETTINGS.calGoal, 500, 10000);
   out.proteinGoal = clamp(Math.round(out.proteinGoal) || DEFAULT_SETTINGS.proteinGoal, 10, 500);
   out.waterGoal = clamp(Math.round(out.waterGoal) || DEFAULT_SETTINGS.waterGoal, 16, 400);
@@ -3159,7 +3183,7 @@ async function loadAll() {
     upgradeVideos(all);                                   // placeholders → real tutorial videos
     if (JSON.stringify(cleanP) !== JSON.stringify(plan)) await DB.set('plan', S.plan);
   } else {
-    S.plan = buildPlan(DEFAULT_PLAN);
+    S.plan = buildPlan(program().plan);
     await DB.set('plan', S.plan);
   }
   S.active = cleanWorkout(isObj(active) ? { id: 'active', ...active } : null);

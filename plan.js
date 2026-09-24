@@ -364,3 +364,66 @@ const DEFAULT_PLAN = {
     REST_DAY // Sunday
   ]
 };
+
+/* ============================ OTHER PROGRAMS ============================
+   Switch in the app: Plan tab → Programs. Each program has a gym and a home version.
+   like(name, sets, reps, rest) copies an exercise (cues, video, what to log) from the plan above. */
+function like(name, sets, reps, rest) {
+  for (const mode of ["gym", "home"]) for (const day of DEFAULT_PLAN[mode]) {
+    const e = day.exercises.find(x => x.name === name);
+    if (e) return { ...e, sets, reps, rest: rest ?? e.rest };
+  }
+  throw new Error("plan.js: no exercise named " + name);
+}
+
+// In-season: keep strength and speed with two short lifts, and protect the arm around games.
+const IN_SEASON_PLAN = {
+  gym: [
+    { title: "Total Body Strength A", type: "strength", focus: "Short and heavy — keep your strength without leaving you sore for games. Stop 1–2 reps short of failure.",
+      exercises: [WARMUP(8), like("Box jumps", 3, "3", 90), like("Trap bar deadlift", 3, "4", 150), like("Dumbbell bench press", 3, "6", 120),
+        like("Chest-supported row", 3, "8", 90), like("Walking lunges (dumbbells)", 2, "6/leg", 90), like("Pallof press", 2, "10/side", 45), like("Cable external rotation", 2, "12/arm", 30)] },
+    { title: "Arm Care + Mobility", type: "mobility", focus: "15–20 easy minutes that keep your shoulder and hips moving well between games.",
+      exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Face pulls", 2, "15", 45), like("Thoracic open books", 2, "10/side", 15),
+        like("90/90 hip switches", 2, "10", 30), like("Cross-body shoulder stretch", 2, "30 sec/side", 15), like("Wrist & forearm stretch", 2, "30 sec each", 15)] },
+    { title: "Speed Tune-Up", type: "agility", focus: "Low volume, full speed. A few fast reps keep you quick without draining your legs.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Base-stealing starts (crossover)", 4, "10 yd", 60),
+        like("Pro agility shuttle (5-10-5)", 3, "1", 90), like("Copenhagen plank", 2, "20 sec/side", 45), COOLDOWN] },
+    { title: "Total Body Strength B", type: "strength", focus: "Posterior chain, pulling and rotational power. Skip it if you have a game tomorrow and feel beat up.",
+      exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Med ball rotational scoop toss", 3, "4/side", 60), like("Romanian deadlift", 3, "6", 120),
+        like("Half-kneeling landmine press", 3, "6/arm", 90), like("Pull-ups", 3, "5", 120), like("Dumbbell step-ups", 2, "6/leg", 75),
+        like("Cable woodchop (high to low)", 2, "8/side", 45), like("Nordic hamstring curls", 2, "4", 90)] },
+    { title: "Game Prep: Mobility", type: "mobility", focus: "Loosen up for the weekend. Nothing hard.",
+      exercises: [like("Foam roll", 1, "6 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
+        like("Band hamstring stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    { title: "Game Day: Arm Care", type: "mobility", focus: "Quick arm prep before you warm up with the team. Save your energy for the game.",
+      exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Light stretching (optional)", 1, "10 min", 0)] },
+    REST_DAY
+  ],
+  home: [
+    { title: "Total Body Strength A", type: "strength", focus: "No equipment in-season lift. Stop 1–2 reps short of failure so you're fresh for games.",
+      exercises: [WARMUP(8), like("Broad jumps", 3, "3", 60), like("Single-leg RDL (backpack)", 3, "6/leg", 60), like("Push-ups", 3, "10", 60),
+        like("Table inverted rows", 3, "8", 75), like("Reverse lunges", 2, "8/leg", 60), like("Dead bugs", 2, "8/side", 45), like("External rotation hold (doorway)", 2, "20 sec/arm", 30)] },
+    { title: "Arm Care + Mobility", type: "mobility", focus: "15–20 easy minutes for your shoulder and hips between games.",
+      exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("Prone Y-T-W raises", 2, "8 each", 45), like("Wall slides", 2, "10", 30),
+        like("Thoracic open books", 2, "10/side", 15), like("90/90 hip switches", 2, "10", 30), like("Wrist & forearm stretch", 2, "30 sec each", 15)] },
+    { title: "Speed Tune-Up", type: "agility", focus: "A few fast reps in the driveway or park. Rest fully between them.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Crossover sprint starts", 4, "10 yd", 60),
+        like("5-10-5 shuttle", 3, "1", 90), like("Copenhagen plank (couch)", 2, "20 sec/side", 45), COOLDOWN] },
+    { title: "Total Body Strength B", type: "strength", focus: "Hamstrings, pulling and core. Skip it if you have a game tomorrow and feel beat up.",
+      exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("Single-leg hops", 2, "4/leg", 60), like("Nordic curls (feet under couch)", 2, "4", 90),
+        like("Pike push-ups", 3, "6", 60), like("Backpack bent-over rows", 3, "10", 60), like("Step-ups with backpack", 2, "6/leg", 60), like("Russian twists (backpack)", 2, "16", 45)] },
+    { title: "Game Prep: Mobility", type: "mobility", focus: "Loosen up for the weekend. Nothing hard.",
+      exercises: [like("Ball rolling (tennis or lacrosse ball)", 1, "6 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
+        like("Towel hamstring stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    { title: "Game Day: Arm Care", type: "mobility", focus: "Quick arm prep before team warm-ups. Save your energy for the game.",
+      exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("External rotation hold (doorway)", 2, "20 sec/arm", 30), like("Light stretching (optional)", 1, "10 min", 0)] },
+    REST_DAY
+  ]
+};
+
+const PROGRAMS = {
+  offseason: { name: "Off-season build", tag: "5 training days", plan: DEFAULT_PLAN,
+    about: "Build strength, power and speed when you're not playing games: 3 lifts, a speed day and a mobility day each week." },
+  inseason: { name: "In-season maintain", tag: "2 lifts + speed", plan: IN_SEASON_PLAN,
+    about: "Keep your strength and speed during the season without being sore for games: 2 short lifts, a speed tune-up, arm care and mobility. Move days around your game schedule." }
+};
