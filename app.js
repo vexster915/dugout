@@ -11,7 +11,7 @@
 
 'use strict';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -63,6 +63,20 @@ const normUrl = v => {
 const safeUrl = u => /^https?:\/\/[^\s]+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
 const isSearchLink = u => /youtube\.com\/results/i.test(String(u || ''));
 const placeholderVideo = name => ytSearch(name + ' proper form');   // ytSearch() lives in plan.js
+// The tutorial picked for this exercise in plan.js (VIDEOS), or a YouTube search if there isn't one.
+const defaultVideo = name => VIDEOS[String(name || '').trim()] || placeholderVideo(name);
+
+// Give exercises that still have a placeholder search link their real tutorial video.
+// Links you picked yourself are never changed.
+function upgradeVideos(exercises) {
+  let changed = false;
+  for (const e of exercises) {
+    const v = VIDEOS[e.name];
+    if (v && (!e.video || isSearchLink(e.video))) { e.video = v; changed = true; }
+  }
+  return changed;
+}
+const ytThumb = id => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
 
 // "6-8" → 8, "10/leg" → 10, "30 sec" → 30  (the number you aim for)
 const targetNum = reps => { const m = String(reps || '').match(/\d+(\.\d+)?/g); return m ? Number(m[m.length - 1]) : null; };
@@ -382,6 +396,11 @@ document.addEventListener('keydown', e => {
     e.target.click();
   }
 });
+// Video thumbnails need internet. If one can't load (offline at the gym), show a plain play tile instead.
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (img && img.tagName === 'IMG' && img.closest('.yt-thumb, .yt-mini')) img.closest('.yt-card, .yt-mini').classList.add('no-thumb');
+}, true);
 // iPhone sometimes leaves the page shifted after the keyboard closes — put it back.
 document.addEventListener('focusout', () => {
   setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) window.scrollTo(0, 0); }, 60);
@@ -627,6 +646,18 @@ function repHint(e, j, last) {
   return t != null ? String(t) : '';
 }
 
+// Tutorial video preview: tap the thumbnail to play the video inside the app.
+function videoCard(e, i) {
+  const info = ytInfo(e.video);
+  if (!info) {
+    return `<div class="wo-tools"><button class="btn btn-sm btn-ghost" data-action="video" data-src="wo" data-i="${i}">${icon('play', 'sm')} Find a form video</button></div>`;
+  }
+  return `<button class="yt-card" data-action="video" data-src="wo" data-i="${i}" aria-label="Watch the ${esc(e.name)} tutorial">
+    <span class="yt-thumb"><img src="${ytThumb(info.id)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="yt-play">${icon('play')}</span></span>
+    <span class="yt-text"><b>Watch form tutorial</b><small>Plays right here · YouTube</small></span>
+  </button>`;
+}
+
 function woExercise(e, i, open) {
   const doneN = e.sets.filter(s => s.done).length;
   const complete = doneN === e.sets.length;
@@ -648,10 +679,8 @@ function woExercise(e, i, open) {
     </button>
     <div class="wo-ex-body">
       ${e.cues ? `<p class="wo-cues">${esc(e.cues)}</p>` : ''}
-      <div class="wo-tools">
-        <button class="btn btn-sm btn-ghost" data-action="video" data-src="wo" data-i="${i}">${icon('play', 'sm')} Form video</button>
-        ${secs && secs <= 600 ? `<button class="btn btn-sm btn-ghost" data-action="workTimer" data-i="${i}" data-sec="${secs}">${icon('timer', 'sm')} ${restLabel(secs)} timer</button>` : ''}
-      </div>
+      ${videoCard(e, i)}
+      ${secs && secs <= 600 ? `<div class="wo-tools"><button class="btn btn-sm btn-ghost" data-action="workTimer" data-i="${i}" data-sec="${secs}">${icon('timer', 'sm')} ${restLabel(secs)} timer</button></div>` : ''}
       ${last && e.track !== 'check' ? `<div class="wo-last">Last time (${shortDate(last.date)}): <b>${last.sets.map(s => setText(s, e.track)).join(' · ')}</b></div>` : ''}
       <div class="set-grid">${labels}${e.sets.map((s, j) => setRow(e, i, s, j, last)).join('')}</div>
       <div class="row">
@@ -962,7 +991,7 @@ submits.saveVideo = f => {
     planEx = target;
   }
   if (!target) { closeSheet(); return; }
-  if (!url) url = placeholderVideo(target.name);
+  if (!url) url = defaultVideo(target.name);
   target.video = url;
   if (planEx) { planEx.video = url; savePlan(); }   // remember it in the plan for next time too
   if (ref.src === 'wo') saveActive();
@@ -1158,7 +1187,12 @@ function planExCard(e, i, n) {
         <button class="btn btn-icon sm btn-ghost" data-action="moveEx" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">${icon('up', 'sm')}</button>
         <button class="btn btn-icon sm btn-ghost" data-action="moveEx" data-i="${i}" data-d="1" ${i === n - 1 ? 'disabled' : ''} aria-label="Move down">${icon('down', 'sm')}</button>
       </div>`
-    : `<div class="ex-side"><button class="btn btn-icon sm" data-action="video" data-src="plan" data-i="${i}" aria-label="Form video for ${esc(e.name)}">${icon('play', 'sm')}</button></div>`;
+    : (() => {
+      const info = ytInfo(e.video);
+      return info
+        ? `<div class="ex-side"><button class="yt-mini" data-action="video" data-src="plan" data-i="${i}" aria-label="Watch the ${esc(e.name)} tutorial"><img src="${ytThumb(info.id)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="yt-play">${icon('play')}</span></button></div>`
+        : `<div class="ex-side"><button class="btn btn-icon sm" data-action="video" data-src="plan" data-i="${i}" aria-label="Find a form video for ${esc(e.name)}">${icon('play', 'sm')}</button></div>`;
+    })();
   return `<div class="ex-card">
     <span class="wo-num">${i + 1}</span>
     <div class="grow" data-action="editPlanEx" data-i="${i}" role="button" tabindex="0" aria-label="Edit ${esc(e.name)}">
@@ -1205,7 +1239,7 @@ function cleanExercise(d, old) {
   if (video && !safeUrl(video)) { toast('Video link must start with https://'); return null; }
   // Renamed an exercise that still has a placeholder? Point the placeholder at the new name.
   const renamed = old && normName(old.name) !== normName(name);
-  if (!video || (renamed && isSearchLink(video) && video === old.video)) video = placeholderVideo(name);
+  if (!video || (renamed && isSearchLink(video) && video === old.video)) video = defaultVideo(name);
   return {
     name,
     sets: clamp(parseInt(d.sets, 10) || 1, 1, 20),
@@ -2215,11 +2249,14 @@ async function loadAll() {
   S.settings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   if (plan && Array.isArray(plan.gym) && Array.isArray(plan.home) && plan.gym.length === 7 && plan.home.length === 7) {
     S.plan = plan;
+    const all = [...plan.gym, ...plan.home].flatMap(d => d.exercises);
+    if (upgradeVideos(all)) await DB.set('plan', S.plan);          // placeholders → real tutorial videos
   } else {
     S.plan = buildPlan(DEFAULT_PLAN);
     await DB.set('plan', S.plan);
   }
   S.active = active || null;
+  if (S.active && upgradeVideos(S.active.exercises)) await DB.set('active', S.active);
   S.workouts = (workouts || []).filter(w => w && w.startedAt).sort((a, b) => b.startedAt - a.startedAt);
   S.meals = meals || [];
   S.foods = foods || [];

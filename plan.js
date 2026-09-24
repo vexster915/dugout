@@ -7,15 +7,124 @@
    What to log:    "weight" = weight + reps    "reps" = reps only
                    "time"   = seconds          "check" = just tick it off
 
-   Video links start as YouTube SEARCH links (placeholders). In the app, tap the
-   play button on an exercise, pick a video, and paste its link to swap it in. */
+   Each exercise comes with a YouTube tutorial video (see VIDEOS below). Exercises
+   without one get a YouTube search link instead — tap the play button in the app to
+   find a video and paste its link to swap it in. */
 
 function ytSearch(q) {
   return "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
 }
 
+/* Tutorial video for each exercise (plays inside the app). Every one was checked to exist
+   and to allow playing inside other apps. To change one: in the app, tap the video, then
+   paste a different YouTube link and tap "Save link". */
+const VIDEOS = {
+  "Dynamic warm-up": "https://www.youtube.com/watch?v=MNouzjZQ4wo", // Spear Physical Therapy — Baseball Dynamic Stretches - Advice from a New York City Physical Therapist
+  "Box jumps": "https://www.youtube.com/watch?v=MkGRfVGyIMA", // Men's Health — How to Do Box Jumps
+  "Leg press": "https://www.youtube.com/watch?v=K5n2vg3oZa4", // Colossus Fitness — How to PROPERLY Leg Press (FIX YOUR FORM NOW)
+  "Trap bar deadlift": "https://www.youtube.com/watch?v=TU2xZ7s4jus", // Alan Thrall (Untamed Strength) — The Trap Bar Deadlift
+  "Walking lunges (dumbbells)": "https://www.youtube.com/watch?v=_DLIS8SySzs", // Colossus Fitness — How to PROPERLY Walking Dumbbell Lunge (FIX THIS NOW!)
+  "Lateral lunges": "https://www.youtube.com/watch?v=vwK7vZNQwUI", // Revival Performance Physical Therapy — Lateral lunge - how to do it right.
+  "Seated leg curl": "https://www.youtube.com/watch?v=oFxEDkppbSQ", // Physique Development — How to Seated Hamstring Machine Leg Curl | Proper Technique, Set Up, & Mistakes
+  "Standing calf raises": "https://www.youtube.com/watch?v=3UWi44yN-wM", // ScottHermanFitness — How To: Standing Barbell Calf Raise
+  "Pallof press": "https://www.youtube.com/watch?v=5_8d8vHgZvU", // Girls Gone Strong | Women's Health & Fitness — Pallof Press - How To Do Pallof Presses + Variations
+  "Hanging knee raises": "https://www.youtube.com/watch?v=p9hhX_Sx5v0", // Signum Fitness & Nutrition — The Hanging Knee Raise | A Tutorial
+  "Warm-up + band arm care": "https://www.youtube.com/watch?v=slqo583qoAg", // Northern Baseball Training — 9 Baseball J-Band Arm Care Exercises | Throw Harder And Avoid Injury
+  "Med ball rotational scoop toss": "https://www.youtube.com/watch?v=b7ix5GglVjE", // Suarez Sport and Orthopedic Physical Therapy — Med Ball Scoop Toss
+  "Dumbbell bench press": "https://www.youtube.com/watch?v=QsYre__-aro", // Jeremy Ethier — STOP Doing Dumbbell Press Like This (5 Mistakes Slowing Your Chest Gains)
+  "Pull-ups": "https://www.youtube.com/watch?v=eGo4IYlbE5g", // Calisthenicmovement — The Perfect Pull Up  - Do it right!
+  "Chest-supported row": "https://www.youtube.com/watch?v=vmX58YYK3-8", // Seriously Strong Training — Perfect Dumbbell Chest Supported Rows (KING of Back Exercises)
+  "Incline dumbbell press": "https://www.youtube.com/watch?v=IP4oeKh1Sd4", // Max Euceda — How to do the INCLINE DUMBBELL BENCH PRESS! | 2 Minute Tutorial
+  "Single-arm dumbbell row": "https://www.youtube.com/watch?v=dFzUjzfih7k", // Max Euceda — How to do the SINGLE ARM DUMBBELL ROW! | 2 Minute Tutorial
+  "Plyo push-ups": "https://www.youtube.com/watch?v=FRo3b_Pfw3M", // Howcast — How to Do a Plyo Push-Up & Clap Push-Up | Boot Camp Workout
+  "Cable woodchop (high to low)": "https://www.youtube.com/watch?v=WKFHw415Vdw", // Discovery Learning — Cable Woodchop (High to Low)
+  "Face pulls": "https://www.youtube.com/watch?v=wnPX6Fwe-Fg", // JPS Health & Fitness — Face Pull Technique 101 (Delt & Back Hypertrophy)
+  "A-skips & B-skips": "https://www.youtube.com/watch?v=A7r6yCpmSrA", // Runify — How to Do A-Skip - B-Skip with Proper Form- Find Your Stride with Coach John Smith
+  "Agility ladder drills": "https://www.youtube.com/watch?v=h_8U2vQrGww", // lexi blackmon + coach steph kim — 13 Ladder Drills: Speed and Agility Training at home - Footwork for Softball and Baseball Athletes
+  "Pro agility shuttle (5-10-5)": "https://www.youtube.com/watch?v=z-wV9O8y-a0", // SKLZ — Instructions for the Pro Agility Test (5-10-5)
+  "5-10-5 shuttle": "https://www.youtube.com/watch?v=z-wV9O8y-a0", // SKLZ — Instructions for the Pro Agility Test (5-10-5)
+  "Sled push": "https://www.youtube.com/watch?v=QaTrePoCT4g", // Squat University — The ULTIMATE Sled Push/Pull Tutorial
+  "Lateral skater bounds": "https://www.youtube.com/watch?v=gjiZLF5S6aA", // Simple Speed Coach — Lateral Bounds ‘Lateral Jumps’ | Lateral Power & Agility Training
+  "Base-stealing starts (crossover)": "https://www.youtube.com/watch?v=sodMW2MfjdQ", // MLB Network — Lofton's keys to stealing bases
+  "Crossover sprint starts": "https://www.youtube.com/watch?v=sodMW2MfjdQ", // MLB Network — Lofton's keys to stealing bases
+  "Drop-step sprints": "https://www.youtube.com/watch?v=qvwkdxepqTk", // Ripken Baseball — Ripken Baseball Fielding Tip - Outfield Drop Step
+  "Copenhagen plank": "https://www.youtube.com/watch?v=yByUFuQsgCg", // Athletes' Potential — Copenhagen Plank with Variations
+  "Copenhagen plank (couch)": "https://www.youtube.com/watch?v=yByUFuQsgCg", // Athletes' Potential — Copenhagen Plank with Variations
+  "Cool-down walk + stretch": "https://www.youtube.com/watch?v=utADwnhrCQ4", // Run Better with Ash — 5 MIN Post-Run Stretching Routine to Maximise Recovery
+  "Foam roll": "https://www.youtube.com/watch?v=Oz4xHEgMaLY", // Tom Peto Training — 10 minute Full Body Foam Roller Routine I FOLLOW ALONG
+  "90/90 hip switches": "https://www.youtube.com/watch?v=qq_Z7sAmVrA", // Simone Sports Performance — 90/90 Hip Switch (Improve Hip Health & Mobility)
+  "World's greatest stretch": "https://www.youtube.com/watch?v=-CiWQ2IvY34", // Squat University — The World's Greatest Stretch (Mobility Exercise) by Squat University
+  "Couch stretch (hip flexors)": "https://www.youtube.com/watch?v=d9pOjXCKGN8", // Tom Morrison — The Couch Stretch Done Correctly
+  "Thoracic open books": "https://www.youtube.com/watch?v=rDviWORCWEw", // Revival Performance Physical Therapy — Open Books (Sidelying Thoracic Rotation)
+  "Cross-body shoulder stretch": "https://www.youtube.com/watch?v=aIq0fLi8iak", // React Physical Therapy — Shoulder Crossbody Stretch
+  "Lat stretch on rack": "https://www.youtube.com/watch?v=izMQh1NeyRU", // TheProactiveAthlete — Lat Stretch
+  "Band hamstring stretch": "https://www.youtube.com/watch?v=Il1L75v6gq0", // AskDoctorJo — Hamstring Stretch with a Strap, Supine - Ask Doctor Jo
+  "Pigeon stretch": "https://www.youtube.com/watch?v=-kbDw9y0BZ4", // Blessing Health System — Pigeon Stretch
+  "Wrist & forearm stretch": "https://www.youtube.com/watch?v=rDqYtzYE-n8", // BeaconOrtho — Wrist Flexion and Extension Stretches for Athletes
+  "Cat-cow + deep breathing": "https://www.youtube.com/watch?v=1Y0YjXS9sKI", // Hinge Health — How to Do a Cat Cow Stretch: A Guide from Physical Therapists
+  "Kettlebell swings": "https://www.youtube.com/watch?v=LBhaLLc153A", // Squat University — The Kettlebell Swing Technique Everyone Gets WRONG!
+  "Romanian deadlift": "https://www.youtube.com/watch?v=7j-2w4-P14I", // Nuffield Health — Romanian Deadlift | Nuffield Health
+  "Single-leg leg press": "https://www.youtube.com/watch?v=ZYDTJaAM-gE", // Buff Dudes Workouts — SINGLE LEG PRESS | Legs | How-To Exercise Tutorial
+  "Hip thrust": "https://www.youtube.com/watch?v=Zp26q4BY5HE", // Girls Gone Strong | Women's Health & Fitness — How To Do a Barbell Hip Thrust
+  "Dumbbell step-ups": "https://www.youtube.com/watch?v=aKj-6hgiViA", // Colossus Fitness — How To PROPERLY Perform Dumbbell Step Ups (GLUTE FOCUSED)
+  "Nordic hamstring curls": "https://www.youtube.com/watch?v=6NCN6kOagfY", // The Kneesovertoesguy — How to Do a Nordic Hamstring Curl
+  "Nordic curls (feet under couch)": "https://www.youtube.com/watch?v=xJiyXM5EW8c", // Apollo Performance Therapy — Nordic Hamstring Curl at Home
+  "Leg extensions": "https://www.youtube.com/watch?v=ljO4jkwv8wQ", // Jeff Nippard — How To Do Leg Extensions With Perfect Technique (Grow Every Quad Head)
+  "Landmine rotations": "https://www.youtube.com/watch?v=DiVMWoLCTLo", // Swift Movement Academy — How To Do Landmine Rotations
+  "Ab wheel rollouts": "https://www.youtube.com/watch?v=rqiTPdK1c_I", // Mind Pump TV — Ab Wheel- How to PROPERLY Use an Ab Wheel | MIND PUMP
+  "Med ball overhead slams": "https://www.youtube.com/watch?v=QxYhFwMd1Ks", // CORE Strong Fitness — How to Perform the Med Ball Slam
+  "Half-kneeling landmine press": "https://www.youtube.com/watch?v=PY9HorHANhc", // Colossus Fitness — How To PROPERLY Half Kneeling Landmine Press For Muscle Gain
+  "Dumbbell lateral raises": "https://www.youtube.com/watch?v=pgrWjBfaFe8", // Colossus Fitness — How to PROPERLY Dumbbell Lateral Raise For Bigger Shoulders (FIX THIS!)
+  "Rear delt fly": "https://www.youtube.com/watch?v=buuYPLVXsJg", // Colossus Fitness — How to PROPERLY Dumbbell Rear Delt Fly | Reverse Dumbbell Fly Tutorial
+  "Hammer curls": "https://www.youtube.com/watch?v=BRVDS6HVR9Q", // Buff Dudes Workouts — How To Perform HAMMER CURLS | Biceps Exercise Tutorial
+  "Cable triceps pushdown": "https://www.youtube.com/watch?v=2-LAMcpzODU", // ScottHermanFitness — How To: Tricep Pushdown (Life Fitness Cable)
+  "Incline dumbbell curls": "https://www.youtube.com/watch?v=HhHHBj3qTJ4", // Max Euceda — How to do the INCLINE DUMBBELL CURL! | 2 Minute Tutorial
+  "Cable external rotation": "https://www.youtube.com/watch?v=PVdgjHqAes8", // Muscle & Motion — Shoulder External Rotation (With Cable)
+  "Wrist curls + reverse wrist curls": "https://www.youtube.com/watch?v=04u4uGk3Ia8", // Whats Up Dude — How To Perform Do Wrist Curls And Reverse Wrist Curls With Dumbbells
+  "Farmer's carry": "https://www.youtube.com/watch?v=NH7Xv-7NQNQ", // Buff Dudes Workouts — How To Perform Farmer Walks Exercise Tutorial
+  "Light stretching (optional)": "https://www.youtube.com/watch?v=XrmCR5m_Nwo", // Jessica Valant — 10 Minute Stretch Workout at Home - Full Body Stretching Exercises!
+  "Broad jumps": "https://www.youtube.com/watch?v=XqpN9AbLMe4", // VelocityMTP — Broad Jump Technique
+  "Jumping lunges": "https://www.youtube.com/watch?v=cIkkHg8YZQU", // FitnessBlender — Lunge, Jumping
+  "Step-ups (chair or bench)": "https://www.youtube.com/watch?v=elhu-WC1qk4", // [P]rehab — Proper Step Ups/Downs
+  "Step-ups with backpack": "https://www.youtube.com/watch?v=elhu-WC1qk4", // [P]rehab — Proper Step Ups/Downs
+  "Reverse lunges": "https://www.youtube.com/watch?v=Ry-wqegeKlE", // Dr. Carl Baird — How To Perform The Reverse Lunge
+  "Single-leg RDL": "https://www.youtube.com/watch?v=84hrdsHgDuQ", // Well+Good — How To Do A Single Leg Deadlift | The Right Way | Well+Good
+  "Single-leg RDL (backpack)": "https://www.youtube.com/watch?v=84hrdsHgDuQ", // Well+Good — How To Do A Single Leg Deadlift | The Right Way | Well+Good
+  "Single-leg glute bridge": "https://www.youtube.com/watch?v=yFNjwkUNIao", // Michael Hermann | Performance Revolution — How To Single Leg  Glute Bridge Properly
+  "Single-leg calf raises": "https://www.youtube.com/watch?v=qPd73snQfUs", // Hospital for Special Surgery — Single-Leg Calf Raise (HSS)
+  "Plank shoulder taps": "https://www.youtube.com/watch?v=gKA5LBy7WAI", // Wellen — How To Properly Do a Plank with Shoulder Taps - Strength Exercises - Wellen
+  "Dead bugs": "https://www.youtube.com/watch?v=GbSC02oU3To", // Hinge Health — How to Do a Dead Bug: A Guide from Physical Therapists
+  "Warm-up + arm circles": "https://www.youtube.com/watch?v=140RTNMciH8", // FitnessBlender — Arm Circles (Lv 1)
+  "Push-ups": "https://www.youtube.com/watch?v=IODxDxX7oi4", // Calisthenicmovement — The Perfect Push Up | Do it right!
+  "Table inverted rows": "https://www.youtube.com/watch?v=FKKZRwBJDxE", // Andrew Heming — Table Rows
+  "Backpack bent-over rows": "https://www.youtube.com/watch?v=TbcCeguuv_4", // Deep Well Athletics — Backpack Bent Over Row
+  "Decline push-ups": "https://www.youtube.com/watch?v=SKPab2YC8BE", // ScottHermanFitness — How To: Decline Push-Up
+  "Prone Y-T-W raises": "https://www.youtube.com/watch?v=QdGTI4Lshg4", // The Active Life — Prone Y T W
+  "Russian twists (backpack)": "https://www.youtube.com/watch?v=wkD8rjkodUI", // Howcast — How to Do a Russian Twist | Ab Workout
+  "Superman hold": "https://www.youtube.com/watch?v=J9zXkxUAfUA", // Children's Hospital Colorado — Core Exercise: Superman
+  "Chair dips": "https://www.youtube.com/watch?v=AWz_7B1cch0", // Coach Nick Fitness — How To Properly Do Tricep Chair Dips - 3 Common Mistakes
+  "Line hops": "https://www.youtube.com/watch?v=shxZipefgXI", // Dave Paczkowski — Line Hops
+  "Tuck jumps": "https://www.youtube.com/watch?v=Yl7tEmpzknY", // Onnit — Onnit Tutorials | Tuck Jumps
+  "Lateral shuffles": "https://www.youtube.com/watch?v=bcZkk8vMzA4", // Parisi Speed School — Side Shuffle Drill
+  "Ball rolling (tennis or lacrosse ball)": "https://www.youtube.com/watch?v=rUjoQuJ36OU", // Antranik Kizirian — ⚽ How to use a Lacrosse Ball ⚽ for Self Massage with Antranik
+  "Doorway chest stretch": "https://www.youtube.com/watch?v=CEQMx4zFwYs", // MidwestOrtho — Doorway Pec Stretch
+  "Towel hamstring stretch": "https://www.youtube.com/watch?v=_HAUA3rrCVw", // CoastalPhysiotherapy — Hamstring Stretch with Towel
+  "Single-leg hops": "https://www.youtube.com/watch?v=7WgzHOQGgYw", // Elevate Yourself — Single Leg Hops | Exercise Tutorial
+  "Single-leg hip thrust (couch)": "https://www.youtube.com/watch?v=qCObDXTe4KY", // Mind Pump TV — How To Do A Single Leg Hip Thrust (Exercise Demo) - FREE Great Butt Guide
+  "Side plank hip dips": "https://www.youtube.com/watch?v=LgaYt4Hi6-g", // Howcast — How to Do a Side Plank with Hip Lifts | Abs Workout
+  "Hollow body hold": "https://www.youtube.com/watch?v=hf00_b2sRdc", // Men's Health — How to Perfect Your Hollow Hold | Form Check | Men's Health
+  "Pike push-ups": "https://www.youtube.com/watch?v=fXgou2W10ok", // The Bodyweight Process — How to Pike Push Up | Beginner (Progressions)
+  "Backpack overhead press": "https://www.youtube.com/watch?v=2tZgG_zNx7w", // Stay Heavy Fitness — Backpack Overhead Press
+  "Backpack curls": "https://www.youtube.com/watch?v=dKqtGGScQhQ", // Nick Bolton — Backpack bicep curls
+  "Diamond push-ups": "https://www.youtube.com/watch?v=J0DnG1_S92I", // ScottHermanFitness — How To: Diamond Push-Up
+  "Wall slides": "https://www.youtube.com/watch?v=tWDGEyMWv10", // Jack Hanrahan Fitness  — Easy fix for rounded shoulders - Scapula Wall Slides #mobility
+  "External rotation hold (doorway)": "https://www.youtube.com/watch?v=Srthrc0W1S8", // Medbridge — Standing Isometric Shoulder External Rotation with Doorway | MedBridge
+  "Towel wringing": "https://www.youtube.com/watch?v=qvxf9uBHNUw", // Old School Strength — FOREARM TRAINING ( TOWEL WRINGING )
+  "Up-downs (plank to push-up)": "https://www.youtube.com/watch?v=L4oFJRDAU4Q" // oxygenmagazine — Up and Down Plank
+};
+
 function ex(name, sets, reps, rest, track, cues, search) {
-  return { name, sets, reps, rest, track, cues, video: ytSearch(search || name + " proper form") };
+  return { name, sets, reps, rest, track, cues, video: VIDEOS[name] || ytSearch(search || name + " proper form") };
 }
 
 // Shared pieces that appear on several days

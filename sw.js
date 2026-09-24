@@ -8,7 +8,7 @@
    If you ever add a new file to the app, add its name to FILES below and change
    CACHE to a new name (e.g. 'dugout-v2'). */
 
-const CACHE = 'dugout-v2';
+const CACHE = 'dugout-v3';
 const FILES = [
   './',
   './index.html',
