@@ -1263,6 +1263,7 @@ function openVideo(ex) {
   openSheet(ex.name, `${top}
     ${ex.cues ? `<p class="wo-cues">${esc(ex.cues)}</p>` : ''}
     ${infoBlock(ex.name)}
+    ${progressLink(ex.name)}
     ${videoRef && videoRef.src === 'wo' ? swapBlock(ex) : ''}
     ${info ? `<details class="table-toggle"><summary>Use a different video</summary>${form}</details>` : form}`);
 }
@@ -1270,6 +1271,13 @@ function openVideo(ex) {
 const videoEmbed = (info, name) => `<div class="video-wrap"><iframe src="https://www.youtube.com/embed/${info.id}?playsinline=1&rel=0&modestbranding=1${info.start ? `&start=${info.start}` : ''}"
   title="${esc(name)} form video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
   referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
+
+// Jump from an exercise to its chart on the Progress tab (once you've logged it).
+function progressLink(name) {
+  const mode = S.active ? S.active.mode : S.settings.mode, ex = loggedExercises(mode).find(e => normName(e.name) === normName(name));
+  return ex ? `<button class="btn btn-ghost btn-block" data-action="exProgress" data-name="${esc(ex.name)}">${icon('progress', 'sm')} Your progress · ${ex.count} session${ex.count === 1 ? '' : 's'}</button>` : '';
+}
+actions.exProgress = el => { S.progEx = el.dataset.name; S.progMetric = null; S.progView = 'lifts'; S.tab = 'progress'; closeSheet(); render({ keepScroll: false }); };
 
 // How-to details from exercises.js. A renamed exercise like "Push-ups (weighted)" falls back to "Push-ups".
 const exerciseInfo = name => EXERCISE_INFO[name] || EXERCISE_INFO[String(name || '').replace(/\s*\(.*\)\s*$/, '')] || null;
