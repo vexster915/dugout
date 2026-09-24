@@ -11,7 +11,7 @@
 
 'use strict';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -171,6 +171,7 @@ const TYPE_SHORT = { strength: 'Lift', agility: 'Agility', mobility: 'Stretch', 
 const TRACKS = { weight: 'Weight + reps', reps: 'Reps only', time: 'Time (seconds)', check: 'Just check it off' };
 const TRACK_SHORT = { weight: 'weight', reps: 'reps', time: 'timed', check: 'check-off' };
 const MEALS = [['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['pre', 'Pre-workout'], ['post', 'Post-workout'], ['dinner', 'Dinner'], ['snack', 'Snack']];
+const MEAL_LABEL = Object.fromEntries(MEALS);
 
 const DEFAULT_SETTINGS = {
   mode: 'gym',            // 'gym' or 'home'
@@ -185,7 +186,8 @@ const DEFAULT_SETTINGS = {
   lastBackup: null,
   installHintDismissed: false,
   username: '',
-  autoLock: 5             // minutes in the background before Dugout locks itself
+  autoLock: 5,            // minutes in the background before Dugout locks itself
+  mealPlan: null          // today's suggested meals: { date, kind, seed, swaps }
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -204,6 +206,8 @@ const S = {
   dietDate: ymd(),
   dietView: 'day',
   dietWeek: ymd(weekStart()),
+  recipeMeal: 'all',   // Meals view filters
+  recipeTag: null,
   progEx: null,
   progMetric: null,
   progRange: 'all',
@@ -484,14 +488,23 @@ function countdown(skip) {
 }
 
 function nutritionCard() {
+  const next = upNextMeal(), kind = mealPlanToday().kind;
   return `<section class="card">
     <div class="spread" style="margin-bottom:14px">
       <div class="card-title">Nutrition today</div>
       <button class="btn btn-sm btn-ghost" data-action="quickLog">${icon('plus', 'sm')} Log food</button>
     </div>
     ${macroBlock(dayTotals(ymd()))}
+    ${next ? `<button class="next-meal" data-action="openRecipe" data-id="${next.r.id}" data-slot="${next.slot}" data-servings="${next.servings}">
+      <span class="grow">
+        <span class="plan-slot">Up next · ${slotName(next.slot, kind)}</span>
+        <span class="meal-name">${esc(next.r.name)}</span>
+        <span class="meal-sub">${servingsText(next.servings)} · ${fmt(next.r.cal * next.servings)} cal · ${fmt(next.r.pro * next.servings)} g protein</span>
+      </span>${icon('right', 'sm')}</button>` : ''}
+    <button class="btn-link meal-link" data-action="openMealPlan">Today's meal plan & recipes</button>
   </section>`;
 }
+actions.openMealPlan = () => { S.tab = 'diet'; S.dietView = 'meals'; render({ keepScroll: false }); };
 
 function macroBlock(t) {
   const { calGoal, proteinGoal } = S.settings;
@@ -1332,11 +1345,11 @@ const sortedFavs = () => [...S.foods].sort((a, b) => a.name.localeCompare(b.name
 function renderDiet() {
   return `<div class="page">
     <div class="page-head"><div><div class="eyebrow">Nutrition</div><h1 class="page-title">Diet</h1></div></div>
-    <div class="seg" role="group" aria-label="Day or week">
-      <button class="${S.dietView === 'day' ? 'on' : ''}" data-action="dietView" data-v="day" aria-pressed="${S.dietView === 'day'}">Day</button>
-      <button class="${S.dietView === 'week' ? 'on' : ''}" data-action="dietView" data-v="week" aria-pressed="${S.dietView === 'week'}">Week totals</button>
+    <div class="seg" role="group" aria-label="Day, week or meal ideas">
+      ${[['day', 'Day'], ['week', 'Week totals'], ['meals', 'Meals']].map(([v, label]) =>
+        `<button class="${S.dietView === v ? 'on' : ''}" data-action="dietView" data-v="${v}" aria-pressed="${S.dietView === v}">${label}</button>`).join('')}
     </div>
-    ${S.dietView === 'week' ? dietWeek() : dietDay()}
+    ${S.dietView === 'week' ? dietWeek() : S.dietView === 'meals' ? dietMeals() : dietDay()}
   </div>`;
 }
 actions.dietView = el => {
@@ -1674,6 +1687,188 @@ actions.dietOpenDay = el => {
   if (k > ymd()) return;
   S.dietDate = k; S.dietView = 'day';
   render({ keepScroll: false });
+};
+
+// ----- Meal plan + recipes (Meals view). Recipes and tips live in meals.js -----
+const PLAN_KINDS = [['training', 'Training'], ['rest', 'Rest day'], ['game', 'Game day']];
+const KIND_SLOTS = {
+  training: ['breakfast', 'lunch', 'pre', 'post', 'dinner', 'snack'],
+  rest: ['breakfast', 'lunch', 'dinner', 'snack'],
+  game: ['breakfast', 'lunch', 'pre', 'post', 'dinner', 'snack']
+};
+const slotName = (slot, kind) => (kind === 'game' && slot === 'pre' ? 'Pre-game' : kind === 'game' && slot === 'post' ? 'Post-game' : MEAL_LABEL[slot]);
+const slotHint = (slot, kind) => ({ pre: kind === 'game' ? '30–60 min before' : '1–2 h before', post: 'within 1 h after' })[slot] || '';
+const KIND_NOTE = {
+  training: 'Carbs before you train, protein + carbs after.',
+  rest: 'Same protein, no pre/post-workout snacks — your muscles rebuild today.',
+  game: 'Full meal 3–4 hours before first pitch, a small carb snack 30–60 minutes before, recovery food after.'
+};
+const GROW_ORDER = ['dinner', 'lunch', 'breakfast', 'post', 'snack', 'pre'];   // which meals get bigger first
+const hashStr = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+
+// Today's plan choices. Each day starts fresh: training or rest comes from today's workout in the Plan tab.
+function mealPlanToday() {
+  const mp = S.settings.mealPlan;
+  if (mp && mp.date === ymd() && KIND_SLOTS[mp.kind]) return mp;
+  return { date: ymd(), kind: dayPlan(dayIdx()).type === 'rest' ? 'rest' : 'training', seed: 0, swaps: {} };
+}
+const saveMealPlan = mp => { S.settings.mealPlan = mp; saveSettings(); };
+
+// Recipes for one meal. On game day, breakfast, lunch and the pre-game snack stick to game-day-friendly food.
+function slotChoices(slot, kind) {
+  const all = RECIPES.filter(r => r.meals.includes(slot));
+  const game = kind === 'game' && ['breakfast', 'lunch', 'pre'].includes(slot) ? all.filter(r => r.tags.includes('game')) : [];
+  return game.length ? game : all;
+}
+
+// One recipe per meal (no repeats), then servings grow or shrink in half steps to land near your calorie goal.
+function buildMealPlan(mp) {
+  const used = new Set();
+  const items = KIND_SLOTS[mp.kind].map(slot => {
+    const list = slotChoices(slot, mp.kind);
+    const i = hashStr(mp.date + slot) + mp.seed + ((mp.swaps || {})[slot] || 0);
+    let r = list[i % list.length];
+    for (let k = 1; used.has(r.id) && k < list.length; k++) r = list[(i + k) % list.length];
+    used.add(r.id);
+    return { slot, r, servings: 1 };
+  });
+  const goal = S.settings.calGoal, total = () => sum(items, x => x.r.cal * x.servings);
+  const order = [...items].sort((a, b) => GROW_ORDER.indexOf(a.slot) - GROW_ORDER.indexOf(b.slot));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const x of order) if (x.servings < 3 && total() + x.r.cal / 2 <= goal + 75) { x.servings += 0.5; grew = true; }
+  }
+  for (let shrank = true; shrank && total() > goal + 150;) {
+    shrank = false;
+    for (const x of [...order].reverse()) if (x.servings > 0.5 && total() > goal + 150) { x.servings -= 0.5; shrank = true; }
+  }
+  return items;
+}
+
+// The next planned meal you haven't logged yet today (for the Today screen).
+function upNextMeal() {
+  const items = buildMealPlan(mealPlanToday()), order = MEALS.map(m => m[0]);
+  const logged = new Set(S.meals.filter(m => m.date === ymd()).map(m => m.meal));
+  const now = order.indexOf(guessMeal());
+  return items.find(x => order.indexOf(x.slot) >= now && !logged.has(x.slot)) || null;
+}
+
+const servingsText = n => `${fmt(n, 1)} serving${n === 1 ? '' : 's'}`;
+const loggedToday = (slot, name) => S.meals.some(m => m.date === ymd() && m.meal === slot && normName(m.name) === normName(name));
+
+function dietMeals() {
+  const mp = mealPlanToday(), items = buildMealPlan(mp), day = dayPlan(dayIdx());
+  const { calGoal, proteinGoal } = S.settings;
+  const cal = sum(items, x => x.r.cal * x.servings), pro = sum(items, x => x.r.pro * x.servings);
+  const rows = items.map(x => {
+    const done = loggedToday(x.slot, x.r.name), hint = slotHint(x.slot, mp.kind);
+    return `<div class="plan-meal ${done ? 'done' : ''}">
+      <button class="plan-meal-main" data-action="openRecipe" data-id="${x.r.id}" data-slot="${x.slot}" data-servings="${x.servings}">
+        <span class="plan-slot">${slotName(x.slot, mp.kind)}${hint ? ` · ${hint}` : ''}${done ? ` · ${icon('check', 'sm')} Logged` : ''}</span>
+        <span class="meal-name">${esc(x.r.name)}</span>
+        <span class="meal-sub">${servingsText(x.servings)} · ${fmt(x.r.cal * x.servings)} cal · ${fmt(x.r.pro * x.servings)} g protein</span>
+      </button>
+      <button class="btn btn-icon sm btn-ghost" data-action="planSwap" data-slot="${x.slot}" aria-label="Swap ${slotName(x.slot, mp.kind)} for another idea">${icon('refresh', 'sm')}</button>
+    </div>`;
+  }).join('');
+  const list = RECIPES.filter(r => (S.recipeMeal === 'all' || r.meals.includes(S.recipeMeal)) && (!S.recipeTag || r.tags.includes(S.recipeTag)));
+  const chip = (action, k, label, on) => `<button class="chip ${on ? 'on' : ''}" data-action="${action}" data-k="${k}" aria-pressed="${on}">${label}</button>`;
+  return `
+    <section class="card hero">
+      <div class="spread">
+        <span class="badge accent">${icon('diet')} Today's meal plan</span>
+        <button class="btn btn-sm btn-ghost" data-action="planShuffle">${icon('refresh', 'sm')} Shuffle</button>
+      </div>
+      <div class="seg" role="group" aria-label="Type of day">
+        ${PLAN_KINDS.map(([k, label]) => `<button class="${mp.kind === k ? 'on' : ''}" data-action="planKind" data-k="${k}" aria-pressed="${mp.kind === k}">${label}</button>`).join('')}
+      </div>
+      <p class="text-2 small">${mp.kind === 'training' && day.type !== 'rest' ? `<b>${esc(day.title)}.</b> ` : ''}${KIND_NOTE[mp.kind]}</p>
+      <div class="stack-sm">${rows}</div>
+      <div class="plan-total"><span>Plan total</span><span><b>${fmt(cal)}</b> cal · <b>${fmt(pro)}</b> g protein</span></div>
+      <p class="hint">Sized to your goal of ${fmt(calGoal)} cal · ${fmt(proteinGoal)} g protein.${pro < proteinGoal - 15 ? ' Short on protein? Add a shake or a Greek yogurt bowl.' : ''} Tap a meal for the recipe and to log it; tap ${icon('refresh', 'sm')} to swap it.</p>
+    </section>
+
+    <div class="section-title">Recipes & meal ideas</div>
+    <div class="chip-row">${[['all', 'All'], ...MEALS].map(([k, label]) => chip('recipeMeal', k, label, S.recipeMeal === k)).join('')}</div>
+    <div class="chip-row">${Object.entries(MEAL_TAGS).map(([k, label]) => chip('recipeTag', k, label, S.recipeTag === k)).join('')}</div>
+    <div>${list.map(recipeRow).join('') || '<div class="empty">No recipes match — try another filter.</div>'}</div>
+
+    <div class="section-title">Eating for baseball</div>
+    <div class="guide">${DIET_GUIDE.map(g => `<details><summary>${esc(g.title)}</summary>
+      <ul class="steps">${g.points.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`).join('')}</div>
+    <p class="hint center">General tips for healthy athletes. Food allergies, a medical condition or a weight goal? Check with a doctor or sports dietitian.</p>`;
+}
+
+const recipeRow = r => `<button class="meal" data-action="openRecipe" data-id="${r.id}">
+  <div><div class="meal-name">${esc(r.name)}</div><div class="meal-sub">${r.min} min · ${r.meals.map(m => MEAL_LABEL[m]).join(', ')}</div></div>
+  <div class="meal-nums">${fmt(r.cal)} cal<small>${fmt(r.pro)} g protein</small></div>
+</button>`;
+
+actions.planKind = el => {
+  if (!KIND_SLOTS[el.dataset.k]) return;
+  saveMealPlan({ ...mealPlanToday(), kind: el.dataset.k, swaps: {} });
+  render();
+};
+actions.planShuffle = () => {
+  const mp = mealPlanToday();
+  saveMealPlan({ ...mp, seed: (mp.seed || 0) + 1, swaps: {} });
+  render(); toast('Fresh meal ideas');
+};
+actions.planSwap = el => {
+  const mp = mealPlanToday(), slot = el.dataset.slot, swaps = { ...(mp.swaps || {}) };
+  swaps[slot] = (swaps[slot] || 0) + 1;
+  saveMealPlan({ ...mp, swaps });
+  render();
+};
+actions.recipeMeal = el => { S.recipeMeal = el.dataset.k; render(); };
+actions.recipeTag = el => { S.recipeTag = S.recipeTag === el.dataset.k ? null : el.dataset.k; render(); };
+
+// The full recipe: nutrition, ingredients, steps — and log it with one tap.
+actions.openRecipe = el => openRecipe(RECIPE_BY_ID[el.dataset.id], el.dataset.slot, num(el.dataset.servings) || 1);
+function openRecipe(r, slot, servings = 1) {
+  if (!r) return;
+  const g = guessMeal(), meal = slot || (r.meals.includes(g) ? g : r.meals[0]);
+  const tile = (label, v, u) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${fmt(v)}${u ? `<small> ${u}</small>` : ''}</div></div>`;
+  openSheet(r.name, `
+    <div class="row wrap" style="gap:6px">
+      <span class="badge">${icon('clock')} ${r.min} min</span>
+      ${r.makes > 1 ? `<span class="badge">Makes ${r.makes}</span>` : ''}
+      ${r.tags.map(t => `<span class="badge accent">${esc(MEAL_TAGS[t])}</span>`).join('')}
+    </div>
+    <div class="tiles four">${tile('Calories', r.cal)}${tile('Protein', r.pro, 'g')}${tile('Carbs', r.carb, 'g')}${tile('Fat', r.fat, 'g')}</div>
+    <p class="hint">Per serving${r.makes > 1 ? ` — the recipe makes ${r.makes}` : ''}. Estimates; brands vary.</p>
+    <p class="text-2 small">${esc(r.why)}</p>
+    <div class="section-title">Ingredients</div>
+    <ul class="steps">${r.ing.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    <div class="section-title">How to make it</div>
+    <ol class="steps">${r.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+    <form class="form" novalidate data-submit="logRecipe" data-id="${r.id}">
+      <div class="form-grid">
+        <div class="field"><span>Servings</span>${stepper('servings', servings, 0.5, { min: 0.5, max: 10, mode: 'decimal' })}</div>
+        <label class="field"><span>Meal</span><select name="meal">${MEALS.map(([k, v]) => `<option value="${k}" ${meal === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">${icon('plus', 'sm')} Log it for today</button>
+    </form>
+    <button class="btn btn-ghost btn-block" data-action="recipeFav" data-id="${r.id}">${icon('star', 'sm')} Save to favorites</button>`);
+}
+submits.logRecipe = f => {
+  const r = RECIPE_BY_ID[f.dataset.id];
+  if (!r) { closeSheet(); return; }
+  const d = formData(f), servings = clamp(num(d.servings) || 1, 0.25, 20);
+  const m = {
+    id: uid(), date: ymd(), time: nowHHMM(), meal: MEAL_LABEL[d.meal] ? d.meal : guessMeal(), name: r.name, servings,
+    cal: Math.round(r.cal * servings), pro: Math.round(r.pro * servings * 10) / 10, createdAt: Date.now()
+  };
+  S.meals.push(m);
+  save(() => DB.put('meals', m));
+  closeSheet(); render();
+  toast(`Logged ${r.name}`, { action: () => removeMeal(m.id) });
+};
+actions.recipeFav = el => {
+  const r = RECIPE_BY_ID[el.dataset.id];
+  if (!r) return;
+  addFavorite({ name: r.name, cal: r.cal, pro: r.pro });
+  closeSheet(); render(); toast(`${r.name} saved to favorites`);
 };
 
 /* ============================== 9. PROGRESS TAB (charts + history) ============================== */

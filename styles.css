@@ -412,6 +412,35 @@ h1, h2, h3, h4, p { margin: 0; }
 .meal-nums { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; font-size: 15px; }
 .meal-nums small { display: block; color: var(--muted); font-weight: 700; font-size: 13px; }
 
+/* Meal plan, recipes and eating tips (Meals view) */
+.chip-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.chip-row::-webkit-scrollbar { display: none; }
+.chip-row .chip { flex: none; }
+.plan-meal { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 10px 10px 12px; background: var(--surface-2); border-radius: 14px; }
+.plan-meal-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 0; background: none; border: 0; text-align: left; color: inherit; }
+.plan-slot { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.plan-slot .i { width: 14px; height: 14px; stroke-width: 3; }
+.plan-meal.done .plan-slot { color: #4ade80; }
+.plan-meal.done .meal-name { color: var(--text-2); }
+.plan-total { display: flex; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 15px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.plan-total b { color: var(--text); }
+.next-meal { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 16px; padding: 12px 14px; background: var(--surface-2); border: 0; border-radius: 14px; text-align: left; color: inherit; }
+.next-meal .grow { display: flex; flex-direction: column; gap: 2px; }
+.next-meal > .i { color: var(--muted); }
+.meal-link { display: block; margin: 6px auto -8px; }
+.tiles.four { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tiles.four .tile { padding: 10px 8px; }
+.tiles.four .tile-value { font-size: 19px; }
+.guide { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.guide details { border-bottom: 1px solid var(--line); }
+.guide details:last-child { border-bottom: 0; }
+.guide summary { display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 0 16px; font-weight: 700; cursor: pointer; list-style: none; }
+.guide summary::-webkit-details-marker { display: none; }
+.guide summary::after { content: "+"; color: var(--muted); font-size: 22px; font-weight: 400; }
+.guide details[open] summary::after { content: "−"; }
+.guide .steps { padding: 0 16px 14px 36px; }
+.hint .i { width: 14px; height: 14px; vertical-align: -2px; }
+
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .tiles.two { grid-template-columns: 1fr 1fr; }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; min-width: 0; }
