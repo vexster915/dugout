@@ -3288,17 +3288,21 @@ const PITCH_SMART = [
 ];
 const pitchRule = age => (age >= 7 ? PITCH_SMART.find(r => age <= r.upTo) || null : null);
 const restDays = (rule, pitches) => rule.tiers.filter(t => pitches > t).length;
+// Pitch Smart goes by everything you pitch in a day, so a bullpen and a game (or both games of a
+// doubleheader) on the same date add up.
+const pitchesOn = date => sum(S.logs.filter(l => l.kind === 'throw' && l.date === date && PITCHING.includes(l.type)), l => l.count || 0);
 const throwText = l => `${THROW_LABEL[l.type] || 'Throwing'} · ${fmt(l.count)} ${PITCHING.includes(l.type) ? 'pitches' : 'throws'}${l.dist ? ` · ${fmt(l.dist)} ft` : ''}${l.feel ? ` · arm ${FEEL[l.feel].toLowerCase()}` : ''}`;
 
 // When can you pitch again? The latest "first day back" from any recent pitching outing.
 function armStatus() {
   const age = S.settings.profile && S.settings.profile.age, rule = age ? pitchRule(age) : null;
   let until = null, from = null;
-  if (rule) for (const l of logsOf('throw').filter(x => PITCHING.includes(x.type) && x.count > 0).slice(-12)) {
-    const rd = restDays(rule, l.count);
+  const days = rule ? [...new Set(logsOf('throw').filter(x => PITCHING.includes(x.type) && x.count > 0).map(x => x.date))].slice(-12) : [];
+  for (const date of days) {
+    const count = pitchesOn(date), rd = restDays(rule, count);
     if (!rd) continue;
-    const back = addDays(parseYmd(l.date), rd + 1);
-    if (!until || back > until) { until = back; from = l; }
+    const back = addDays(parseYmd(date), rd + 1);
+    if (!until || back > until) { until = back; from = { date, count }; }
   }
   return { age, rule, until: until && until > parseYmd(ymd()) ? until : null, from };
 }
@@ -3364,9 +3368,11 @@ submits.saveThrow = f => {
   putLog(l);
   closeSheet(); render();
   const rule = pitchRule(S.settings.profile && S.settings.profile.age);
-  if (PITCHING.includes(l.type) && rule && count > rule.max) toast(`That's over the Pitch Smart daily limit for your age (${rule.max}). Rest up!`);
-  else if (PITCHING.includes(l.type) && rule) { const r = restDays(rule, count); toast(r ? `Saved — ${r} day${r === 1 ? '' : 's'} of rest before pitching again` : 'Saved — no rest day needed'); }
-  else toast(l.feel === 1 ? 'Saved — please get that arm checked' : 'Throwing saved');
+  if (PITCHING.includes(l.type) && rule) {
+    const day = pitchesOn(date), r = restDays(rule, day), also = day > count ? ` (${day} pitches that day)` : '';
+    toast(day > rule.max ? `${day > count ? `${day} pitches that day — that's` : "That's"} over the Pitch Smart daily limit for your age (${rule.max}). Rest up!`
+      : r ? `Saved — ${r} day${r === 1 ? '' : 's'} of rest before pitching again${also}` : 'Saved — no rest day needed');
+  } else toast(l.feel === 1 ? 'Saved — please get that arm checked' : 'Throwing saved');
 };
 
 // ----- Games & season stats -----
@@ -3496,17 +3502,24 @@ submits.saveSkill = f => {
 };
 
 // ----- Live pitch counter (kept in settings so it survives closing the app mid-game) -----
+// An unsaved count from an earlier day is kept (a night game past midnight, or a count you forgot to save)
+// until you save it to that day or start over.
 function pitchState() {
   let p = S.settings.pitch;
-  if (!isObj(p) || p.date !== ymd() || !Array.isArray(p.inn) || !Array.isArray(p.seq)) { p = S.settings.pitch = { date: ymd(), type: 'game', s: 0, b: 0, inn: [0], seq: [] }; saveSettings(); }
+  const ok = isObj(p) && /^\d{4}-\d{2}-\d{2}$/.test(p.date || '') && Number.isInteger(p.s) && Number.isInteger(p.b) && p.s >= 0 && p.b >= 0
+    && Array.isArray(p.inn) && p.inn.length && Array.isArray(p.seq);
+  if (!ok || (p.date !== ymd() && !(p.s + p.b))) { p = S.settings.pitch = { date: ymd(), type: 'game', s: 0, b: 0, inn: [0], seq: [] }; saveSettings(); }
   return p;
 }
 function pitchBody() {
   const p = pitchState(), total = p.s + p.b, rule = pitchRule(S.settings.profile && S.settings.profile.age);
-  const rest = rule ? restDays(rule, total) : 0, level = !rule ? '' : total >= rule.max ? 'over' : total >= rule.max - 10 ? 'near' : '';
-  return `<div class="pc-total ${level}">${total}<small>pitches${rule ? ` · limit ${rule.max}` : ''}</small></div>
-    ${rule ? `<div class="meter pc ${level}"><span style="width:${Math.min(100, (total / rule.max) * 100)}%"></span></div>
-      <p class="small text-2 center">${total >= rule.max ? '<b>Daily limit reached — time to come out.</b> ' : ''}${total ? `If you stop now: <b>${rest} day${rest === 1 ? '' : 's'}</b> of rest` : 'Pitch Smart limit for your age shown above'}</p>`
+  const today = p.date === ymd(), earlier = pitchesOn(p.date), day = earlier + total;
+  const rest = rule ? restDays(rule, day) : 0, level = !rule ? '' : day >= rule.max ? 'over' : day >= rule.max - 10 ? 'near' : '';
+  return `${today ? '' : `<div class="banner warn">${icon('info')}<div>This count is from ${fmtDate(parseYmd(p.date), { weekday: 'long', month: 'short', day: 'numeric' })}. Save it to that day, or start over.</div></div>`}
+    <div class="pc-total ${level}">${total}<small>pitches${rule ? ` · limit ${rule.max}` : ''}</small></div>
+    ${earlier ? `<p class="small muted center">${total ? `Plus ${earlier} pitches already logged ${today ? 'today' : 'that day'} — ${day} total` : `${earlier} pitches already logged ${today ? 'today' : 'that day'}`}</p>` : ''}
+    ${rule ? `<div class="meter pc ${level}"><span style="width:${Math.min(100, (day / rule.max) * 100)}%"></span></div>
+      <p class="small text-2 center">${day >= rule.max ? '<b>Daily limit reached — time to come out.</b> ' : ''}${day ? `If you stop now: <b>${rest} day${rest === 1 ? '' : 's'}</b> of rest` : 'Pitch Smart limit for your age shown above'}</p>`
       : '<p class="hint center"><button class="btn-link inline-link" data-action="calcGoals">Add your age</button> to see your pitch limit and rest days.</p>'}
     <div class="pc-btns">
       <button class="btn pc-btn strike" data-action="pitch" data-k="s">Strike<b>${p.s}</b></button>
@@ -3540,7 +3553,7 @@ actions.pitchUndo = () => {
 actions.pitchInning = () => { const p = pitchState(); if (p.inn[p.inn.length - 1] > 0) { p.inn.push(0); saveSettings(); } redrawPitch(); };
 changes.pitchType = el => { pitchState().type = el.value === 'bullpen' ? 'bullpen' : 'game'; saveSettings(); };
 actions.pitchReset = async () => {
-  if (!(await confirmBox('Start over?', 'The pitch count for today goes back to zero.', { ok: 'Start over', danger: true }))) { actions.pitchCounter(); return; }
+  if (!(await confirmBox('Start over?', 'The live pitch count goes back to zero. Pitches you already saved stay in your throwing log.', { ok: 'Start over', danger: true }))) { actions.pitchCounter(); return; }
   S.settings.pitch = null; saveSettings(); actions.pitchCounter();
 };
 actions.pitchSave = () => {
@@ -3551,7 +3564,7 @@ actions.pitchSave = () => {
     note: `${p.s} strikes, ${p.b} balls (${Math.round((p.s / total) * 100)}%)${p.type === 'game' ? ` · ${innings} inning${innings === 1 ? '' : 's'}` : ''}` });
   S.settings.pitch = null; saveSettings();
   closeSheet(); render();
-  const rule = pitchRule(S.settings.profile && S.settings.profile.age), r = rule ? restDays(rule, total) : null;
+  const rule = pitchRule(S.settings.profile && S.settings.profile.age), r = rule ? restDays(rule, pitchesOn(p.date)) : null;
   toast(r ? `Saved ${total} pitches — ${r} day${r === 1 ? '' : 's'} of rest` : `Saved ${total} pitches`);
 };
 
@@ -3854,7 +3867,7 @@ const CSV = {
     const rows = [['Date', 'Type', 'What', 'Value', 'Unit', 'Details']];
     for (const l of [...S.logs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) {
       if (l.kind === 'weight') rows.push([l.date, 'Body weight', '', l.w, S.settings.unit, '']);
-      else if (l.kind === 'water') rows.push([l.date, 'Water', '', l.oz, 'oz', '']);
+      else if (l.kind === 'water') rows.push([l.date, 'Water', '', metricWater() ? Math.round(l.oz * 0.0295735 * 100) / 100 : l.oz, metricWater() ? 'L' : 'oz', '']);
       else if (l.kind === 'test') { const t = TEST_BY_ID[l.test]; if (t) rows.push([l.date, 'Test', t.name, l.v, t.unit, '']); }
       else if (l.kind === 'throw') rows.push([l.date, 'Throwing', THROW_LABEL[l.type] || l.type, l.count, PITCHING.includes(l.type) ? 'pitches' : 'throws', [l.dist ? `${l.dist} ft` : '', l.feel ? `arm ${FEEL[l.feel].toLowerCase()}` : '', l.note || ''].filter(Boolean).join('; ')]);
       else if (l.kind === 'game') rows.push([l.date, 'Game', [l.opp && `vs ${l.opp}`, l.result, l.score].filter(Boolean).join(' '), '', '',
@@ -3970,7 +3983,7 @@ const HELP = [
   ['Arm care and pitch counts', ['Log every throwing session with how your arm feels. Big week-to-week jumps in throwing are a common cause of arm trouble.',
     'During games use the pitch counter: it shows your Pitch Smart limit for your age and the rest days you\'ll need. Your league\'s rules come first.',
     'Soreness that fades in a day is normal. Pain, numbness or pain that lingers is not — stop throwing and tell a coach, athletic trainer or doctor.']],
-  ['Programs and your plan', ['Plan → Programs switches between off-season (build) and in-season (maintain). Your history stays.',
+  ['Programs and your plan', ['Plan → Programs switches between off-season (build), pre-season (sharpen) and in-season (maintain). Your history stays.',
     'Tap any exercise to change sets, reps, rest or the video. Use the exercise library to add new ones, or swap an exercise for today during a workout.']],
   ['Backups and privacy', ['Everything stays on this phone, encrypted with your password. There is no password reset — keep it in your iPhone Passwords app.',
     'Export a backup about once a week (Settings) and save it to Files or email it to yourself. Spreadsheet (CSV) exports are for coaches and are not encrypted.']]
@@ -4064,7 +4077,10 @@ function cleanPlan(plan) {
 const cleanWorkout = w => {
   if (!isObj(w) || !w.id || !w.startedAt || !Array.isArray(w.exercises)) return null;
   w.exercises = w.exercises.filter(e => isObj(e) && e.name && Array.isArray(e.sets));
-  w.exercises.forEach(e => { e.sets = e.sets.filter(isObj); if (!TRACKS[e.track]) e.track = 'weight'; });
+  w.exercises.forEach(e => {
+    e.sets = e.sets.filter(isObj).map(st => ({ ...st, w: optNum(st.w), r: optNum(st.r), done: !!st.done }));
+    if (!TRACKS[e.track]) e.track = 'weight';
+  });
   if (!MODES[w.mode]) w.mode = 'gym';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(w.date)) w.date = ymd(new Date(w.startedAt));
   w.title = String(w.title || 'Workout');
@@ -4296,8 +4312,14 @@ submits.signIn = async f => {
     }
     return;
   }
-  await DB.delRaw('lockout');
-  await openApp();
+  try {
+    await DB.delRaw('lockout');
+    await openApp();
+  } catch (e) {
+    console.error(e);
+    setBusy(f, false);
+    authError(f, 'Could not open your data: ' + (e.message || e));
+  }
 };
 
 // After 5 wrong tries in a row, make people wait: 30 seconds, then doubling up to 1 hour.
@@ -4320,7 +4342,7 @@ async function lockApp(message) {
   $('#toast').classList.remove('show');
   toastAct = null;
   DB.lock();
-  badgeSig = '';
+  badgeSig = ''; calcResult = null; pendingBackup = null;
   Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null });
   render();
   if (message) toast(message);
@@ -4397,7 +4419,8 @@ actions.forgotPw = () => openSheet('Forgot your password?', `
 actions.resetEverything = async () => {
   if (!(await confirmBox('Erase everything?', 'All workouts, food logs, favorites, settings and your login will be deleted from this phone. This cannot be undone.', { ok: 'Erase', danger: true }))) return;
   if (!(await confirmBox('Are you sure?', 'Last chance — everything on this phone will be erased.', { ok: 'Yes, erase everything', danger: true }))) return;
-  await DB.eraseEverything();
+  try { await DB.eraseEverything(); }
+  catch (e) { toast('Erase failed: ' + (e.message || e)); return; }
   DB.lock();
   S.vault = null;
   render();
