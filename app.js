@@ -3081,6 +3081,7 @@ function renderSettings() {
       </div></div>
       <button class="btn btn-primary btn-block" data-action="exportBackup" data-external>${icon('download', 'sm')} Export backup</button>
       <label class="btn btn-ghost btn-block" for="import-file" data-external>${icon('upload', 'sm')} Import backup</label>
+      <button class="btn btn-ghost btn-block" data-action="csvMenu">${icon('share', 'sm')} Export spreadsheets (CSV)</button>
       <input class="vh" type="file" id="import-file" accept=".json,application/json,text/plain" data-change="importFile">
       <div class="hint center">${S.workouts.length} workouts · ${S.meals.length} food entries · ${S.foods.length} favorites saved</div>
     </div>
@@ -3137,25 +3138,16 @@ function markBackedUp() {
   render();
   toast('Backup exported');
 }
-actions.exportBackup = async () => {
-  const name = `dugout-backup-${ymd()}.json`;
-  let json;
-  try { json = JSON.stringify(await DB.sealBackup(backupData())); }      // encrypted with your login
-  catch (e) { toast('Backup failed: ' + (e.message || e)); return; }
+// Hand a file to the user: the Share sheet on iPhone ("Save to Files", AirDrop, Mail…),
+// a normal download elsewhere. Returns false if the share sheet was closed without saving.
+async function shareFile(name, text, type, title) {
   let file = null;
-  try { file = new File([json], name, { type: 'application/json' }); } catch (e) { /* very old browser */ }
-  // iPhone: opens the Share sheet → "Save to Files", AirDrop, Mail…
+  try { file = new File([text], name, { type }); } catch (e) { /* very old browser */ }
   if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: 'Dugout backup' });
-      markBackedUp();
-      return;
-    } catch (err) {
-      if (err && err.name === 'AbortError') return;       // share sheet closed — nothing saved
-    }
+    try { await navigator.share({ files: [file], title }); return true; }
+    catch (err) { if (err && err.name === 'AbortError') return false; }
   }
-  // Computers / other browsers: a normal download
-  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
   a.href = url;
   a.download = name;
@@ -3163,7 +3155,55 @@ actions.exportBackup = async () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 15000);
-  markBackedUp();
+  return true;
+}
+actions.exportBackup = async () => {
+  let json;
+  try { json = JSON.stringify(await DB.sealBackup(backupData())); }      // encrypted with your login
+  catch (e) { toast('Backup failed: ' + (e.message || e)); return; }
+  if (await shareFile(`dugout-backup-${ymd()}.json`, json, 'application/json', 'Dugout backup')) markBackedUp();
+};
+
+// ----- Spreadsheets (CSV) for you or your coach — these are NOT encrypted -----
+const csvCell = v => {
+  let t = String(v ?? '');
+  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(t) && isNaN(Number(t))) t = "'" + t;   // stop spreadsheet formulas
+  return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+};
+const toCsv = rows => rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+const CSV = {
+  workouts: ['Workouts', () => {
+    const rows = [['Date', 'Mode', 'Workout', 'Exercise', 'Set', `Weight (${S.settings.unit})`, 'Reps or seconds', 'Done', 'Effort (1-10)', 'Workout notes']];
+    for (const w of [...S.workouts].reverse()) w.exercises.forEach((e, ei) => e.sets.forEach((st, i) =>
+      rows.push([w.date, MODES[w.mode].label, w.title, e.name, i + 1, e.track === 'weight' ? st.w ?? '' : '', st.r ?? '', st.done ? 'yes' : 'no', w.rpe || '', ei === 0 && i === 0 ? w.notes || '' : ''])));
+    return rows;
+  }],
+  food: ['Food log', () => [['Date', 'Time', 'Meal', 'Food', 'Servings', 'Serving size', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'],
+    ...[...S.meals].sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1))
+      .map(m => [m.date, m.time || '', MEAL_LABEL[m.meal] || '', m.name, m.servings || 1, m.serving || '', m.cal, m.pro, m.carb ?? '', m.fat ?? ''])]],
+  tracking: ['Weight, water, tests, throwing and check-ins', () => {
+    const rows = [['Date', 'Type', 'What', 'Value', 'Unit', 'Details']];
+    for (const l of [...S.logs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) {
+      if (l.kind === 'weight') rows.push([l.date, 'Body weight', '', l.w, S.settings.unit, '']);
+      else if (l.kind === 'water') rows.push([l.date, 'Water', '', l.oz, 'oz', '']);
+      else if (l.kind === 'test') { const t = TEST_BY_ID[l.test]; if (t) rows.push([l.date, 'Test', t.name, l.v, t.unit, '']); }
+      else if (l.kind === 'throw') rows.push([l.date, 'Throwing', THROW_LABEL[l.type] || l.type, l.count, PITCHING.includes(l.type) ? 'pitches' : 'throws', [l.dist ? `${l.dist} ft` : '', l.feel ? `arm ${FEEL[l.feel].toLowerCase()}` : '', l.note || ''].filter(Boolean).join('; ')]);
+      else if (l.kind === 'checkin') rows.push([l.date, 'Check-in', 'Readiness', readiness(l), '/100', `sleep ${l.sleep} h; energy ${l.energy}/5; soreness ${l.sore}/5`]);
+    }
+    return rows;
+  }]
+};
+actions.csvMenu = () => openSheet('Export spreadsheets', `<div class="stack">
+  <p class="text-2 small">Opens in Excel, Numbers or Google Sheets — handy for sharing with a coach or trainer.</p>
+  ${Object.entries(CSV).map(([k, [label]]) => `<button class="btn btn-ghost btn-block" data-action="exportCsv" data-k="${k}" data-external>${icon('download', 'sm')} ${label}</button>`).join('')}
+  <div class="banner warn">${icon('shield')}<div>Spreadsheet files are <b>not encrypted</b> — anyone with the file can read it. For a full, private copy of your data use <b>Export backup</b> instead.</div></div>
+</div>`);
+actions.exportCsv = async el => {
+  const entry = CSV[el.dataset.k];
+  if (!entry) return;
+  const rows = entry[1]();
+  if (rows.length < 2) { toast('Nothing logged yet'); return; }
+  await shareFile(`dugout-${el.dataset.k}-${ymd()}.csv`, '﻿' + toCsv(rows), 'text/csv', `Dugout ${entry[0].toLowerCase()}`);
 };
 
 let pendingBackup = null;
