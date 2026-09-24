@@ -3390,6 +3390,7 @@ function renderSettings() {
     <div class="set-list">
       <div class="set-item"><div class="grow"><div>Storage</div><div class="hint">${storageText()}</div></div></div>
       <button class="set-item as-btn" data-action="checkUpdate"><div class="grow"><div>Check for updates</div><div class="hint">Loads the newest app files from GitHub (needs internet)</div></div>${icon('refresh')}</button>
+      <button class="set-item as-btn" data-action="help"><div class="grow"><div>How to use Dugout</div><div class="hint">Tips for every part of the app</div></div>${icon('info')}</button>
       <button class="set-item as-btn" data-action="installHelp"><div class="grow"><div>How to install on iPhone</div></div>${icon('info')}</button>
     </div>
 
@@ -3573,6 +3574,30 @@ actions.checkUpdate = async () => {
   } catch (e) { /* ignore — reload anyway */ }
   setTimeout(() => location.reload(), 400);
 };
+
+// ----- How to use Dugout -----
+const HELP = [
+  ['Your day in Dugout', ['Open the Today tab: it shows today\'s workout, a quick check-in, your nutrition, water and what to eat next.',
+    'Tap Start to begin a workout. Check off each set — the rest timer starts on its own, and your weights from last time are filled in.',
+    'Tap ▶ on any exercise for a form video, step-by-step how-to, common mistakes and easier or harder versions.']],
+  ['Logging food fast', ['Type a few letters to search 142 common foods, your favorites and anything you logged before. Change Servings and the numbers update.',
+    'Use the Recent row, Favorites, the + on a meal, or "Copy yesterday\'s food" to log in one tap.',
+    'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
+  ['Setting your goals', ['Settings → Calculate my goals turns your age, size, training and goal into calories, protein, carbs, fat and water.',
+    'Weigh in once or twice a week (Progress → Body) and recalculate every month or so. If you\'re trying to gain and your weight stalls for 2–3 weeks, add about 250 calories.']],
+  ['Testing the right way', ['Warm up fully first. Take 2–3 tries and log your best.', 'Test the same way each time — same surface, same timer, same time of day — so the numbers are fair.',
+    'Re-test every 4–6 weeks. The stopwatch (Progress → Baseball) lets a partner time your sprints.']],
+  ['Arm care and pitch counts', ['Log every throwing session with how your arm feels. Big week-to-week jumps in throwing are a common cause of arm trouble.',
+    'During games use the pitch counter: it shows your Pitch Smart limit for your age and the rest days you\'ll need. Your league\'s rules come first.',
+    'Soreness that fades in a day is normal. Pain, numbness or pain that lingers is not — stop throwing and tell a coach, athletic trainer or doctor.']],
+  ['Programs and your plan', ['Plan → Programs switches between off-season (build) and in-season (maintain). Your history stays.',
+    'Tap any exercise to change sets, reps, rest or the video. Use the exercise library to add new ones, or swap an exercise for today during a workout.']],
+  ['Backups and privacy', ['Everything stays on this phone, encrypted with your password. There is no password reset — keep it in your iPhone Passwords app.',
+    'Export a backup about once a week (Settings) and save it to Files or email it to yourself. Spreadsheet (CSV) exports are for coaches and are not encrypted.']]
+];
+actions.help = () => openSheet('How to use Dugout', `<div class="guide">${HELP.map(([title, points]) => `<details><summary>${esc(title)}</summary>
+  <ul class="steps">${points.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`).join('')}</div>
+  <button class="btn btn-primary btn-block" data-action="closeSheet">Got it</button>`);
 
 actions.installHelp = () => openSheet('Install on iPhone', `
   <ol class="steps">
