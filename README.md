@@ -7,7 +7,7 @@ Everything is stored only on your phone, encrypted with your login, and it works
 
 **Train**
 - Weekly gym and home (no equipment) plans — **off-season** build, **pre-season** sharpen and **in-season** maintain programs
-- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for all 103 exercises
+- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 113 exercises, plus a searchable exercise library
 - Next-weight suggestions, warm-up sets, plate calculator, exercise swaps, effort rating and notes
 - Daily readiness check-in (sleep, energy, soreness)
 

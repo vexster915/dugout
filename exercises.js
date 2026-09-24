@@ -634,6 +634,68 @@ const EXERCISE_INFO = {
     mistakes: ["Going easy — squeeze hard"],
     easier: "Shorter time", harder: "Wet towel for more resistance", swap: ["Wrist curls + reverse wrist curls"]
   },
+  /* ---------- Extra library exercises (not in the starting programs; "plan" = default sets when you add one) ---------- */
+  "Goblet squat": {
+    muscles: "Quads, glutes, core", why: "Teaches a deep, upright squat and builds leg strength with just one dumbbell.",
+    steps: ["Hold a dumbbell or kettlebell against your chest with both hands.", "Feet a little wider than your shoulders, toes turned out slightly.", "Sit down between your heels, chest tall, elbows inside your knees.", "Drive up through your whole foot."],
+    mistakes: ["Heels lifting", "Chest collapsing forward"], easier: "Squat to a box or bench", harder: "Pause 2 seconds at the bottom", swap: ["Leg press", "Reverse lunges"],
+    plan: { sets: 3, reps: "10", rest: 90, track: "weight", cues: "Dumbbell at your chest, sit down between your heels, chest tall." }
+  },
+  "Bulgarian split squat": {
+    muscles: "Quads, glutes, adductors", why: "One of the best single-leg strength builders — evens out your legs and builds a strong drive leg.",
+    steps: ["Stand a stride in front of a bench and rest the top of your back foot on it.", "Hold dumbbells at your sides.", "Lower straight down until your back knee nearly touches the floor.", "Drive up through your front foot."],
+    mistakes: ["Front foot too close to the bench", "Leaning way forward"], easier: "Bodyweight, hold something for balance", harder: "Heavier dumbbells or a slow 3-second lowering", swap: ["Reverse lunges", "Dumbbell step-ups"],
+    plan: { sets: 3, reps: "8/leg", rest: 90, track: "weight", cues: "Back foot on the bench, lower straight down, drive through the front foot." }
+  },
+  "Band pull-aparts": {
+    muscles: "Rear delts, upper back", why: "Quick, easy upper-back work that keeps your throwing shoulder balanced. Great in every warm-up.",
+    steps: ["Hold a light band at shoulder height with straight arms, hands shoulder-width.", "Pull the band apart until it touches your chest.", "Squeeze your shoulder blades together.", "Return slowly."],
+    mistakes: ["Shrugging", "Bending your elbows a lot"], easier: "Lighter band or wider grip", harder: "Pause 2 seconds with the band at your chest", swap: ["Face pulls", "Prone Y-T-W raises"],
+    plan: { sets: 3, reps: "15", rest: 30, track: "reps", cues: "Straight arms, pull the band to your chest, squeeze your shoulder blades." }
+  },
+  "Scap push-ups": {
+    muscles: "Serratus, upper back", why: "Trains the muscle that moves your shoulder blade around your ribcage — key for healthy throwing.",
+    steps: ["Get into a high plank with straight arms.", "Without bending your elbows, let your chest sink so your shoulder blades pinch together.", "Push the floor away so your upper back rounds slightly.", "Move slowly for all reps."],
+    mistakes: ["Bending the elbows", "Hips sagging"], easier: "From your knees or against a wall", harder: "Pause at the top", swap: ["Wall slides", "Up-downs (plank to push-up)"],
+    plan: { sets: 2, reps: "12", rest: 30, track: "reps", cues: "Arms stay straight — only your shoulder blades move." }
+  },
+  "Med ball chest pass": {
+    muscles: "Chest, shoulders, triceps", why: "Explosive upper-body power without heavy weights.",
+    steps: ["Stand facing a wall, 6–8 feet away, holding a med ball at your chest.", "Step forward and throw the ball into the wall as hard as you can.", "Catch it on the rebound and reset."],
+    mistakes: ["Using a ball that's too heavy to throw fast", "Throwing only with your arms — step into it"], easier: "Lighter ball", harder: "Split stance and full speed", swap: ["Plyo push-ups", "Med ball overhead slams"],
+    plan: { sets: 3, reps: "6", rest: 60, track: "reps", cues: "Step and throw the ball into the wall as hard as you can." }
+  },
+  "Bear crawl": {
+    muscles: "Core, shoulders, hips", why: "Whole-body coordination and core control with your knees hovering.",
+    steps: ["Start on hands and knees, then lift your knees an inch off the floor.", "Crawl forward moving the opposite hand and foot together.", "Keep your back flat and hips low.", "Go 10–15 yards, then crawl back."],
+    mistakes: ["Hips popping up high", "Knees touching down"], easier: "Hold the position without crawling", harder: "Crawl backward or sideways", swap: ["Plank shoulder taps", "Dead bugs"],
+    plan: { sets: 3, reps: "15 yd", rest: 45, track: "check", cues: "Knees an inch off the floor, opposite hand and foot move together." }
+  },
+  "Hip airplanes": {
+    muscles: "Glutes, hip rotators, balance", why: "Builds hip control on one leg — the same control you need landing on your stride leg.",
+    steps: ["Stand on one leg and hinge forward until your body is roughly parallel to the floor.", "Rotate your hips open toward the ceiling.", "Rotate them back down until level.", "Hold something at first for balance."],
+    mistakes: ["Rushing", "Rounding your back"], easier: "Hand on a wall", harder: "Eyes closed or slower reps", swap: ["Single-leg RDL", "90/90 hip switches"],
+    plan: { sets: 2, reps: "5/leg", rest: 30, track: "check", cues: "Hinge on one leg, rotate your hips open and closed with control." }
+  },
+  "Banded lateral walks": {
+    muscles: "Glute medius, hips", why: "Wakes up the side glutes that keep your knees stable when you cut and land.",
+    steps: ["Put a mini band above your knees or around your ankles.", "Get into a quarter squat.", "Step sideways, keeping tension on the band.", "Go 10 steps each way."],
+    mistakes: ["Standing up tall", "Letting your knees cave in"], easier: "Lighter band", harder: "Band around your ankles or a stronger band", swap: ["Lateral shuffles", "Lateral lunges"],
+    plan: { sets: 2, reps: "10 steps each way", rest: 30, track: "check", cues: "Stay low, keep tension on the band, knees pushed out." }
+  },
+  "Suitcase carry": {
+    muscles: "Obliques, grip, shoulders", why: "Carrying weight on one side trains your core to stay tall — like holding your posture through a swing.",
+    steps: ["Pick up a heavy dumbbell or kettlebell in one hand.", "Stand tall — don't lean toward the weight.", "Walk 30–40 yards with quick steps.", "Switch hands and walk back."],
+    mistakes: ["Leaning to the side", "Shrugging the loaded shoulder"], easier: "Lighter weight", harder: "Heavier weight or longer walk", swap: ["Farmer's carry", "Pallof press"],
+    plan: { sets: 3, reps: "30 yd/side", rest: 60, track: "weight", cues: "Heavy weight in one hand, stand tall, don't lean." }
+  },
+  "Band 90/90 external rotation": {
+    muscles: "Rotator cuff", why: "Strengthens the rotator cuff in the throwing position — a staple of pitcher arm-care programs.",
+    steps: ["Anchor a light band at chest height in front of you.", "Raise your arm to the side, elbow bent 90° at shoulder height, band in hand.", "Rotate your forearm up and back until it points to the ceiling.", "Return slowly."],
+    mistakes: ["Letting the elbow drop", "Going too heavy"], easier: "Elbow lower, lighter band", harder: "Pause 2 seconds at the top", swap: ["Cable external rotation", "External rotation hold (doorway)"],
+    plan: { sets: 2, reps: "12/arm", rest: 30, track: "reps", cues: "Elbow at shoulder height, rotate up slowly, control it back." }
+  },
+
   "Up-downs (plank to push-up)": {
     muscles: "Shoulders, triceps, core", why: "Shoulder stability and core control.",
     steps: ["Start in a forearm plank.", "Push up onto one hand, then the other, into a high plank.", "Lower back down one forearm at a time.", "Keep your hips steady."],
@@ -645,16 +707,16 @@ const EXERCISE_INFO = {
 // Categories for the exercise library (Plan tab → Exercise library). Every exercise above is listed once.
 const EXERCISE_GROUPS = [
   ["Warm-up & cool-down", ["Dynamic warm-up", "Warm-up + band arm care", "Warm-up + arm circles", "Cool-down walk + stretch", "Easy walk (optional)", "Light stretching (optional)"]],
-  ["Power & jumps", ["Box jumps", "Broad jumps", "Tuck jumps", "Jumping lunges", "Single-leg hops", "Plyo push-ups", "Med ball rotational scoop toss", "Med ball overhead slams", "Kettlebell swings"]],
-  ["Legs", ["Leg press", "Single-leg leg press", "Trap bar deadlift", "Romanian deadlift", "Walking lunges (dumbbells)", "Reverse lunges", "Lateral lunges", "Dumbbell step-ups", "Step-ups (chair or bench)", "Step-ups with backpack",
+  ["Power & jumps", ["Box jumps", "Broad jumps", "Med ball chest pass", "Tuck jumps", "Jumping lunges", "Single-leg hops", "Plyo push-ups", "Med ball rotational scoop toss", "Med ball overhead slams", "Kettlebell swings"]],
+  ["Legs", ["Leg press", "Single-leg leg press", "Goblet squat", "Bulgarian split squat", "Trap bar deadlift", "Romanian deadlift", "Walking lunges (dumbbells)", "Reverse lunges", "Lateral lunges", "Dumbbell step-ups", "Step-ups (chair or bench)", "Step-ups with backpack",
     "Seated leg curl", "Nordic hamstring curls", "Nordic curls (feet under couch)", "Leg extensions", "Hip thrust", "Single-leg glute bridge", "Single-leg hip thrust (couch)", "Single-leg RDL", "Single-leg RDL (backpack)", "Standing calf raises", "Single-leg calf raises"]],
   ["Upper body", ["Dumbbell bench press", "Incline dumbbell press", "Push-ups", "Decline push-ups", "Diamond push-ups", "Pike push-ups", "Pull-ups", "Chest-supported row", "Single-arm dumbbell row",
     "Table inverted rows", "Backpack bent-over rows", "Half-kneeling landmine press", "Backpack overhead press", "Chair dips"]],
-  ["Shoulders & arm care", ["Face pulls", "Rear delt fly", "Dumbbell lateral raises", "Cable external rotation", "External rotation hold (doorway)", "Prone Y-T-W raises", "Wall slides", "Up-downs (plank to push-up)"]],
+  ["Shoulders & arm care", ["Face pulls", "Rear delt fly", "Band pull-aparts", "Scap push-ups", "Band 90/90 external rotation", "Dumbbell lateral raises", "Cable external rotation", "External rotation hold (doorway)", "Prone Y-T-W raises", "Wall slides", "Up-downs (plank to push-up)"]],
   ["Arms & grip", ["Hammer curls", "Incline dumbbell curls", "Backpack curls", "Cable triceps pushdown", "Wrist curls + reverse wrist curls", "Towel wringing", "Farmer's carry"]],
-  ["Core & rotation", ["Pallof press", "Hanging knee raises", "Cable woodchop (high to low)", "Landmine rotations", "Ab wheel rollouts", "Plank shoulder taps", "Dead bugs", "Russian twists (backpack)",
+  ["Core & rotation", ["Pallof press", "Hanging knee raises", "Bear crawl", "Suitcase carry", "Cable woodchop (high to low)", "Landmine rotations", "Ab wheel rollouts", "Plank shoulder taps", "Dead bugs", "Russian twists (backpack)",
     "Superman hold", "Side plank hip dips", "Hollow body hold", "Copenhagen plank", "Copenhagen plank (couch)"]],
   ["Speed & agility", ["A-skips & B-skips", "Agility ladder drills", "Pro agility shuttle (5-10-5)", "5-10-5 shuttle", "Sled push", "Lateral skater bounds", "Base-stealing starts (crossover)", "Crossover sprint starts", "Drop-step sprints", "Line hops", "Lateral shuffles"]],
-  ["Mobility & recovery", ["Foam roll", "Ball rolling (tennis or lacrosse ball)", "90/90 hip switches", "World's greatest stretch", "Couch stretch (hip flexors)", "Thoracic open books", "Cross-body shoulder stretch",
+  ["Mobility & recovery", ["Foam roll", "Ball rolling (tennis or lacrosse ball)", "Hip airplanes", "Banded lateral walks", "90/90 hip switches", "World's greatest stretch", "Couch stretch (hip flexors)", "Thoracic open books", "Cross-body shoulder stretch",
     "Lat stretch on rack", "Band hamstring stretch", "Towel hamstring stretch", "Pigeon stretch", "Wrist & forearm stretch", "Cat-cow + deep breathing", "Doorway chest stretch"]]
 ];

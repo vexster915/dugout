@@ -1347,10 +1347,13 @@ actions.libAdd = el => {
   toast(`${name} added to ${DAYS[S.planDay]}`);
 };
 
-// How the starting plan sets up an exercise (cues, reps, what to log).
+// How the starting programs set up an exercise (cues, reps, what to log). Library-only exercises carry
+// their own defaults in exercises.js ("plan").
 function planTemplate(name) {
-  for (const mode of ['gym', 'home']) for (const d of DEFAULT_PLAN[mode]) { const e = d.exercises.find(x => x.name === name); if (e) return e; }
-  return null;
+  const plans = [program().plan, ...Object.values(PROGRAMS).map(p => p.plan)];
+  for (const plan of plans) for (const mode of ['gym', 'home']) for (const d of plan[mode]) { const e = d.exercises.find(x => x.name === name); if (e) return e; }
+  const x = EXERCISE_INFO[name];
+  return x && x.plan ? x.plan : null;
 }
 actions.swapEx = el => {
   if (!S.active || !videoRef || videoRef.src !== 'wo') return;
