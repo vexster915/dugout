@@ -464,10 +464,11 @@ actions.step = el => {
   input.value = clamp(Math.round(v * 100) / 100, min, max);
   input.dispatchEvent(new Event('input', { bubbles: true }));   // lets forms react (e.g. servings rescale the numbers)
 };
+const STEPPER_LABEL = { sets: 'Sets', rest: 'Rest between sets in seconds', servings: 'Servings' };
 const stepper = (name, value, d, { min = 0, max = 9999, minus = icon('minus', 'sm'), plus = icon('plus', 'sm'), mode = 'numeric', input = '' } = {}) => `
   <div class="stepper">
     <button type="button" class="btn" data-action="step" data-target="${name}" data-d="${-d}" data-min="${min}" data-max="${max}" aria-label="Less">${minus}</button>
-    <input name="${name}" inputmode="${mode}" value="${esc(value)}" autocomplete="off"${input ? ` data-input="${input}"` : ''}>
+    <input name="${name}" inputmode="${mode}" value="${esc(value)}" autocomplete="off" aria-label="${STEPPER_LABEL[name] || name}"${input ? ` data-input="${input}"` : ''}>
     <button type="button" class="btn" data-action="step" data-target="${name}" data-d="${d}" data-min="${min}" data-max="${max}" aria-label="More">${plus}</button>
   </div>`;
 
