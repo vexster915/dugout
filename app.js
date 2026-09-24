@@ -503,6 +503,7 @@ function todayCard(day, di, doneToday) {
   const preview = day.exercises.slice(0, 5).map(e => `<div><span>${esc(e.name)}</span><span>${e.sets} × ${esc(e.reps)}</span></div>`).join('')
     + (n > 5 ? `<div><span class="muted">+ ${n - 5} more</span><span></span></div>` : '');
   const startLabel = isRest ? 'Start optional recovery' : doneToday ? 'Train again' : `Start ${m.label} workout`;
+  const check = checkinOf(ymd()), lowReady = check && readiness(check) < 50 ? readiness(check) : null;
   return `<section class="card hero">
     <div class="spread">
       <span class="badge accent">${icon(m.icon)} ${m.label} · ${TYPES[day.type] || 'Workout'}</span>
@@ -512,6 +513,7 @@ function todayCard(day, di, doneToday) {
       <h2 class="day-title">${esc(day.title)}</h2>
       ${day.focus ? `<p class="text-2 small" style="margin-top:8px">${esc(day.focus)}</p>` : ''}
     </div>
+    ${lowReady != null && !isRest && !doneToday ? `<div class="banner warn">${icon('info')}<div>Readiness is ${lowReady} today. Warm up, then decide — cutting a set from each exercise, or doing the mobility day instead, is a smart call.</div></div>` : ''}
     <div class="meta-row">
       <span>${icon('clock', 'sm')} ${clockTime(S.settings.workoutTime)}</span>
       ${n ? `<span>${n} exercise${n === 1 ? '' : 's'}</span><span>~${estMinutes(day)} min</span>` : ''}
@@ -1716,7 +1718,8 @@ function dietDay() {
     const list = meals.filter(m => (m.meal || 'snack') === k);
     if (!list.length) return '';
     return `<div class="meal-group">
-      <div class="meal-group-head"><span>${label}</span><span>${fmt(sum(list, m => m.cal))} cal · ${fmt(sum(list, m => m.pro), 1)} g</span></div>
+      <div class="meal-group-head"><span>${label}</span><span class="row" style="gap:8px">${fmt(sum(list, m => m.cal))} cal · ${fmt(sum(list, m => m.pro), 1)} g
+        <button class="add-mini" data-action="logFood" data-meal="${k}" aria-label="Add food to ${label}">${icon('plus', 'sm')}</button></span></div>
       ${list.map(mealRow).join('')}
     </div>`;
   }).join('');
@@ -1872,9 +1875,9 @@ function setServingLabel(f, serving) {
   if (note) note.textContent = serving ? `1 serving = ${serving}` : '';
 }
 
-function openFoodSheet(meal = null) {
+function openFoodSheet(meal = null, slot = null) {
   editMealId = meal ? meal.id : null;
-  const m = meal || { name: '', cal: '', pro: '', carb: null, fat: null, servings: 1, serving: '', meal: guessMeal(), time: nowHHMM() };
+  const m = meal || { name: '', cal: '', pro: '', carb: null, fat: null, servings: 1, serving: '', meal: MEAL_LABEL[slot] ? slot : guessMeal(), time: nowHHMM() };
   const isFav = !!meal && S.foods.some(f => normName(f.name) === normName(meal.name));
   const base = meal ? perServing(meal) : {};
   const numField = (k, label, v) => `<label class="field"><span>${label}</span><input name="${k}" inputmode="decimal" value="${v == null ? '' : esc(v)}" placeholder="${k === 'carb' || k === 'fat' ? 'optional' : '0'}" autocomplete="off" data-input="foodNum"></label>`;
@@ -1901,7 +1904,7 @@ function openFoodSheet(meal = null) {
     </div>` : ''}
   </form>`);
 }
-actions.logFood = () => openFoodSheet();
+actions.logFood = el => openFoodSheet(null, el && el.dataset.meal);
 actions.editMeal = el => { const m = S.meals.find(x => x.id === el.dataset.id); if (m) openFoodSheet(m); };
 
 // Typing: show matching foods. An exact match with a favorite or something you logged before fills in

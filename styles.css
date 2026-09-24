@@ -547,7 +547,9 @@ i.t-rest { background: var(--muted); }
 .fav-meta { font-size: 13px; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
 .fav .btn { min-height: 38px; }
 .meal-group { display: flex; flex-direction: column; }
-.meal-group-head { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 4px 2px 6px; }
+.meal-group-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 4px 2px 6px; }
+.add-mini { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line-2); background: none; color: var(--accent); padding: 0; }
+.add-mini .i { width: 16px; height: 16px; }
 .meal {
   display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; width: 100%;
   padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; text-align: left; margin-bottom: 6px;
