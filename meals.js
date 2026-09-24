@@ -228,7 +228,68 @@ const RECIPES = [
     cal: 360, pro: 32, carb: 28, fat: 15,
     why: "More than 30 g of protein with zero cooking — as much as a meal.",
     ing: ["3 oz (85 g) sliced deli turkey", "2 string cheese sticks", "1 oz pretzels", "Mustard for dipping"],
-    steps: ["Wrap 1–2 slices of turkey around each cheese stick.", "Eat with pretzels, dipping in mustard."] }
+    steps: ["Wrap 1–2 slices of turkey around each cheese stick.", "Eat with pretzels, dipping in mustard."] },
+  /* ---------------------------- More ideas ---------------------------- */
+  { id: "egg-muffin-sandwiches", name: "Freezer egg & cheese muffin sandwiches", meals: ["breakfast"], tags: ["prep"], min: 30, makes: 6,
+    cal: 610, pro: 40, carb: 55, fat: 24,
+    why: "Better than the drive-thru and ready in 2 minutes. One serving is 2 sandwiches — 40 g of protein before school.",
+    ing: ["12 English muffins", "12 eggs", "12 slices Canadian bacon", "12 slices American cheese", "Cooking spray, salt, pepper"],
+    steps: ["Heat the oven to 350°F (175°C) and spray a 12-cup muffin tin.", "Crack an egg into each cup, poke the yolk with a fork and season. Bake 15–18 minutes until set.", "Toast the muffins and build: muffin, Canadian bacon, egg, cheese.", "Wrap each sandwich in a paper towel, bag them and freeze (up to 1 month).", "Reheat from frozen in the paper towel: about 2 minutes, flipping halfway."] },
+
+  { id: "choc-pb-shake", name: "Chocolate peanut butter shake", meals: ["post", "snack", "breakfast"], tags: ["quick", "nocook", "veg"], min: 3, makes: 1,
+    cal: 470, pro: 38, carb: 49, fat: 16,
+    why: "Tastes like a milkshake, works like a recovery meal. Easy calories if you're trying to gain weight.",
+    ing: ["1 scoop chocolate protein powder", "1 cup milk", "1 frozen banana", "1 tbsp peanut butter", "1 tbsp unsweetened cocoa powder", "Handful of ice"],
+    steps: ["Put everything in a blender.", "Blend 45–60 seconds until thick and smooth.", "Drink within an hour after training — or with breakfast on the go."] },
+
+  { id: "teriyaki-salmon-bowl", name: "Teriyaki salmon rice bowls", meals: ["dinner", "lunch"], tags: [], min: 25, makes: 2,
+    cal: 750, pro: 45, carb: 83, fat: 25,
+    why: "A poke-bowl feel at home: omega-3 fats from the salmon, big carbs from rice, extra protein from edamame.",
+    ing: ["2 salmon fillets (5 oz / 140 g each)", "3 cups cooked rice", "1 cup shelled edamame (frozen)", "¼ cup teriyaki sauce", "½ cucumber, sliced", "2 tsp sesame seeds + sliced green onion"],
+    steps: ["Heat the oven to 400°F (200°C). Put the salmon on a lined pan and brush with half the teriyaki.", "Bake 12–15 minutes, until it flakes easily (145°F / 63°C).", "Microwave the edamame with a splash of water, covered, about 3 minutes.", "Build bowls: rice, salmon, edamame and cucumber. Drizzle the rest of the teriyaki and top with sesame seeds and green onion."] },
+
+  { id: "honey-garlic-chicken", name: "Honey garlic chicken thighs + potatoes", meals: ["dinner"], tags: ["prep"], min: 40, makes: 4,
+    cal: 545, pro: 41, carb: 64, fat: 14,
+    why: "Chicken thighs stay juicy even when reheated, so this is a great make-ahead dinner. Sweet, salty and easy.",
+    ing: ["1½ lb (680 g) boneless, skinless chicken thighs", "2 lb (900 g) baby potatoes, halved", "4 cups green beans, trimmed", "2 tbsp olive oil", "¼ cup honey + ¼ cup low-sodium soy sauce", "4 cloves garlic, minced", "Salt and pepper"],
+    steps: ["Heat the oven to 425°F (220°C). Toss the potatoes with half the oil and some salt and roast 15 minutes.", "Whisk the honey, soy sauce and garlic.", "Add the chicken and green beans to the pan with the rest of the oil. Pour half the sauce over the chicken.", "Roast 20–25 minutes, until the chicken reaches at least 165°F (74°C). Brush on the rest of the sauce for the last 5 minutes."] },
+
+  { id: "shrimp-tacos", name: "Shrimp tacos + black beans", meals: ["dinner"], tags: [], min: 20, makes: 2,
+    cal: 575, pro: 50, carb: 61, fat: 16,
+    why: "Shrimp cooks in 3 minutes and is almost pure protein. Three tacos and a side of beans make a full plate.",
+    ing: ["12 oz (340 g) raw shrimp, peeled", "1 tbsp oil + 1 tbsp taco seasoning", "6 corn tortillas", "1 cup coleslaw mix", "½ avocado, sliced", "¼ cup plain Greek yogurt + juice of 1 lime + hot sauce", "1 cup black beans, warmed"],
+    steps: ["Toss the shrimp with the taco seasoning.", "Cook in the oil in a hot pan, 1–2 minutes per side, until pink.", "Stir the yogurt, lime juice and hot sauce together.", "Warm the tortillas in a dry pan. Fill with slaw, shrimp, avocado and sauce. Beans on the side."] },
+
+  { id: "chickpea-curry", name: "Chickpea spinach curry", meals: ["dinner", "lunch"], tags: ["prep", "veg"], min: 30, makes: 4,
+    cal: 600, pro: 24, carb: 93, fat: 15,
+    why: "A cheap, filling meatless dinner full of carbs and fiber. Add leftover chicken if you want more protein.",
+    ing: ["2 cans (15 oz) chickpeas, rinsed", "1 can (15 oz) crushed tomatoes", "1 cup light coconut milk", "4 big handfuls spinach", "1 onion, diced", "2 tbsp oil", "1 tbsp curry powder + 1 tsp garlic powder + 1 tsp salt", "4 cups cooked rice", "1 cup plain Greek yogurt"],
+    steps: ["Cook the onion in the oil over medium heat for 5 minutes.", "Stir in the spices for 30 seconds.", "Add the chickpeas, tomatoes and coconut milk. Simmer 10–15 minutes.", "Stir in the spinach until it wilts.", "Serve over rice with a spoonful of yogurt. Keeps 4 days."] },
+
+  { id: "rice-cakes-pb", name: "Rice cakes with PB, banana & honey", meals: ["pre", "snack"], tags: ["quick", "nocook", "game", "veg"], min: 3, makes: 1,
+    cal: 275, pro: 6, carb: 45, fat: 9,
+    why: "Light, crunchy and quick to digest — easy energy 30–60 minutes before practice or a game.",
+    ing: ["3 plain rice cakes", "1 tbsp peanut butter", "½ banana, sliced", "1 tsp honey"],
+    steps: ["Spread a thin layer of peanut butter on the rice cakes.", "Top with banana slices and a drizzle of honey."] },
+
+  { id: "chicken-quesadilla", name: "Chicken & cheese quesadilla", meals: ["post", "lunch"], tags: ["quick"], min: 10, makes: 1,
+    cal: 525, pro: 48, carb: 40, fat: 18,
+    why: "Nearly 50 g of protein in 10 minutes using leftover or rotisserie chicken.",
+    ing: ["1 large (10-inch) flour tortilla", "4 oz (113 g) cooked chicken breast, shredded", "¼ cup shredded Mexican cheese", "¼ cup salsa"],
+    steps: ["Sprinkle half the cheese over half the tortilla, add the chicken and the rest of the cheese, and fold.", "Cook in a dry pan over medium heat, 2–3 minutes per side, until golden.", "Cut into wedges and dip in salsa."] },
+
+  { id: "hummus-plate", name: "Hummus, pita & turkey plate", meals: ["snack", "lunch"], tags: ["quick", "nocook"], min: 5, makes: 1,
+    cal: 445, pro: 26, carb: 57, fat: 13,
+    why: "A snack plate with real protein. Packs well in a lunch box.",
+    ing: ["1 whole-wheat pita, cut in wedges", "¼ cup hummus", "3 oz (85 g) sliced deli turkey", "1 cup baby carrots"],
+    steps: ["Put the hummus in a small container.", "Roll up the turkey slices.", "Dip pita, turkey and carrots in the hummus."] },
+
+  { id: "chicken-alfredo", name: "Lighter chicken Alfredo with broccoli", meals: ["dinner"], tags: ["prep"], min: 30, makes: 4,
+    cal: 710, pro: 58, carb: 73, fat: 21,
+    why: "Creamy comfort food made with milk and cream cheese instead of heavy cream — a big recovery meal after a hard day.",
+    ing: ["12 oz (340 g) fettuccine or penne", "1½ lb (680 g) chicken breast", "4 cups broccoli florets", "2 tbsp butter", "1 cup milk", "4 tbsp (2 oz) cream cheese", "½ cup grated parmesan", "1 tsp garlic powder, salt, pepper"],
+    steps: ["Season the chicken and cook it in a pan, 6–7 minutes per side, until 165°F (74°C). Slice.", "Boil the pasta, adding the broccoli for the last 3 minutes. Save ½ cup of the water, then drain.", "In the same pot, melt the butter, then whisk in the milk, cream cheese and garlic powder until smooth. Stir in the parmesan.", "Toss the pasta, broccoli and chicken in the sauce, loosening it with pasta water. Keeps 3 days."] }
+
 ];
 
 const RECIPE_BY_ID = Object.fromEntries(RECIPES.map(r => [r.id, r]));

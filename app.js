@@ -3825,7 +3825,7 @@ function whatsNew() {
   openSheet("What's new in Dugout 2.0", `
     ${item('diet', 'Easier food logging', 'Search 142 foods, pick servings, and track carbs and fat. Recent foods and "copy yesterday" save taps.')}
     ${item('flame', 'Goals made for you', 'Calculate calories, protein and water from your size and training. Track water and body weight.')}
-    ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 35 recipes, a game-day timeline, the week ahead and a shopping list.')}
+    ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 45 recipes, a game-day timeline, the week ahead and a shopping list.')}
     ${item('dumbbell', 'Smarter workouts', 'How-tos for every exercise, a library, swaps, next-weight tips, warm-up sets, a plate calculator and effort notes.')}
     ${item('plan', 'In-season program', 'Switch programs on the Plan tab: two short lifts a week to stay strong during the season.')}
     ${item('timer', 'Baseball tests and arm care', 'Progress → Baseball: 60-yard, exit velo and more, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
