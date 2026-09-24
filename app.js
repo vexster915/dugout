@@ -206,7 +206,8 @@ const DEFAULT_SETTINGS = {
   waterGoal: 100,         // ounces
   program: 'offseason',   // which starting plan (plan.js PROGRAMS) resets go back to
   profile: null,          // goal calculator answers: { sex, age, ft, inch, cm, weight, activity, goal }
-  badges: null            // badge ids already celebrated
+  badges: null,           // badge ids already celebrated
+  reviewSeen: ''          // week (Monday "YYYY-MM-DD") whose review card you closed
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -484,6 +485,7 @@ function renderToday() {
     ${modeToggle()}
     ${installBanner()}
     ${backupBanner()}
+    ${weekReview()}
     ${todayCard(dayPlan(di), di, doneToday)}
     ${checkinCard()}
     ${nutritionCard()}
@@ -521,6 +523,41 @@ function todayCard(day, di, doneToday) {
     <button class="btn-link" data-action="pickDay">Do a different day's workout</button>
   </section>`;
 }
+
+// ----- Last week in review (Today, Monday–Wednesday) -----
+function weekReview() {
+  const start = addDays(weekStart(), -7), from = ymd(start), to = ymd(addDays(start, 6));
+  if (S.settings.reviewSeen === from || dayIdx() > 2) return '';
+  const inWeek = d => d >= from && d <= to;
+  const ws = S.workouts.filter(w => inWeek(w.date)), planned = planFor().filter(d => d.type !== 'rest' && d.exercises.length).length;
+  const days = Array.from({ length: 7 }, (_, i) => dayTotals(ymd(addDays(start, i)))), eaten = days.filter(t => t.cal > 0);
+  if (!ws.length && !eaten.length && !S.logs.some(l => inWeek(l.date))) return '';
+  const proHits = days.filter(t => t.pro >= S.settings.proteinGoal).length, avgCal = eaten.length ? sum(eaten, t => t.cal) / eaten.length : 0;
+  const checks = logsOf('checkin').filter(l => inWeek(l.date)), sleep = checks.length ? sum(checks, l => l.sleep) / checks.length : null;
+  const waterHits = logsOf('water').filter(l => inWeek(l.date) && l.oz >= S.settings.waterGoal).length;
+  const wts = logsOf('weight').filter(l => inWeek(l.date)), wch = wts.length > 1 ? wts[wts.length - 1].w - wts[0].w : null;
+  const throws = sum(logsOf('throw').filter(l => inWeek(l.date)), l => l.count || 0);
+  const tile = (label, value, sub) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${value}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
+  const tip = eaten.length && proHits < 4 ? 'Protein was the weak spot — add a shake or a Greek yogurt bowl to hit your goal more days this week.'
+    : ws.length < planned ? `You got ${ws.length} of ${planned} sessions in. Pick your workout times for this week now so they happen.`
+    : sleep != null && sleep < 8 ? 'Sleep ran short. Set a bedtime alarm this week — it pays off in speed and strength.'
+    : 'Strong week. Keep stacking them.';
+  return `<section class="card stack">
+    <div class="spread"><div><div class="eyebrow">${fmtDate(start, { month: 'short', day: 'numeric' })} – ${fmtDate(addDays(start, 6), { month: 'short', day: 'numeric' })}</div>
+      <div class="card-title">Last week in review</div></div>
+      <button class="btn btn-icon sm btn-ghost" data-action="dismissReview" data-k="${from}" aria-label="Hide last week's review">${icon('x', 'sm')}</button></div>
+    <div class="tiles two">
+      ${tile('Workouts', `${ws.length}<small> / ${planned}</small>`, ws.length >= planned ? 'Every session done' : '')}
+      ${tile('Protein goal hit', `${proHits}<small> / 7 days</small>`, eaten.length ? `${fmt(avgCal)} cal a day on average` : 'No food logged')}
+      ${sleep != null ? tile('Average sleep', `${fmt(sleep, 1)}<small> h</small>`, sleep < 8 ? 'Aim for 8–10 hours' : 'Right on target') : ''}
+      ${tile('Water goal hit', `${waterHits}<small> / 7 days</small>`, '')}
+      ${wch != null ? tile('Body weight', `${wch > 0 ? '+' : ''}${fmt(wch, 1)}<small> ${S.settings.unit}</small>`, `${wts.length} weigh-ins`) : ''}
+      ${throws ? tile('Throws', fmt(throws), '') : ''}
+    </div>
+    <p class="small text-2">${tip}</p>
+  </section>`;
+}
+actions.dismissReview = el => { S.settings.reviewSeen = el.dataset.k; saveSettings(); render(); };
 
 // ----- Daily check-in: sleep, energy, soreness → readiness score -----
 const checkinOf = date => S.logs.find(l => l.kind === 'checkin' && l.date === date) || null;
