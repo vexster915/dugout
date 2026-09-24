@@ -628,6 +628,7 @@ function nutritionCard() {
     ${S.settings.goalsSet ? '' : `<button class="banner as-btn goal-nudge" data-action="calcGoals">${icon('flame')}
       <span class="grow"><b>Personalize your goals.</b> These are starter numbers — answer a few questions to get yours.</span>${icon('right', 'sm')}</button>`}
     ${macroBlock(dayTotals(ymd()))}
+    ${gameLine()}
     ${next ? `<button class="next-meal" data-action="openRecipe" data-id="${next.r.id}" data-slot="${next.slot}" data-servings="${next.servings}">
       <span class="grow">
         <span class="plan-slot">Up next · ${slotName(next.slot, kind)}</span>
@@ -636,6 +637,14 @@ function nutritionCard() {
       </span>${icon('right', 'sm')}</button>` : ''}
     <button class="btn-link meal-link" data-action="openMealPlan">Today's meal plan & recipes</button>
   </section>`;
+}
+// On a game day, Today shows first pitch and when to eat the pre-game meal.
+function gameLine() {
+  const mp = mealPlanToday();
+  if (mp.kind !== 'game') return '';
+  const gt = /^\d{2}:\d{2}$/.test(mp.gameTime || '') ? mp.gameTime : S.settings.workoutTime, [h, m] = gt.split(':').map(Number), t = h * 60 + m - 210;
+  const meal = t >= 0 ? clockTime(`${pad(Math.floor(t / 60))}:${pad(t % 60)}`) : null;
+  return `<button class="banner as-btn goal-nudge" data-action="openMealPlan">${icon('trophy')}<span class="grow"><b>Game day</b> · first pitch ${clockTime(gt)}${meal ? ` — pre-game meal around ${meal}` : ''}</span>${icon('right', 'sm')}</button>`;
 }
 actions.openMealPlan = () => { S.tab = 'diet'; S.dietView = 'meals'; render({ keepScroll: false }); };
 
@@ -3504,6 +3513,14 @@ function toolsCard() {
 
 let storagePersisted = null;
 
+// "Age 17 · 5′10″ · 170 lb · build muscle" from the goal calculator answers.
+function profileText() {
+  const p = S.settings.profile;
+  if (!p || !p.age) return '';
+  const h = S.settings.unit === 'kg' ? (p.cm ? `${fmt(p.cm)} cm` : '') : (p.ft ? `${p.ft}′${p.inch || 0}″` : '');
+  return [`Age ${p.age}`, h, p.weight ? `${fmt(p.weight, 1)} ${S.settings.unit}` : '', GOALS[p.goal] ? GOALS[p.goal][0].toLowerCase() : ''].filter(Boolean).join(' · ');
+}
+
 function renderSettings() {
   const st = S.settings;
   const toggle = (k, title, hint) => `<label class="set-item">
@@ -3536,7 +3553,7 @@ function renderSettings() {
 
     <div class="section-title">Daily nutrition goals</div>
     <div class="set-list">
-      <button class="set-item as-btn" data-action="calcGoals"><div class="grow"><div>Calculate my goals</div><div class="hint">From your size, age, training and goal</div></div>${icon('flame')}</button>
+      <button class="set-item as-btn" data-action="calcGoals"><div class="grow"><div>Calculate my goals</div><div class="hint">${profileText() || 'From your size, age, training and goal'}</div></div>${icon('flame')}</button>
       <button class="set-item as-btn" data-action="editGoals"><div class="grow"><div>${fmt(st.calGoal)} cal · ${fmt(st.proteinGoal)} g protein</div>
         <div class="hint">${[st.carbGoal ? `${fmt(st.carbGoal)} g carbs` : '', st.fatGoal ? `${fmt(st.fatGoal)} g fat` : '', `${waterText(st.waterGoal)} water`].filter(Boolean).join(' · ')} · tap to edit</div></div>${icon('edit')}</button>
     </div>
