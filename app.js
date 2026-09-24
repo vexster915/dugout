@@ -168,7 +168,9 @@ const ICONS = {
   video: '<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3"/>',
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
-  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>'
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  drop: '<path d="M12 3.5c3 3.6 6 7 6 10.3a6 6 0 0 1-12 0C6 10.5 9 7.1 12 3.5z"/>',
+  scale: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0l-2.2 2.2"/>'
 };
 const FILLED = new Set(['play', 'more']);
 const icon = (name, cls = '') => `<svg class="i ${FILLED.has(name) ? 'fill' : ''} ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -197,7 +199,11 @@ const DEFAULT_SETTINGS = {
   installHintDismissed: false,
   username: '',
   autoLock: 5,            // minutes in the background before Dugout locks itself
-  mealPlan: null          // today's suggested meals: { date, kind, seed, swaps }
+  mealPlan: null,         // today's suggested meals: { date, kind, seed, swaps }
+  carbGoal: 0,            // optional (0 = not set)
+  fatGoal: 0,
+  waterGoal: 100,         // ounces
+  profile: null           // goal calculator answers: { sex, age, ft, inch, cm, weight, activity, goal }
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -211,6 +217,7 @@ const S = {
   workouts: [],        // finished workouts, newest first
   meals: [],
   foods: [],           // favorites
+  logs: [],            // body weight, water, tests, throwing… ({ id, kind, date, … })
   planDay: dayIdx(),
   planReorder: false,
   dietDate: ymd(),
@@ -233,6 +240,17 @@ async function save(work) {
 const saveSettings = () => save(() => DB.set('settings', S.settings));
 const savePlan = () => save(() => DB.set('plan', S.plan));
 const saveActive = () => save(() => (S.active ? DB.set('active', S.active) : DB.del('active')));
+const logsOf = kind => S.logs.filter(l => l.kind === kind).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.at || 0) - (b.at || 0)));
+function putLog(l) {
+  const i = S.logs.findIndex(x => x.id === l.id);
+  if (i >= 0) S.logs[i] = l; else S.logs.push(l);
+  save(() => DB.put('logs', l));
+  return l;
+}
+function removeLog(id) {
+  S.logs = S.logs.filter(x => x.id !== id);
+  save(() => DB.remove('logs', id));
+}
 let saveActiveTimer = null;
 const saveActiveSoon = () => { clearTimeout(saveActiveTimer); saveActiveTimer = setTimeout(saveActive, 400); };
 
@@ -455,6 +473,7 @@ function renderToday() {
     ${backupBanner()}
     ${todayCard(dayPlan(di), di, doneToday)}
     ${nutritionCard()}
+    ${waterCard()}
     ${weekCard()}
   </div>`;
 }
@@ -505,6 +524,8 @@ function nutritionCard() {
       <div class="card-title">Nutrition today</div>
       <button class="btn btn-sm btn-ghost" data-action="quickLog">${icon('plus', 'sm')} Log food</button>
     </div>
+    ${S.settings.goalsSet ? '' : `<button class="banner as-btn goal-nudge" data-action="calcGoals">${icon('flame')}
+      <span class="grow"><b>Personalize your goals.</b> These are starter numbers — answer a few questions to get yours.</span>${icon('right', 'sm')}</button>`}
     ${macroBlock(dayTotals(ymd()))}
     ${next ? `<button class="next-meal" data-action="openRecipe" data-id="${next.r.id}" data-slot="${next.slot}" data-servings="${next.servings}">
       <span class="grow">
@@ -528,7 +549,8 @@ function macroBlock(t) {
       <div class="meter ${cls}" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct(v, g))}"><span style="width:${pct(v, g)}%"></span></div>
     </div>`;
   const extra = t.carb || t.fat ? `<div class="macro-extra">
-      <span><i class="key carb"></i>Carbs <b>${fmt(t.carb)} g</b></span><span><i class="key fat"></i>Fat <b>${fmt(t.fat)} g</b></span></div>` : '';
+      <span><i class="key carb"></i>Carbs <b>${fmt(t.carb)}${S.settings.carbGoal ? ` / ${fmt(S.settings.carbGoal)}` : ''} g</b></span>
+      <span><i class="key fat"></i>Fat <b>${fmt(t.fat)}${S.settings.fatGoal ? ` / ${fmt(S.settings.fatGoal)}` : ''} g</b></span></div>` : '';
   return row('cal', 'Calories', t.cal, calGoal, '') + row('pro', 'Protein', t.pro, proteinGoal, ' g') + extra;
 }
 
@@ -1401,6 +1423,7 @@ function dietDay() {
         <button class="btn btn-sm btn-ghost" data-action="editGoals">${icon('edit', 'sm')} Goals</button>
       </div>
     </section>
+    ${waterCard(date)}
     <button class="btn btn-primary btn-xl" data-action="logFood">${icon('plus')} Log food</button>
     <div class="section-row">
       <div class="section-title">Favorites</div>
@@ -1708,19 +1731,142 @@ actions.manageFavs = () => {
   </div>`);
 };
 
+// Water is stored in ounces; metric shows liters.
+const metricWater = () => S.settings.unit === 'kg';
+const waterText = oz => (metricWater() ? `${fmt(oz * 0.0295735, 1)} L` : `${fmt(oz)} oz`);
+const waterInput = oz => (metricWater() ? Math.round(oz * 0.0295735 * 10) / 10 : Math.round(oz));
+
+// ----- Water (one "water" log per day, in ounces) -----
+const waterOf = date => { const l = S.logs.find(x => x.kind === 'water' && x.date === date); return l ? l.oz : 0; };
+function waterCard(date = ymd()) {
+  const oz = waterOf(date), goal = S.settings.waterGoal, pct = clamp((oz / goal) * 100, 0, 100);
+  const adds = metricWater() ? [[8.45, '+250 ml'], [16.9, '+500 ml'], [25.36, '+750 ml']] : [[8, '+8 oz'], [16, '+16 oz'], [20, '+20 oz']];
+  return `<section class="card water-card">
+    <div class="macro-top">
+      <span class="macro-name"><i class="key water"></i>Water</span>
+      <span class="macro-left">${oz >= goal ? 'Goal hit' : `${waterText(goal - oz)} to go`}</span>
+    </div>
+    <div class="macro-val">${waterText(oz)} <small>/ ${waterText(goal)}</small></div>
+    <div class="meter water" role="progressbar" aria-label="Water" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><span style="width:${pct}%"></span></div>
+    <div class="water-btns">
+      ${adds.map(([v, l]) => `<button class="btn btn-sm btn-ghost" data-action="addWater" data-oz="${v}" data-date="${date}">${icon('drop', 'sm')} ${l}</button>`).join('')}
+      <button class="btn btn-sm btn-ghost btn-icon sm" data-action="addWater" data-oz="${-adds[0][0]}" data-date="${date}" aria-label="Take some off" ${oz <= 0 ? 'disabled' : ''}>${icon('minus', 'sm')}</button>
+    </div>
+  </section>`;
+}
+actions.addWater = el => {
+  const date = el.dataset.date || ymd(), cur = S.logs.find(x => x.kind === 'water' && x.date === date);
+  const before = cur ? cur.oz : 0, oz = Math.max(0, Math.round((before + (num(el.dataset.oz) || 0)) * 10) / 10);
+  putLog({ id: cur ? cur.id : 'water-' + date, kind: 'water', date, oz, at: Date.now() });
+  render();
+  if (before < S.settings.waterGoal && oz >= S.settings.waterGoal) toast('Water goal hit — nice work');
+};
+
 actions.editGoals = () => openSheet('Daily goals', `<form class="form" novalidate data-submit="saveGoals">
-  <label class="field"><span>Calories per day</span><input name="cal" inputmode="numeric" value="${S.settings.calGoal}" autocomplete="off"></label>
-  <label class="field"><span>Protein per day (grams)</span><input name="pro" inputmode="numeric" value="${S.settings.proteinGoal}" autocomplete="off"></label>
-  <p class="hint">Use the numbers that fit you — a coach or dietitian can help you pick them.</p>
+  <button type="button" class="btn btn-ghost btn-block" data-action="calcGoals">${icon('flame', 'sm')} Calculate them for me</button>
+  <div class="form-grid">
+    <label class="field"><span>Calories</span><input name="cal" inputmode="numeric" value="${S.settings.calGoal}" autocomplete="off"></label>
+    <label class="field"><span>Protein (g)</span><input name="pro" inputmode="numeric" value="${S.settings.proteinGoal}" autocomplete="off"></label>
+    <label class="field"><span>Carbs (g)</span><input name="carb" inputmode="numeric" value="${S.settings.carbGoal || ''}" placeholder="optional" autocomplete="off"></label>
+    <label class="field"><span>Fat (g)</span><input name="fat" inputmode="numeric" value="${S.settings.fatGoal || ''}" placeholder="optional" autocomplete="off"></label>
+  </div>
+  <label class="field"><span>Water per day (${metricWater() ? 'liters' : 'oz'})</span><input name="water" inputmode="decimal" value="${waterInput(S.settings.waterGoal)}" autocomplete="off"></label>
+  <p class="hint">Use the numbers that fit you — the calculator, a coach or a dietitian can help you pick them.</p>
   <button class="btn btn-primary btn-block" type="submit">Save goals</button>
 </form>`);
 submits.saveGoals = f => {
   const d = formData(f);
   const cal = Math.round(num(d.cal) || 0), pro = Math.round(num(d.pro) || 0);
+  const carb = Math.round(num(d.carb) || 0), fat = Math.round(num(d.fat) || 0);
+  const water = Math.round(metricWater() ? (num(d.water) || 0) / 0.0295735 : num(d.water) || 0);
   if (cal < 500 || cal > 10000) { toast('Calories should be between 500 and 10,000'); return; }
   if (pro < 10 || pro > 500) { toast('Protein should be between 10 and 500 g'); return; }
-  Object.assign(S.settings, { calGoal: cal, proteinGoal: pro, goalsSet: true });
+  if (carb < 0 || carb > 1500 || fat < 0 || fat > 500) { toast('Carbs up to 1,500 g and fat up to 500 g'); return; }
+  if (water < 16 || water > 400) { toast(metricWater() ? 'Water should be 0.5 to 12 liters' : 'Water should be 16 to 400 oz'); return; }
+  Object.assign(S.settings, { calGoal: cal, proteinGoal: pro, carbGoal: carb, fatGoal: fat, waterGoal: water, goalsSet: true });
   saveSettings(); closeSheet(); render(); toast('Goals saved');
+};
+
+// ----- Goal calculator -----
+// Mifflin-St Jeor resting burn × how much you train, then +/− for your goal. Protein ≈ 0.8–0.9 g per lb
+// (1.8–2 g per kg), fat ≈ 27% of calories, carbs fill the rest. Water ≈ half your body weight in oz + 20 oz.
+const ACTIVITY = [[1.55, 'Light', '2–3 workouts a week, or in-season'], [1.725, 'Active', 'Training 4–6 days a week'], [1.9, 'Very active', 'Practice plus lifting most days']];
+const GOALS = { gain: ['Build muscle / gain weight', 400], maintain: ['Stay the same', 0], lose: ['Lose fat', -400] };
+const LB = 0.45359237;
+const latestWeight = () => { const w = logsOf('weight'); return w.length ? w[w.length - 1].w : null; };
+
+function calcTargets(p, metric) {
+  const kg = metric ? p.weight : p.weight * LB, lb = kg / LB;
+  const cm = metric ? p.cm : (p.ft * 12 + p.inch) * 2.54;
+  const bmr = 10 * kg + 6.25 * cm - 5 * p.age + (p.sex === 'female' ? -161 : 5);
+  const maintain = bmr * p.activity;
+  const adjust = p.goal === 'lose' && p.age < 18 ? -250 : GOALS[p.goal][1];   // growing athletes: gentler cut
+  const r5 = v => Math.round(v / 5) * 5;
+  const cal = Math.round((maintain + adjust) / 50) * 50;
+  const pro = r5(lb * (p.goal === 'maintain' ? 0.8 : 0.9));
+  const fat = r5((cal * 0.27) / 9);
+  const carb = Math.max(0, r5((cal - pro * 4 - fat * 9) / 4));
+  const water = Math.round((lb / 2 + 20) / 4) * 4;
+  return { bmr: Math.round(bmr), maintain: Math.round(maintain), adjust, cal, pro, carb, fat, water };
+}
+
+actions.calcGoals = () => {
+  const metric = S.settings.unit === 'kg';
+  const p = { sex: 'male', age: 17, ft: 5, inch: 10, cm: 178, activity: 1.725, goal: 'gain', ...(S.settings.profile || {}) };
+  const weight = latestWeight() ?? p.weight ?? '';
+  const sel = (name, opts, cur) => `<select name="${name}">${opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  openSheet('Calculate my goals', `<form class="form" novalidate data-submit="calcGoals">
+    <p class="text-2 small">Estimates how much you should eat each day from your size, age and training. Redo it every month or so as your weight changes.</p>
+    <div class="form-grid">
+      <label class="field"><span>Sex</span>${sel('sex', [['male', 'Male'], ['female', 'Female']], p.sex)}</label>
+      <label class="field"><span>Age</span><input name="age" inputmode="numeric" value="${esc(p.age)}" autocomplete="off"></label>
+    </div>
+    ${metric ? `<label class="field"><span>Height (cm)</span><input name="cm" inputmode="numeric" value="${esc(p.cm)}" autocomplete="off"></label>`
+      : `<div class="form-grid">
+      <label class="field"><span>Height (feet)</span><input name="ft" inputmode="numeric" value="${esc(p.ft)}" autocomplete="off"></label>
+      <label class="field"><span>+ inches</span><input name="inch" inputmode="numeric" value="${esc(p.inch)}" autocomplete="off"></label></div>`}
+    <label class="field"><span>Body weight (${S.settings.unit})</span><input name="weight" inputmode="decimal" value="${esc(weight)}" placeholder="e.g. ${metric ? 75 : 170}" autocomplete="off"></label>
+    <label class="field"><span>Training</span>${sel('activity', ACTIVITY.map(([v, l, h]) => [v, `${l} — ${h}`]), p.activity)}</label>
+    <label class="field"><span>Goal</span>${sel('goal', Object.entries(GOALS).map(([k, [l]]) => [k, l]), p.goal)}</label>
+    <button class="btn btn-primary btn-block" type="submit">Calculate</button>
+  </form>`);
+};
+
+let calcResult = null;
+submits.calcGoals = f => {
+  const d = formData(f), metric = S.settings.unit === 'kg';
+  const p = {
+    sex: d.sex === 'female' ? 'female' : 'male', age: num(d.age), weight: num(d.weight), cm: num(d.cm), ft: num(d.ft), inch: num(d.inch) ?? 0,
+    activity: ACTIVITY.some(a => a[0] === num(d.activity)) ? num(d.activity) : 1.725, goal: GOALS[d.goal] ? d.goal : 'maintain'
+  };
+  const inches = metric ? p.cm / 2.54 : p.ft * 12 + p.inch, lb = metric ? p.weight / LB : p.weight;
+  if (!(p.age >= 10 && p.age <= 80)) { toast('Enter an age from 10 to 80'); return; }
+  if (!(inches >= 48 && inches <= 90)) { toast(metric ? 'Enter your height in cm (120–230)' : 'Enter your height in feet and inches'); return; }
+  if (!(lb >= 60 && lb <= 400)) { toast(`Enter your body weight in ${S.settings.unit}`); return; }
+  const t = calcTargets(p, metric);
+  calcResult = { p, t };
+  const tile = (label, v, u) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${fmt(v)}${u ? `<small> ${u}</small>` : ''}</div></div>`;
+  openSheet('Your daily targets', `
+    <div class="tiles four">${tile('Calories', t.cal)}${tile('Protein', t.pro, 'g')}${tile('Carbs', t.carb, 'g')}${tile('Fat', t.fat, 'g')}</div>
+    <div class="card stack-sm">
+      <div class="small text-2">Your body burns about <b>${fmt(t.bmr)}</b> calories a day at rest. With your training that's about <b>${fmt(t.maintain)}</b> to stay the same weight${t.adjust ? `, ${t.adjust > 0 ? 'plus' : 'minus'} <b>${fmt(Math.abs(t.adjust))}</b> to ${t.adjust > 0 ? 'build muscle' : 'lose fat slowly'}` : ''}.</div>
+      <div class="small text-2">Water: about <b>${waterText(t.water)}</b> a day, more on hot days and doubleheaders.</div>
+      ${p.age < 18 ? '<div class="small text-2">You\'re still growing, so under-eating costs you size, speed and strength. If your weight stalls for 2–3 weeks while trying to gain, add 250 calories.</div>' : ''}
+    </div>
+    <p class="hint">Estimates for healthy athletes — a doctor or sports dietitian can fine-tune them.</p>
+    <div class="sheet-actions">
+      <button class="btn btn-ghost" data-action="calcGoals">Back</button>
+      <button class="btn btn-primary" data-action="useGoals">Use these goals</button>
+    </div>`);
+};
+actions.useGoals = () => {
+  if (!calcResult) return;
+  const { p, t } = calcResult;
+  Object.assign(S.settings, { calGoal: t.cal, proteinGoal: t.pro, carbGoal: t.carb, fatGoal: t.fat, waterGoal: t.water, goalsSet: true, profile: p });
+  saveSettings();
+  if (latestWeight() !== p.weight) putLog({ id: uid(), kind: 'weight', date: ymd(), w: p.weight, at: Date.now() });
+  calcResult = null;
+  closeSheet(); render(); toast('Goals updated');
 };
 
 // ----- Week totals -----
@@ -2219,6 +2365,7 @@ function renderProgress() {
       ${chart}
     </section>
     ${prCard(exList, mode)}
+    ${bodyCard()}
     <div class="section-title">${m.label} workout history</div>
     ${historyList(ws)}
   </div>`;
@@ -2254,6 +2401,62 @@ function prCard(exList, mode) {
     </button>`).join('')}
   </section>`;
 }
+
+// ----- Body weight -----
+const logPoint = (l, v) => { const d = parseYmd(l.date); return { t: d.getTime(), v, label: fmtDate(d), short: fmtDate(d, { month: 'short', day: 'numeric' }) }; };
+function bodyCard() {
+  const list = logsOf('weight'), u = S.settings.unit, last = list[list.length - 1];
+  const change = days => {
+    const cut = ymd(addDays(new Date(), -days)), old = list.filter(l => l.date <= cut).pop() || list[0];
+    return last && old && old !== last ? last.w - old.w : null;
+  };
+  const ch = change(30);
+  if (list.length > 1) later(() => lineChart('#chart-body', list.map(l => logPoint(l, l.w)), { fmtV: v => `${fmt(v, 1)} ${u}` }));
+  return `<section class="card stack">
+    <div class="spread"><div class="card-title row">${icon('scale')} Body weight</div>
+      <button class="btn btn-sm btn-ghost" data-action="logWeight">${icon('plus', 'sm')} Log</button></div>
+    ${list.length ? `<div class="grid2">
+        <div class="tile"><div class="tile-label">Latest · ${shortDate(last.date)}</div><div class="tile-value">${fmt(last.w, 1)}<small> ${u}</small></div></div>
+        <div class="tile"><div class="tile-label">Last 30 days</div><div class="tile-value">${ch == null ? '–' : `${ch > 0 ? '+' : ''}${fmt(ch, 1)}<small> ${u}</small>`}</div></div>
+      </div>
+      ${list.length > 1 ? '<div class="chart" id="chart-body"></div>' : ''}
+      <button class="btn-link" data-action="weightHistory">All weigh-ins (${list.length})</button>`
+      : `<p class="hint">Weigh in once or twice a week — same time of day, before eating — to see if you're gaining the way you want.</p>`}
+  </section>`;
+}
+actions.logWeight = () => openSheet('Log body weight', `<form class="form" novalidate data-submit="saveWeight">
+  <div class="form-grid">
+    <label class="field"><span>Weight (${S.settings.unit})</span><input name="w" inputmode="decimal" value="${latestWeight() ?? ''}" autocomplete="off"></label>
+    <label class="field"><span>Date</span><input name="date" type="date" value="${ymd()}" max="${ymd()}"></label>
+  </div>
+  <p class="hint">For a fair comparison, weigh yourself at the same time of day — ideally in the morning before eating.</p>
+  <button class="btn btn-primary btn-block" type="submit">Save</button>
+</form>`);
+submits.saveWeight = f => {
+  const d = formData(f), w = num(d.w);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(d.date) && d.date <= ymd() ? d.date : ymd();
+  const [lo, hi] = S.settings.unit === 'kg' ? [25, 250] : [55, 550];
+  if (!(w >= lo && w <= hi)) { toast(`Enter a weight between ${lo} and ${hi} ${S.settings.unit}`); return; }
+  const same = S.logs.find(l => l.kind === 'weight' && l.date === date);     // one weigh-in per day
+  putLog({ id: same ? same.id : uid(), kind: 'weight', date, w: Math.round(w * 10) / 10, at: Date.now() });
+  closeSheet(); render(); toast('Weight saved');
+};
+actions.weightHistory = () => {
+  const list = logsOf('weight').reverse();
+  openSheet('Weigh-ins', `<div class="stack-sm">${list.map(l => `<div class="log-row">
+    <span class="grow">${fmtDate(parseYmd(l.date), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+    <b>${fmt(l.w, 1)} ${S.settings.unit}</b>
+    <button class="btn btn-icon sm btn-ghost" data-action="deleteLog" data-id="${l.id}" aria-label="Delete">${icon('trash', 'sm')}</button></div>`).join('')}</div>`);
+};
+// Delete any dated log entry (weigh-in, test result, throwing session…) with an Undo.
+actions.deleteLog = el => {
+  const l = S.logs.find(x => x.id === el.dataset.id);
+  if (!l) return;
+  removeLog(l.id);
+  const row = el.closest('.log-row'); if (row) row.remove();
+  render();
+  toast('Deleted', { action: () => { putLog(l); render(); } });
+};
 
 function historyList(ws) {
   if (!ws.length) return `<div class="empty">No ${MODES[S.settings.mode].label.toLowerCase()} workouts yet.</div>`;
@@ -2330,10 +2533,9 @@ function renderSettings() {
 
     <div class="section-title">Daily nutrition goals</div>
     <div class="set-list">
-      <div class="set-item"><div class="grow"><div>Calories</div></div>
-        <input class="input" inputmode="numeric" value="${st.calGoal}" data-change="setGoal" data-k="calGoal" aria-label="Calorie goal"></div>
-      <div class="set-item"><div class="grow"><div>Protein (grams)</div></div>
-        <input class="input" inputmode="numeric" value="${st.proteinGoal}" data-change="setGoal" data-k="proteinGoal" aria-label="Protein goal"></div>
+      <button class="set-item as-btn" data-action="calcGoals"><div class="grow"><div>Calculate my goals</div><div class="hint">From your size, age, training and goal</div></div>${icon('flame')}</button>
+      <button class="set-item as-btn" data-action="editGoals"><div class="grow"><div>${fmt(st.calGoal)} cal · ${fmt(st.proteinGoal)} g protein</div>
+        <div class="hint">${[st.carbGoal ? `${fmt(st.carbGoal)} g carbs` : '', st.fatGoal ? `${fmt(st.fatGoal)} g fat` : '', `${waterText(st.waterGoal)} water`].filter(Boolean).join(' · ')} · tap to edit</div></div>${icon('edit')}</button>
     </div>
 
     <div class="section-title">Backup — never lose your data</div>
@@ -2385,22 +2587,12 @@ changes.setTime = el => {
   toast(`Workout time: ${clockTime(S.settings.workoutTime)}`);
 };
 actions.setUnit = el => { S.settings.unit = el.dataset.u; saveSettings(); render(); };
-changes.setGoal = el => {
-  const k = el.dataset.k, v = Math.round(num(el.value) || 0);
-  const [lo, hi] = k === 'calGoal' ? [500, 10000] : [10, 500];
-  if (v < lo || v > hi) { toast(`Enter a number from ${fmt(lo)} to ${fmt(hi)}`); el.value = S.settings[k]; return; }
-  S.settings[k] = v;
-  S.settings.goalsSet = true;
-  saveSettings();
-  toast('Goal saved');
-};
-
 // ----- Backup file -----
 function backupData() {
   return {
     app: 'dugout', format: 1, version: APP_VERSION, exportedAt: new Date().toISOString(),
     kv: { settings: { ...S.settings, lastBackup: Date.now() }, plan: S.plan, ...(S.active ? { active: S.active } : {}) },
-    workouts: S.workouts, meals: S.meals, foods: S.foods
+    workouts: S.workouts, meals: S.meals, foods: S.foods, logs: S.logs
   };
 }
 function markBackedUp() {
@@ -2568,6 +2760,8 @@ function cleanSettings(st) {
   if (!['lb', 'kg'].includes(out.unit)) out.unit = 'lb';
   out.calGoal = clamp(Math.round(out.calGoal) || DEFAULT_SETTINGS.calGoal, 500, 10000);
   out.proteinGoal = clamp(Math.round(out.proteinGoal) || DEFAULT_SETTINGS.proteinGoal, 10, 500);
+  out.waterGoal = clamp(Math.round(out.waterGoal) || DEFAULT_SETTINGS.waterGoal, 16, 400);
+  for (const k of ['profile', 'mealPlan']) if (!isObj(out[k])) out[k] = null;
   return out;
 }
 function cleanExerciseData(e) {
@@ -2607,8 +2801,8 @@ const cleanFood = f => (isObj(f) && f.id && f.name ? Object.assign(f, {
 const cleanMeal = m => (cleanFood(m) && /^\d{4}-\d{2}-\d{2}$/.test(m.date) ? m : null);
 
 async function loadAll() {
-  const [settings, plan, active, workouts, meals, foods] = await Promise.all([
-    DB.get('settings'), DB.get('plan'), DB.get('active'), DB.all('workouts'), DB.all('meals'), DB.all('foods')
+  const [settings, plan, active, workouts, meals, foods, logs] = await Promise.all([
+    DB.get('settings'), DB.get('plan'), DB.get('active'), DB.all('workouts'), DB.all('meals'), DB.all('foods'), DB.all('logs')
   ]);
   S.settings = cleanSettings(settings);
   const cleanP = cleanPlan(plan);
@@ -2626,6 +2820,7 @@ async function loadAll() {
   S.workouts = (workouts || []).map(cleanWorkout).filter(Boolean).sort((a, b) => b.startedAt - a.startedAt);
   S.meals = (meals || []).map(cleanMeal).filter(Boolean);
   S.foods = (foods || []).map(cleanFood).filter(Boolean);
+  S.logs = (logs || []).filter(l => isObj(l) && l.id && typeof l.kind === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date));
   S.openEx = null;
   S.progEx = null;
   S.progMetric = null;
@@ -2802,7 +2997,7 @@ async function lockApp(message) {
   $('#toast').classList.remove('show');
   toastAct = null;
   DB.lock();
-  Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], openEx: null });
+  Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null });
   render();
   if (message) toast(message);
 }
