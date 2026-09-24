@@ -15,6 +15,7 @@ const APP_VERSION = '1.3.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
+if (typeof FOODS === 'undefined') self.FOODS = [];
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -428,11 +429,12 @@ actions.step = el => {
   const min = num(el.dataset.min) ?? 0, max = num(el.dataset.max) ?? 9999;
   const v = (num(input.value) ?? 0) + Number(el.dataset.d);
   input.value = clamp(Math.round(v * 100) / 100, min, max);
+  input.dispatchEvent(new Event('input', { bubbles: true }));   // lets forms react (e.g. servings rescale the numbers)
 };
-const stepper = (name, value, d, { min = 0, max = 9999, minus = icon('minus', 'sm'), plus = icon('plus', 'sm'), mode = 'numeric' } = {}) => `
+const stepper = (name, value, d, { min = 0, max = 9999, minus = icon('minus', 'sm'), plus = icon('plus', 'sm'), mode = 'numeric', input = '' } = {}) => `
   <div class="stepper">
     <button type="button" class="btn" data-action="step" data-target="${name}" data-d="${-d}" data-min="${min}" data-max="${max}" aria-label="Less">${minus}</button>
-    <input name="${name}" inputmode="${mode}" value="${esc(value)}" autocomplete="off">
+    <input name="${name}" inputmode="${mode}" value="${esc(value)}" autocomplete="off"${input ? ` data-input="${input}"` : ''}>
     <button type="button" class="btn" data-action="step" data-target="${name}" data-d="${d}" data-min="${min}" data-max="${max}" aria-label="More">${plus}</button>
   </div>`;
 
@@ -525,7 +527,9 @@ function macroBlock(t) {
       <div class="macro-val">${fmt(v)}${u ? `<small>${u}</small>` : ''} <small>/ ${fmt(g)}${u}</small></div>
       <div class="meter ${cls}" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct(v, g))}"><span style="width:${pct(v, g)}%"></span></div>
     </div>`;
-  return row('cal', 'Calories', t.cal, calGoal, '') + row('pro', 'Protein', t.pro, proteinGoal, ' g');
+  const extra = t.carb || t.fat ? `<div class="macro-extra">
+      <span><i class="key carb"></i>Carbs <b>${fmt(t.carb)} g</b></span><span><i class="key fat"></i>Fat <b>${fmt(t.fat)} g</b></span></div>` : '';
+  return row('cal', 'Calories', t.cal, calGoal, '') + row('pro', 'Protein', t.pro, proteinGoal, ' g') + extra;
 }
 
 function weekCard() {
@@ -1336,9 +1340,9 @@ actions.resetDay = async () => {
 let editMealId = null;
 
 function dayTotals(date) {
-  let cal = 0, pro = 0;
-  for (const m of S.meals) if (m.date === date) { cal += m.cal || 0; pro += m.pro || 0; }
-  return { cal: Math.round(cal), pro: Math.round(pro * 10) / 10 };
+  let cal = 0, pro = 0, carb = 0, fat = 0;
+  for (const m of S.meals) if (m.date === date) { cal += m.cal || 0; pro += m.pro || 0; carb += m.carb || 0; fat += m.fat || 0; }
+  return { cal: Math.round(cal), pro: Math.round(pro * 10) / 10, carb: Math.round(carb), fat: Math.round(fat) };
 }
 
 // Guess the meal from the time of day (built around your workout time).
@@ -1408,8 +1412,11 @@ function dietDay() {
     ${groups || `<div class="empty">Nothing logged ${isToday ? 'yet today' : 'on this day'}.</div>`}`;
 }
 
+// "1.5 × 1 cup", "2 servings" or nothing for a single plain serving
+const servingText = m => (m.serving ? `${m.servings && m.servings !== 1 ? `${fmt(m.servings, 2)} × ` : ''}${m.serving}` : m.servings && m.servings !== 1 ? `${fmt(m.servings, 2)} servings` : '');
+const macroText = m => [m.carb != null ? `${fmt(m.carb)} g carbs` : '', m.fat != null ? `${fmt(m.fat)} g fat` : ''].filter(Boolean).join(' · ');
 const mealRow = m => `<button class="meal" data-action="editMeal" data-id="${m.id}">
-  <div><div class="meal-name">${esc(m.name)}</div><div class="meal-sub">${m.time ? clockTime(m.time) : ''}${m.servings && m.servings !== 1 ? ` · ${fmt(m.servings, 2)} servings` : ''}</div></div>
+  <div><div class="meal-name">${esc(m.name)}</div><div class="meal-sub">${[m.time ? clockTime(m.time) : '', esc(servingText(m)), macroText(m)].filter(Boolean).join(' · ')}</div></div>
   <div class="meal-nums">${fmt(m.cal)} cal<small>${fmt(m.pro, 1)} g protein</small></div>
 </button>`;
 
@@ -1430,25 +1437,78 @@ actions.dietStep = el => {
 actions.dietToday = () => { S.dietDate = ymd(); render(); };
 
 // ----- Logging food -----
-function foodSuggestions() {
-  const seen = new Set(), out = [];
-  const add = n => { const k = normName(n); if (k && !seen.has(k)) { seen.add(k); out.push(n); } };
-  sortedFavs().forEach(f => add(f.name));
-  [...S.meals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 300).forEach(m => add(m.name));
-  return out.slice(0, 80);
+// Search as you type: your favorites first, then foods you've logged before, then the built-in list (foods.js).
+const MACROS = ['cal', 'pro', 'carb', 'fat'];
+const r1 = v => Math.max(0, Math.round((v || 0) * 10) / 10);
+const perServing = m => {
+  const s = m.servings > 0 ? m.servings : 1, per = v => (v == null ? null : v / s);
+  return { name: m.name, serving: m.serving || '', cal: per(m.cal), pro: per(m.pro), carb: per(m.carb), fat: per(m.fat) };
+};
+let foodHits = [];
+function searchFoods(q) {
+  const words = normName(q).split(' ').filter(Boolean);
+  if (!words.length) return [];
+  const phrase = words.join(' ');
+  const score = name => {
+    const n = normName(name);
+    if (!words.every(w => n.includes(w))) return 0;
+    const parts = n.split(/[\s,()/-]+/);
+    return (n.startsWith(phrase) ? 3 : 1) + (words.every(w => parts.some(p => p.startsWith(w))) ? 1 : 0);
+  };
+  const out = [], seen = new Set();
+  const add = (f, src, bonus) => {
+    const k = normName(f.name), sc = score(f.name);
+    if (!sc || seen.has(k)) return;
+    seen.add(k);
+    out.push({ ...f, src, sc: sc + bonus });
+  };
+  sortedFavs().forEach(f => add(perServing(f), 'fav', 2));
+  [...S.meals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 300).forEach(m => add(perServing(m), 'hist', 1));
+  FOODS.forEach(f => add(f, 'db', 0));
+  return out.sort((a, b) => b.sc - a.sc).slice(0, 8);
+}
+function foodResults(q) {
+  foodHits = searchFoods(q);
+  return foodHits.map((f, i) => `<button type="button" class="food-hit" data-action="pickFood" data-i="${i}">
+    <span class="grow"><span class="food-hit-name">${f.src === 'fav' ? icon('star', 'sm') : ''}${esc(f.name)}</span>
+      <span class="food-hit-sub">${esc(f.serving || (f.src === 'db' ? '1 serving' : 'as you logged it'))}${f.src === 'hist' ? ' · recent' : f.group ? ` · ${esc(f.group)}` : ''}</span></span>
+    <span class="meal-nums">${fmt(f.cal)} cal<small>${fmt(f.pro, 1)} g protein</small></span>
+  </button>`).join('');
+}
+
+// The numbers in the form are totals for what you ate; "base" remembers them per ONE serving,
+// so changing Servings rescales everything.
+const formBase = f => JSON.parse(f.dataset.base || '{}');
+function fillMacros(f, base, servings) {
+  for (const k of MACROS) {
+    const v = base[k];
+    f.elements[k].value = v == null ? '' : k === 'cal' ? Math.round(v * servings) : Math.round(v * servings * 10) / 10;
+  }
+  f.dataset.base = JSON.stringify(base);
+  f.dataset.auto = JSON.stringify({ cal: f.elements.cal.value, pro: f.elements.pro.value });
+}
+function setServingLabel(f, serving) {
+  f.elements.serving.value = serving || '';
+  const note = $('.serving-note', f);
+  if (note) note.textContent = serving ? `1 serving = ${serving}` : '';
 }
 
 function openFoodSheet(meal = null) {
   editMealId = meal ? meal.id : null;
-  const m = meal || { name: '', cal: '', pro: '', meal: guessMeal(), time: nowHHMM() };
+  const m = meal || { name: '', cal: '', pro: '', carb: null, fat: null, servings: 1, serving: '', meal: guessMeal(), time: nowHHMM() };
   const isFav = !!meal && S.foods.some(f => normName(f.name) === normName(meal.name));
-  openSheet(meal ? 'Edit food' : 'Log food', `<form class="form" novalidate data-submit="saveMeal">
+  const base = meal ? perServing(meal) : {};
+  const numField = (k, label, v) => `<label class="field"><span>${label}</span><input name="${k}" inputmode="decimal" value="${v == null ? '' : esc(v)}" placeholder="${k === 'carb' || k === 'fat' ? 'optional' : '0'}" autocomplete="off" data-input="foodNum"></label>`;
+  openSheet(meal ? 'Edit food' : 'Log food', `<form class="form" novalidate data-submit="saveMeal" data-base="${esc(JSON.stringify(base))}" data-picked="${esc(normName(m.name))}">
     <label class="field"><span>Food</span>
-      <input name="name" list="food-suggest" value="${esc(m.name)}" placeholder="e.g. Chicken breast, 6 oz" maxlength="80" required autocomplete="off" data-input="foodName"></label>
-    <datalist id="food-suggest">${foodSuggestions().map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist>
+      <input name="name" value="${esc(m.name)}" placeholder="Search foods or type your own" maxlength="80" required autocomplete="off" autocorrect="off" data-input="foodName"></label>
+    <div class="food-results"></div>
+    <input type="hidden" name="serving" value="${esc(m.serving || '')}">
+    <div class="field"><span>Servings <small class="serving-note">${m.serving ? `1 serving = ${esc(m.serving)}` : ''}</small></span>
+      ${stepper('servings', m.servings || 1, 0.5, { min: 0.5, max: 20, mode: 'decimal', input: 'foodServings' })}</div>
     <div class="form-grid">
-      <label class="field"><span>Calories</span><input name="cal" inputmode="decimal" value="${esc(m.cal)}" placeholder="0" autocomplete="off"></label>
-      <label class="field"><span>Protein (g)</span><input name="pro" inputmode="decimal" value="${esc(m.pro)}" placeholder="0" autocomplete="off"></label>
+      ${numField('cal', 'Calories', m.cal)}${numField('pro', 'Protein (g)', m.pro)}
+      ${numField('carb', 'Carbs (g)', m.carb)}${numField('fat', 'Fat (g)', m.fat)}
     </div>
     <div class="form-grid">
       <label class="field"><span>Meal</span><select name="meal">${MEALS.map(([k, v]) => `<option value="${k}" ${m.meal === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -1465,23 +1525,38 @@ function openFoodSheet(meal = null) {
 actions.logFood = () => openFoodSheet();
 actions.editMeal = el => { const m = S.meals.find(x => x.id === el.dataset.id); if (m) openFoodSheet(m); };
 
-// Typing a food you've logged before fills in its calories and protein. If you keep typing
-// and the name stops matching, the filled-in numbers are cleared (numbers you typed yourself stay).
+// Typing: show matching foods. An exact match with a favorite or something you logged before fills in
+// its numbers; if you keep typing and it stops matching, those filled-in numbers are cleared again
+// (numbers you typed yourself always stay).
 inputs.foodName = el => {
-  const f = el.form, { cal, pro } = f.elements, key = normName(el.value);
+  const f = el.form, key = normName(el.value);
+  $('.food-results', f).innerHTML = foodResults(el.value);
+  if (f.elements.serving.value && f.dataset.picked !== key) setServingLabel(f, '');
   const auto = f.dataset.auto ? JSON.parse(f.dataset.auto) : null;
-  const untouched = !!auto && cal.value === auto.cal && pro.value === auto.pro;
-  if (cal.value && !untouched) return;
+  const untouched = !!auto && f.elements.cal.value === auto.cal && f.elements.pro.value === auto.pro;
+  if (f.elements.cal.value && !untouched) return;
   const hit = key && (S.foods.find(x => normName(x.name) === key)
     || [...S.meals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).find(x => normName(x.name) === key));
-  if (!hit) {
-    if (untouched) { cal.value = ''; pro.value = ''; delete f.dataset.auto; }
-    return;
-  }
-  const per = hit.servings && hit.servings !== 1 ? 1 / hit.servings : 1;
-  cal.value = Math.round(hit.cal * per);
-  pro.value = Math.round(hit.pro * per * 10) / 10;
-  f.dataset.auto = JSON.stringify({ cal: cal.value, pro: pro.value });
+  if (hit) { fillMacros(f, perServing(hit), num(f.elements.servings.value) || 1); f.dataset.picked = key; setServingLabel(f, hit.serving); return; }
+  if (untouched) { for (const k of MACROS) f.elements[k].value = ''; f.dataset.base = '{}'; delete f.dataset.auto; }
+};
+actions.pickFood = el => {
+  const f = el.closest('form'), food = foodHits[+el.dataset.i];
+  if (!f || !food) return;
+  f.elements.name.value = food.name;
+  f.dataset.picked = normName(food.name);
+  setServingLabel(f, food.serving);
+  fillMacros(f, { cal: food.cal, pro: food.pro, carb: food.carb ?? null, fat: food.fat ?? null }, num(f.elements.servings.value) || 1);
+  $('.food-results', f).innerHTML = '';
+};
+inputs.foodServings = el => {
+  const f = el.form, s = num(el.value), base = formBase(f);
+  if (s > 0 && MACROS.some(k => base[k] != null)) fillMacros(f, base, s);
+};
+inputs.foodNum = el => {
+  const f = el.form, s = num(f.elements.servings.value) || 1, v = num(el.value), base = formBase(f);
+  base[el.name] = v == null ? null : v / s;
+  f.dataset.base = JSON.stringify(base);
 };
 
 submits.saveMeal = f => {
@@ -1489,14 +1564,15 @@ submits.saveMeal = f => {
   const typed = String(d.name || '').trim();
   const fav = S.foods.find(x => normName(x.name) === normName(typed));
   const name = fav ? fav.name : typed;
-  const cal = num(d.cal), pro = num(d.pro);
+  const [cal, pro, carb, fat] = MACROS.map(k => num(d[k]));
   if (!name) { toast('Type what you ate'); return; }
   if (cal == null && pro == null) { toast('Enter the calories and/or protein'); return; }
+  const servings = clamp(num(d.servings) || 1, 0.1, 50);
   const entry = {
-    name,
-    cal: Math.max(0, Math.round(cal || 0)),
-    pro: Math.max(0, Math.round((pro || 0) * 10) / 10),
-    meal: d.meal || guessMeal(),
+    name, servings, serving: String(d.serving || '').trim(),
+    cal: Math.max(0, Math.round(cal || 0)), pro: r1(pro),
+    carb: carb == null ? null : r1(carb), fat: fat == null ? null : r1(fat),
+    meal: MEAL_LABEL[d.meal] ? d.meal : guessMeal(),
     time: d.time || nowHHMM()
   };
   const editing = !!editMealId;
@@ -1506,9 +1582,9 @@ submits.saveMeal = f => {
     if (!m) { closeSheet(); return; }
     Object.assign(m, entry);
   } else {
-    m = { id: uid(), date: S.dietDate, servings: 1, createdAt: Date.now(), ...entry };
+    m = { id: uid(), date: S.dietDate, createdAt: Date.now(), ...entry };
     S.meals.push(m);
-    if (d.fav) addFavorite({ name, cal: entry.cal, pro: entry.pro });
+    if (d.fav) addFavorite(perServing(m));
   }
   save(() => DB.put('meals', m));
   closeSheet(); render();
@@ -1530,16 +1606,17 @@ actions.deleteMeal = () => {
 actions.mealToFav = () => {
   const m = S.meals.find(x => x.id === editMealId);
   if (!m) return;
-  const per = m.servings && m.servings !== 1 ? 1 / m.servings : 1;
-  addFavorite({ name: m.name, cal: Math.round(m.cal * per), pro: Math.round(m.pro * per * 10) / 10 });
+  addFavorite(perServing(m));
   closeSheet(); render(); toast(`${m.name} added to favorites`);
 };
 
 // ----- Favorites -----
-function addFavorite({ name, cal, pro }) {
+// Favorites store numbers for ONE serving (carbs, fat and the serving size are optional).
+function addFavorite({ name, serving = '', cal, pro, carb = null, fat = null }) {
+  const data = { cal: Math.round(cal || 0), pro: r1(pro), carb: carb == null ? null : r1(carb), fat: fat == null ? null : r1(fat), serving: serving || '' };
   const existing = S.foods.find(f => normName(f.name) === normName(name));
-  if (existing) { Object.assign(existing, { cal, pro }); save(() => DB.put('foods', existing)); return existing; }
-  const f = { id: uid(), name, cal, pro, uses: 0, createdAt: Date.now() };
+  if (existing) { Object.assign(existing, data); save(() => DB.put('foods', existing)); return existing; }
+  const f = { id: uid(), name, ...data, uses: 0, createdAt: Date.now() };
   S.foods.push(f);
   save(() => DB.put('foods', f));
   return f;
@@ -1547,8 +1624,9 @@ function addFavorite({ name, cal, pro }) {
 
 function logFavorite(f, servings) {
   const m = {
-    id: uid(), date: S.dietDate, time: nowHHMM(), meal: guessMeal(), name: f.name, servings,
-    cal: Math.round(f.cal * servings), pro: Math.round(f.pro * servings * 10) / 10, createdAt: Date.now()
+    id: uid(), date: S.dietDate, time: nowHHMM(), meal: guessMeal(), name: f.name, servings, serving: f.serving || '',
+    cal: Math.round(f.cal * servings), pro: r1(f.pro * servings),
+    carb: f.carb == null ? null : r1(f.carb * servings), fat: f.fat == null ? null : r1(f.fat * servings), createdAt: Date.now()
   };
   S.meals.push(m);
   f.uses = (f.uses || 0) + 1;
@@ -1568,7 +1646,7 @@ actions.favOpen = el => {
   const f = S.foods.find(x => x.id === el.dataset.id);
   if (!f) return;
   openSheet(f.name, `<form class="form" novalidate data-submit="favLogServings" data-id="${f.id}">
-    <p class="text-2">${fmt(f.cal)} cal · ${fmt(f.pro, 1)} g protein per serving</p>
+    <p class="text-2">${[`${fmt(f.cal)} cal`, `${fmt(f.pro, 1)} g protein`, macroText(f)].filter(Boolean).join(' · ')} per serving${f.serving ? ` (${esc(f.serving)})` : ''}</p>
     <div class="field"><span>Servings</span>${stepper('servings', 1, 0.5, { min: 0.5, max: 20, mode: 'decimal' })}</div>
     <button class="btn btn-primary btn-block" type="submit">${icon('plus', 'sm')} Log it</button>
     <div class="grid2">
@@ -1589,9 +1667,10 @@ submits.favLogServings = f => {
 function favForm(f) {
   return `<form class="form" novalidate data-submit="saveFav" data-id="${f ? f.id : ''}">
     <label class="field"><span>Food name</span><input name="name" value="${esc(f ? f.name : '')}" maxlength="80" required autocomplete="off" placeholder="e.g. Protein shake"></label>
+    <label class="field"><span>Serving size <small>optional</small></span><input name="serving" value="${esc(f ? f.serving || '' : '')}" maxlength="40" autocomplete="off" placeholder="e.g. 1 bottle, 1 cup, 6 oz"></label>
     <div class="form-grid">
-      <label class="field"><span>Calories</span><input name="cal" inputmode="decimal" value="${f ? esc(f.cal) : ''}" placeholder="0" autocomplete="off"></label>
-      <label class="field"><span>Protein (g)</span><input name="pro" inputmode="decimal" value="${f ? esc(f.pro) : ''}" placeholder="0" autocomplete="off"></label>
+      ${[['cal', 'Calories'], ['pro', 'Protein (g)'], ['carb', 'Carbs (g)'], ['fat', 'Fat (g)']].map(([k, label]) =>
+        `<label class="field"><span>${label}</span><input name="${k}" inputmode="decimal" value="${f && f[k] != null ? esc(f[k]) : ''}" placeholder="${k === 'carb' || k === 'fat' ? 'optional' : '0'}" autocomplete="off"></label>`).join('')}
     </div>
     <p class="hint">Numbers are for one serving.</p>
     <button class="btn btn-primary btn-block" type="submit">${f ? 'Save favorite' : 'Add favorite'}</button>
@@ -1603,7 +1682,9 @@ actions.newFav = () => openSheet('New favorite', favForm(null));
 submits.saveFav = f => {
   const d = formData(f), name = String(d.name || '').trim();
   if (!name) { toast('Enter a name'); return; }
-  const data = { name, cal: Math.max(0, Math.round(num(d.cal) || 0)), pro: Math.max(0, Math.round((num(d.pro) || 0) * 10) / 10) };
+  const [carb, fat] = [num(d.carb), num(d.fat)];
+  const data = { name, serving: String(d.serving || '').trim(), cal: Math.max(0, Math.round(num(d.cal) || 0)), pro: r1(num(d.pro)),
+    carb: carb == null ? null : r1(carb), fat: fat == null ? null : r1(fat) };
   const existing = f.dataset.id ? S.foods.find(x => x.id === f.dataset.id) : null;
   if (existing) { Object.assign(existing, data); save(() => DB.put('foods', existing)); }
   else addFavorite(data);
@@ -1621,7 +1702,7 @@ actions.manageFavs = () => {
   const favs = sortedFavs();
   openSheet('Favorite foods', `<div class="stack">
     ${favs.map(f => `<button class="meal" data-action="editFav" data-id="${f.id}">
-      <div><div class="meal-name">${esc(f.name)}</div><div class="meal-sub">per serving · tap to edit</div></div>
+      <div><div class="meal-name">${esc(f.name)}</div><div class="meal-sub">${f.serving ? esc(f.serving) : 'per serving'} · tap to edit</div></div>
       <div class="meal-nums">${fmt(f.cal)} cal<small>${fmt(f.pro, 1)} g protein</small></div></button>`).join('') || '<p class="hint">No favorites yet.</p>'}
     <button class="btn btn-primary btn-block" data-action="newFav">${icon('plus', 'sm')} New favorite</button>
   </div>`);
@@ -1653,6 +1734,7 @@ function dietWeek() {
   const logged = days.filter(x => x.cal > 0 || x.pro > 0);
   const totCal = sum(days, x => x.cal), totPro = sum(days, x => x.pro);
   const avgCal = logged.length ? totCal / logged.length : 0, avgPro = logged.length ? totPro / logged.length : 0;
+  const totCarb = sum(days, x => x.carb), totFat = sum(days, x => x.fat);
   const calHits = days.filter(x => x.cal >= calGoal).length, proHits = days.filter(x => x.pro >= proteinGoal).length;
   const thisWeek = S.dietWeek === ymd(weekStart());
   later(() => {
@@ -1675,6 +1757,10 @@ function dietWeek() {
       <div class="tile"><div class="tile-label">Average calories / day</div><div class="tile-value">${fmt(avgCal)}</div></div>
       <div class="tile"><div class="tile-label">Average protein / day</div><div class="tile-value">${fmt(avgPro)}<small> g</small></div></div>
     </div>
+    ${totCarb || totFat ? `<div class="tiles two">
+      <div class="tile"><div class="tile-label">Average carbs / day</div><div class="tile-value">${fmt(totCarb / logged.length)}<small> g</small></div></div>
+      <div class="tile"><div class="tile-label">Average fat / day</div><div class="tile-value">${fmt(totFat / logged.length)}<small> g</small></div></div>
+    </div>` : ''}
     <section class="card">
       <div class="spread"><div class="card-title">Calories</div><span class="muted small bold">Goal hit ${calHits} of 7 days</span></div>
       <div class="chart" id="chart-cal"></div>
@@ -1878,7 +1964,7 @@ submits.logRecipe = f => {
   const d = formData(f), servings = clamp(num(d.servings) || 1, 0.25, 20);
   const m = {
     id: uid(), date: ymd(), time: nowHHMM(), meal: MEAL_LABEL[d.meal] ? d.meal : guessMeal(), name: r.name, servings,
-    cal: Math.round(r.cal * servings), pro: Math.round(r.pro * servings * 10) / 10, createdAt: Date.now()
+    cal: Math.round(r.cal * servings), pro: r1(r.pro * servings), carb: r1(r.carb * servings), fat: r1(r.fat * servings), createdAt: Date.now()
   };
   S.meals.push(m);
   save(() => DB.put('meals', m));
@@ -1888,7 +1974,7 @@ submits.logRecipe = f => {
 actions.recipeFav = el => {
   const r = RECIPE_BY_ID[el.dataset.id];
   if (!r) return;
-  addFavorite({ name: r.name, cal: r.cal, pro: r.pro });
+  addFavorite({ name: r.name, cal: r.cal, pro: r.pro, carb: r.carb, fat: r.fat });
   closeSheet(); render(); toast(`${r.name} saved to favorites`);
 };
 
@@ -2514,7 +2600,10 @@ const cleanWorkout = w => {
   w.title = String(w.title || 'Workout');
   return w;
 };
-const cleanFood = f => (isObj(f) && f.id && f.name ? Object.assign(f, { name: String(f.name), cal: Number(f.cal) || 0, pro: Number(f.pro) || 0 }) : null);
+const optNum = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+const cleanFood = f => (isObj(f) && f.id && f.name ? Object.assign(f, {
+  name: String(f.name), cal: Number(f.cal) || 0, pro: Number(f.pro) || 0, carb: optNum(f.carb), fat: optNum(f.fat), serving: String(f.serving || '')
+}) : null);
 const cleanMeal = m => (cleanFood(m) && /^\d{4}-\d{2}-\d{2}$/.test(m.date) ? m : null);
 
 async function loadAll() {

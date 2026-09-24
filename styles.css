@@ -20,6 +20,8 @@
   /* chart / nutrition colors */
   --cal: #d95926;
   --pro: #3987e5;
+  --carb: #d9a21b;
+  --fat: #a07be8;
   --grid: #1f2733;
 
   --accent: var(--gym);
@@ -239,6 +241,11 @@ h1, h2, h3, h4, p { margin: 0; }
 .key { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
 .key.cal { background: var(--cal); }
 .key.pro { background: var(--pro); }
+.key.carb { background: var(--carb); }
+.key.fat { background: var(--fat); }
+.macro-extra { display: flex; gap: 18px; margin-top: 14px; font-size: 14px; color: var(--text-2); font-weight: 600; }
+.macro-extra span { display: inline-flex; align-items: center; gap: 7px; }
+.macro-extra b { color: var(--text); font-variant-numeric: tabular-nums; }
 .meter { height: 12px; border-radius: 99px; overflow: hidden; }
 .meter > span { display: block; height: 100%; border-radius: 99px; transition: width 0.4s ease; }
 .meter.cal { background: rgba(217, 89, 38, 0.2); }
@@ -411,6 +418,18 @@ h1, h2, h3, h4, p { margin: 0; }
 .meal-sub { font-size: 13px; color: var(--muted); font-weight: 600; }
 .meal-nums { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; font-size: 15px; }
 .meal-nums small { display: block; color: var(--muted); font-weight: 700; font-size: 13px; }
+
+/* Food search results in the Log food sheet */
+.food-results { display: flex; flex-direction: column; gap: 6px; margin-top: -6px; }
+.food-results:empty { display: none; }
+.food-hit {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; text-align: left; color: inherit;
+  background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 12px;
+}
+.food-hit-name { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 15px; }
+.food-hit-name .i { width: 14px; height: 14px; color: var(--warn); }
+.food-hit-sub { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 1px; }
+.serving-note { font-weight: 600; color: var(--muted); letter-spacing: 0; }
 
 /* Meal plan, recipes and eating tips (Meals view) */
 .chip-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
