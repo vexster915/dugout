@@ -2308,15 +2308,15 @@ function dietWeek() {
     </section>
     <section class="card">
       <table class="table">
-        <thead><tr><th>Day</th><th>Calories</th><th>Protein</th></tr></thead>
+        <thead><tr><th>Day</th><th>Calories</th><th>Protein</th><th>Water</th></tr></thead>
         <tbody>
           ${days.map(x => `<tr class="${x.key === todayKey ? 'today' : ''}" data-action="dietOpenDay" data-date="${x.key}">
             <td>${fmtDate(x.d, { weekday: 'short', month: 'short', day: 'numeric' })}</td>
-            ${cell(x.cal, calGoal, fmt(x.cal), x.future)}${cell(x.pro, proteinGoal, fmt(x.pro, 1) + ' g', x.future)}</tr>`).join('')}
-          <tr><td class="bold">Total</td><td class="bold">${fmt(totCal)}</td><td class="bold">${fmt(totPro, 1)} g</td></tr>
+            ${cell(x.cal, calGoal, fmt(x.cal), x.future)}${cell(x.pro, proteinGoal, fmt(x.pro, 1) + ' g', x.future)}${cell(waterOf(x.key), S.settings.waterGoal, waterOf(x.key) ? waterText(waterOf(x.key)) : '–', x.future)}</tr>`).join('')}
+          <tr><td class="bold">Total</td><td class="bold">${fmt(totCal)}</td><td class="bold">${fmt(totPro, 1)} g</td><td class="bold">${waterText(sum(days, x => waterOf(x.key)))}</td></tr>
         </tbody>
       </table>
-      <p class="hint" style="margin-top:10px">✓ = daily goal reached. Tap a day to see what you ate.</p>
+      <p class="hint" style="margin-top:10px">✓ = daily goal reached · water goal hit ${days.filter(x => waterOf(x.key) >= S.settings.waterGoal).length} of 7 days. Tap a day to see what you ate.</p>
     </section>`;
 }
 actions.dietWeekStep = el => {
