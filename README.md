@@ -24,6 +24,7 @@ Everything is stored only on your phone, encrypted with your login, and it works
 - Baseball tests: 60-yard dash, exit velocity, throwing velocity, pop time and more
 - Arm care: throwing log, live pitch counter and Pitch Smart rest days by age, sprint stopwatch
 - Encrypted backups, plus CSV spreadsheets for your coach
+- Dark or light theme (light is easier to read outdoors)
 
 ## Files
 

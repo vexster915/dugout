@@ -760,3 +760,31 @@ i.t-rest { background: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ---------- Light theme (Settings → Appearance) — easier to read outdoors in the sun ---------- */
+:root[data-theme="light"] {
+  --bg: #f3f5f8; --surface: #ffffff; --surface-2: #eef1f5; --surface-3: #e1e6ed;
+  --line: #dde3ea; --line-2: #c9d1dc; --text: #0f1720; --text-2: #394556; --muted: #687385; --grid: #e7ebf0;
+  --gym: #d9480f; --home: #0b8a7c; --warn: #b45309; --danger: #d64545;
+  --cal: #d9480f; --pro: #2563eb; --carb: #b7791f; --fat: #7c4ddb; --water: #0284c7;
+  color-scheme: light;
+}
+:root[data-theme="light"] body[data-mode="gym"] { --accent: var(--gym); --accent-ink: #ffffff; --accent-soft: rgba(217, 72, 15, 0.1); }
+:root[data-theme="light"] body[data-mode="home"] { --accent: var(--home); --accent-ink: #ffffff; --accent-soft: rgba(11, 138, 124, 0.1); }
+:root[data-theme="light"] #tabbar { background: rgba(255, 255, 255, 0.97); }
+:root[data-theme="light"] .wo-head { background: rgba(243, 245, 248, 0.95); }
+:root[data-theme="light"] .set-in::placeholder { color: #9aa4b2; }
+:root[data-theme="light"] .cal-day.future { color: #b3bcc8; }
+:root[data-theme="light"] .chart .baseline { stroke: #b8c1cc; }
+:root[data-theme="light"] .badge.good, :root[data-theme="light"] .table td.hit, :root[data-theme="light"] .wo-tip > .i,
+:root[data-theme="light"] .plan-meal.done .plan-slot, :root[data-theme="light"] .test-row .up,
+:root[data-theme="light"] .pc-btn.strike, :root[data-theme="light"] .ready-dot.good { color: #15803d; }
+:root[data-theme="light"] .btn-danger, :root[data-theme="light"] .auth-error, :root[data-theme="light"] .test-row .down,
+:root[data-theme="light"] .pc-total.over, :root[data-theme="light"] .ready-dot.low { color: #c53030; }
+:root[data-theme="light"] .pc-btn.ball { color: #1d4ed8; }
+:root[data-theme="light"] .ready-dot.ok { color: var(--warn); }
+:root[data-theme="light"] .set-row.done .set-check, :root[data-theme="light"] .wo-ex.complete .wo-num { color: #ffffff; }
+:root[data-theme="light"] .food-hit-name .i { color: #b45309; }
+:root[data-theme="light"] .sheet-backdrop { background: rgba(15, 23, 32, 0.45); }
+:root[data-theme="light"] #toast { box-shadow: 0 12px 32px rgba(15, 23, 32, 0.18); }
+:root[data-theme="light"] .card, :root[data-theme="light"] .set-list, :root[data-theme="light"] .wo-ex { box-shadow: 0 1px 2px rgba(15, 23, 32, 0.04); }

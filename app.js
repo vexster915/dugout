@@ -133,6 +133,19 @@ function ytInfo(url) {
   }
 }
 
+// ----- Appearance: dark, light or follow the phone. Kept outside the encrypted data (it's just a
+// preference) so the right colors show even on the sign-in screen. -----
+const THEMES = [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Auto']];
+const themePref = () => { try { return localStorage.getItem('dugout-theme') || 'dark'; } catch (e) { return 'dark'; } };
+function applyTheme() {
+  const pref = themePref(), light = pref === 'light' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: light)').matches);
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', light ? '#f3f5f8' : '#07090d');
+}
+applyTheme();
+window.matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', applyTheme);
+
 const isStandalone = () => window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
 /* ============================== 2. ICONS ============================== */
@@ -3544,6 +3557,8 @@ function renderSettings() {
     <div class="set-list">
       <div class="set-item"><div class="grow"><div>Workout time</div><div class="hint">Shown on the Today screen</div></div>
         <input class="input" type="time" value="${esc(st.workoutTime)}" data-change="setTime" aria-label="Workout time"></div>
+      <div class="set-item"><div class="grow"><div>Appearance</div><div class="hint">Light is easier to read outside</div></div>
+        <div class="seg" style="width:190px">${THEMES.map(([k, l]) => `<button class="${themePref() === k ? 'on' : ''}" data-action="setTheme" data-k="${k}" aria-pressed="${themePref() === k}">${l}</button>`).join('')}</div></div>
       <div class="set-item"><div class="grow"><div>Weight units</div><div class="hint">Changes labels only</div></div>
         <div class="seg" style="width:120px">${['lb', 'kg'].map(u => `<button class="${st.unit === u ? 'on' : ''}" data-action="setUnit" data-u="${u}" aria-pressed="${st.unit === u}">${u}</button>`).join('')}</div></div>
       ${toggle('autoRest', 'Auto-start rest timer', 'Starts when you check off a set')}
@@ -3608,6 +3623,10 @@ changes.setTime = el => {
   S.settings.workoutTime = el.value.slice(0, 5);
   saveSettings();
   toast(`Workout time: ${clockTime(S.settings.workoutTime)}`);
+};
+actions.setTheme = el => {
+  try { localStorage.setItem('dugout-theme', el.dataset.k); } catch (e) { /* private mode: just this session */ }
+  applyTheme(); render();
 };
 actions.setUnit = el => { S.settings.unit = el.dataset.u; saveSettings(); render(); };
 // ----- Backup file -----
@@ -4052,6 +4071,7 @@ function whatsNew() {
     ${item('plan', 'In-season program', 'Switch programs on the Plan tab: two short lifts a week to stay strong during the season.')}
     ${item('timer', 'Baseball tests, stats and arm care', 'Progress → Baseball: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
     ${item('trophy', 'Stay on track', 'Daily readiness check-in, a weekly review, a training calendar, badges and spreadsheet export.')}
+    ${item('settings', 'Light mode', 'Settings → Appearance: a bright theme that is easier to read outside at the field.')}
     <button class="btn btn-primary btn-block" data-action="closeSheet">Let's go</button>`);
 }
 
