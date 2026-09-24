@@ -229,6 +229,7 @@ const S = {
   progEx: null,
   progMetric: null,
   progRange: 'all',
+  progView: 'lifts',   // Progress tab: lifts, body or baseball
   histLimit: 15,
   openEx: null         // which exercise card is open during a workout (null = automatic)
 };
@@ -475,6 +476,7 @@ function renderToday() {
     ${todayCard(dayPlan(di), di, doneToday)}
     ${nutritionCard()}
     ${waterCard()}
+    ${logsOf('throw').some(l => l.date >= ymd(addDays(now, -14))) ? armCard() : ''}
     ${weekCard()}
   </div>`;
 }
@@ -2295,7 +2297,7 @@ function niceTicks(lo, hi, count = 4) {
 const tickLabel = v => (Math.abs(v) >= 10000 ? fmtK(v) : fmt(v, 1));
 
 // Column chart (weekly calories / protein) with a goal line. Tap a column for its value.
-function barChart(sel, data, { goal, cls, unit }) {
+function barChart(sel, data, { goal, cls, unit, label }) {
   const el = $(sel);
   if (!el) return;
   const W = Math.max(260, el.clientWidth || 320), H = 190, L = 44, R = 10, T = 18, B = 26;
@@ -2308,7 +2310,7 @@ function barChart(sel, data, { goal, cls, unit }) {
     const r = Math.min(4, w / 2, h);
     return `M${x},${yTop + h}V${yTop + r}Q${x},${yTop} ${x + r},${yTop}H${x + w - r}Q${x + w},${yTop} ${x + w},${yTop + r}V${yTop + h}Z`;
   };
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${unit === 'g' ? 'Protein' : 'Calories'} for each day of the week">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(label || `${unit === 'g' ? 'Protein' : 'Calories'} for each day of the week`)}">`;
   top.forEach(t => { s += `<line class="gridline" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="tick" x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${tickLabel(t)}</text>`; });
   data.forEach((d, i) => {
     if (d.v > 0) s += `<path class="bar ${cls}" data-i="${i}" d="${col(cx(i) - bw / 2, y(d.v), bw, y(0) - y(d.v))}"/>`;
@@ -2473,7 +2475,21 @@ function weekStreak(ws) {
   return n;
 }
 
+const PROG_VIEWS = [['lifts', 'Lifts'], ['body', 'Body'], ['baseball', 'Baseball']];
+actions.progView = el => { S.progView = el.dataset.v; render({ keepScroll: false }); };
+function goalsCard() {
+  const st = S.settings;
+  return `<section class="card stack-sm">
+    <div class="spread"><div class="card-title">Daily targets</div><button class="btn btn-sm btn-ghost" data-action="calcGoals">Recalculate</button></div>
+    <div class="small text-2">${[`${fmt(st.calGoal)} cal`, `${fmt(st.proteinGoal)} g protein`, st.carbGoal ? `${fmt(st.carbGoal)} g carbs` : '', st.fatGoal ? `${fmt(st.fatGoal)} g fat` : '', `${waterText(st.waterGoal)} water`].filter(Boolean).join(' · ')}</div>
+    <p class="hint">Recalculate every few weeks as your weight changes.</p>
+  </section>`;
+}
 function renderProgress() {
+  const head = `<div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
+    <div class="seg" role="group" aria-label="What to show">${PROG_VIEWS.map(([k, l]) => `<button class="${S.progView === k ? 'on' : ''}" data-action="progView" data-v="${k}" aria-pressed="${S.progView === k}">${l}</button>`).join('')}</div>`;
+  if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${goalsCard()}</div>`;
+  if (S.progView === 'baseball') return `<div class="page">${head}${testsCard()}${armCard()}${throwCard()}</div>`;
   const mode = S.settings.mode, m = MODES[mode];
   const ws = S.workouts.filter(w => w.mode === mode);
   const weekKey = ymd(weekStart()), monthKey = ymd().slice(0, 7);
@@ -2509,7 +2525,7 @@ function renderProgress() {
       </details>` : ''}`;
   }
   return `<div class="page">
-    <div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
+    ${head}
     ${modeToggle()}
     <div class="tiles">
       <div class="tile"><div class="tile-label">Workouts this week</div><div class="tile-value">${ws.filter(w => w.date >= weekKey).length}</div></div>
@@ -2521,7 +2537,6 @@ function renderProgress() {
       ${chart}
     </section>
     ${prCard(exList, mode)}
-    ${bodyCard()}
     <div class="section-title">${m.label} workout history</div>
     ${historyList(ws)}
   </div>`;
@@ -2652,6 +2667,181 @@ actions.deleteWorkout = async el => {
   S.workouts = S.workouts.filter(w => w.id !== id);
   await save(() => DB.remove('workouts', id));
   render(); toast('Workout deleted');
+};
+
+/* ============================== 9b. BASEBALL: TESTS + ARM CARE ============================== */
+
+// Measurables you can test and track. "good" = a rough strong high-school mark (just a guide).
+const TESTS = [
+  { id: 'sixty', name: '60-yard dash', unit: 's', lower: true, good: 7.0, hint: 'Hand or laser timed from a standing start.' },
+  { id: 'ten', name: '10-yard split', unit: 's', lower: true, hint: 'The first 10 yards of your 60 — pure acceleration.' },
+  { id: 'homefirst', name: 'Home to first', unit: 's', lower: true, good: 4.3, hint: 'From contact to your foot hitting the bag.' },
+  { id: 'agility', name: 'Pro agility (5-10-5)', unit: 's', lower: true, hint: 'Best of 2 tries, touching each line.' },
+  { id: 'vertical', name: 'Vertical jump', unit: 'in', hint: 'Standing reach to the highest point you touch.' },
+  { id: 'broad', name: 'Broad jump', unit: 'in', hint: 'In inches — 8 ft 2 in is 98.' },
+  { id: 'exitvelo', name: 'Exit velocity', unit: 'mph', good: 90, hint: 'Best ball off a tee, measured with a radar or sensor.' },
+  { id: 'batspeed', name: 'Bat speed', unit: 'mph', hint: 'Peak bat speed from a swing sensor.' },
+  { id: 'throwvelo', name: 'Throwing velocity', unit: 'mph', good: 85, hint: 'Infield or outfield throw, or off the mound.' },
+  { id: 'poptime', name: 'Pop time (catchers)', unit: 's', lower: true, good: 2.0, hint: 'Glove to glove on a throw to second.' }
+];
+const TEST_BY_ID = Object.fromEntries(TESTS.map(t => [t.id, t]));
+const testFmt = (t, v) => `${t.unit === 's' ? Number(v).toFixed(2) : fmt(v, 1)} ${t.unit}`;   // times always show 2 decimals
+const testLogs = id => logsOf('test').filter(l => l.test === id);
+const bestOf = (t, list) => list.reduce((b, l) => (!b || (t.lower ? l.v < b.v : l.v > b.v) ? l : b), null);
+
+function testsCard() {
+  const rows = TESTS.map(t => {
+    const list = testLogs(t.id);
+    if (!list.length) return '';
+    const last = list[list.length - 1], best = bestOf(t, list), first = list[0];
+    const ch = list.length > 1 ? last.v - first.v : null, better = ch != null && (t.lower ? ch < 0 : ch > 0);
+    return `<button class="test-row" data-action="openTest" data-id="${t.id}">
+      <span class="grow"><span class="bold">${esc(t.name)}</span>
+        <span class="meal-sub">Best ${testFmt(t, best.v)}${ch ? ` · <span class="${better ? 'up' : 'down'}">${ch > 0 ? '+' : ''}${fmt(ch, t.unit === 's' ? 2 : 1)} since ${shortDate(first.date)}</span>` : ''}</span></span>
+      <span class="meal-nums">${testFmt(t, last.v)}<small>${shortDate(last.date)}</small></span>
+    </button>`;
+  }).join('');
+  return `<section class="card stack">
+    <div class="spread"><div class="card-title row">${icon('timer')} Baseball tests</div>
+      <button class="btn btn-sm btn-ghost" data-action="logTest">${icon('plus', 'sm')} Log</button></div>
+    ${rows || `<p class="hint">Track the numbers scouts and coaches look at — 60-yard dash, exit velo, throwing velo, pop time and more. Test every 4–6 weeks to see your training pay off.</p>`}
+  </section>`;
+}
+
+actions.logTest = el => {
+  const pick = (el && el.dataset.id) || (testLogs('sixty').length ? '' : 'sixty');
+  openSheet('Log a test result', `<form class="form" novalidate data-submit="saveTest">
+    <label class="field"><span>Test</span><select name="test" data-change="testHint">${TESTS.map(t => `<option value="${t.id}" ${t.id === pick ? 'selected' : ''}>${esc(t.name)} (${t.unit})</option>`).join('')}</select></label>
+    <p class="hint test-hint">${esc((TEST_BY_ID[pick] || TESTS[0]).hint)}</p>
+    <div class="form-grid">
+      <label class="field"><span>Result</span><input name="v" inputmode="decimal" autocomplete="off" placeholder="e.g. 7.05"></label>
+      <label class="field"><span>Date</span><input name="date" type="date" value="${ymd()}" max="${ymd()}"></label>
+    </div>
+    <button class="btn btn-primary btn-block" type="submit">Save result</button>
+  </form>`);
+};
+changes.testHint = el => { $('.test-hint', el.form).textContent = (TEST_BY_ID[el.value] || {}).hint || ''; };
+submits.saveTest = f => {
+  const d = formData(f), t = TEST_BY_ID[d.test], v = num(d.v);
+  if (!t) return;
+  if (!(v > 0 && v < 1000)) { toast(`Enter your ${t.name.toLowerCase()} in ${t.unit}`); return; }
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(d.date) && d.date <= ymd() ? d.date : ymd();
+  const prev = bestOf(t, testLogs(t.id));
+  putLog({ id: uid(), kind: 'test', test: t.id, date, v, at: Date.now() });
+  closeSheet(); render();
+  toast(prev && (t.lower ? v < prev.v : v > prev.v) ? `New best ${t.name.toLowerCase()}: ${testFmt(t, v)}!` : 'Result saved');
+};
+actions.openTest = el => {
+  const t = TEST_BY_ID[el.dataset.id];
+  if (!t) return;
+  const list = testLogs(t.id), best = bestOf(t, list);
+  openSheet(t.name, `
+    <div class="grid2">
+      <div class="tile"><div class="tile-label">Best</div><div class="tile-value">${best ? testFmt(t, best.v) : '–'}</div></div>
+      <div class="tile"><div class="tile-label">${t.good ? 'Strong high-school mark' : 'Tests logged'}</div><div class="tile-value">${t.good ? `${t.lower ? '≤' : '≥'} ${testFmt(t, t.good)}` : list.length}</div></div>
+    </div>
+    ${list.length > 1 ? '<div class="chart" id="chart-test"></div>' : ''}
+    <p class="hint">${esc(t.hint)}${t.good ? ' Marks are a rough guide — every level and position is different.' : ''}</p>
+    <div class="stack-sm">${list.slice().reverse().map(l => `<div class="log-row"><span class="grow">${fmtDate(parseYmd(l.date), { month: 'short', day: 'numeric', year: 'numeric' })}${l === best ? ' · best' : ''}</span>
+      <b>${testFmt(t, l.v)}</b><button class="btn btn-icon sm btn-ghost" data-action="deleteLog" data-id="${l.id}" aria-label="Delete">${icon('trash', 'sm')}</button></div>`).join('')}</div>
+    <button class="btn btn-primary btn-block" data-action="logTest" data-id="${t.id}">${icon('plus', 'sm')} Log a new result</button>`);
+  if (list.length > 1) lineChart('#chart-test', list.map(l => logPoint(l, l.v)), { fmtV: v => testFmt(t, v) });
+};
+
+// ----- Arm care: throwing log + pitch-count rest days -----
+const THROW_TYPES = [['catch', 'Catch play / warm-up'], ['longtoss', 'Long toss'], ['position', 'Position practice'], ['bullpen', 'Bullpen'], ['game', 'Game pitching'], ['plyo', 'Plyo balls / arm care']];
+const THROW_LABEL = Object.fromEntries(THROW_TYPES);
+const PITCHING = ['bullpen', 'game'];
+const FEEL = ['', 'Painful', 'Sore', 'OK', 'Good', 'Great'];
+// Pitch Smart (MLB + USA Baseball) daily pitch limits and rest days by age. "tiers" are the top pitch
+// count for 0, 1, 2… days of rest — e.g. ages 17–18: 1–30 → 0 days, 31–45 → 1, 46–60 → 2, 61–80 → 3, 81+ → 4.
+const PITCH_SMART = [
+  { upTo: 8, max: 50, tiers: [20, 35, 50] }, { upTo: 10, max: 75, tiers: [20, 35, 50, 65] },
+  { upTo: 12, max: 85, tiers: [20, 35, 50, 65] }, { upTo: 14, max: 95, tiers: [20, 35, 50, 65] },
+  { upTo: 16, max: 95, tiers: [30, 45, 60, 75] }, { upTo: 18, max: 105, tiers: [30, 45, 60, 80] },
+  { upTo: 22, max: 120, tiers: [30, 45, 60, 80, 105] }
+];
+const pitchRule = age => (age >= 7 ? PITCH_SMART.find(r => age <= r.upTo) || null : null);
+const restDays = (rule, pitches) => rule.tiers.filter(t => pitches > t).length;
+const throwText = l => `${THROW_LABEL[l.type] || 'Throwing'} · ${fmt(l.count)} ${PITCHING.includes(l.type) ? 'pitches' : 'throws'}${l.dist ? ` · ${fmt(l.dist)} ft` : ''}${l.feel ? ` · arm ${FEEL[l.feel].toLowerCase()}` : ''}`;
+
+// When can you pitch again? The latest "first day back" from any recent pitching outing.
+function armStatus() {
+  const age = S.settings.profile && S.settings.profile.age, rule = age ? pitchRule(age) : null;
+  let until = null, from = null;
+  if (rule) for (const l of logsOf('throw').filter(x => PITCHING.includes(x.type) && x.count > 0).slice(-12)) {
+    const rd = restDays(rule, l.count);
+    if (!rd) continue;
+    const back = addDays(parseYmd(l.date), rd + 1);
+    if (!until || back > until) { until = back; from = l; }
+  }
+  return { age, rule, until: until && until > parseYmd(ymd()) ? until : null, from };
+}
+function armCard() {
+  const { age, rule, until, from } = armStatus(), all = logsOf('throw'), last = all[all.length - 1];
+  const week = all.filter(l => l.date >= ymd(addDays(new Date(), -6)));
+  const status = !age ? '<button class="btn-link inline-link" data-action="calcGoals">Add your age</button> to see Pitch Smart rest days after you pitch.'
+    : !rule ? 'Pitch Smart pitch limits cover ages 7–22.'
+    : until ? `<b>Rest from pitching</b> through ${fmtDate(addDays(until, -1), { weekday: 'long', month: 'short', day: 'numeric' })} — ${fmt(from.count)} pitches on ${shortDate(from.date)}.`
+    : `<b>Ready to pitch.</b> Daily limit at age ${age}: ${rule.max} pitches.`;
+  return `<section class="card stack-sm">
+    <div class="spread"><div class="card-title row">${icon('shield')} Arm care</div>
+      <button class="btn btn-sm btn-ghost" data-action="logThrow">${icon('plus', 'sm')} Log throwing</button></div>
+    <div class="small text-2">${status}</div>
+    ${last ? `<div class="small muted">Last: ${esc(throwText(last))} (${shortDate(last.date)})</div>` : '<div class="small muted">Log catch play, long toss, bullpens and games to keep an eye on your arm.</div>'}
+    ${week.length ? `<div class="small muted">Last 7 days: ${fmt(sum(week, l => l.count || 0))} throws in ${week.length} session${week.length === 1 ? '' : 's'}</div>` : ''}
+    ${last && last.feel === 1 && last.date >= ymd(addDays(new Date(), -3)) ? `<div class="banner warn">${icon('info')}<div>Pain is different from normal soreness. Don't throw through it — tell your coach or athletic trainer, and see a doctor if it doesn't go away.</div></div>`
+      : last && last.feel === 2 && last.date >= ymd(addDays(new Date(), -2)) ? `<div class="banner">${icon('info')}<div>Arm sore? Keep today light: easy catch only, plus your band arm-care work.</div></div>` : ''}
+  </section>`;
+}
+function throwCard() {
+  const all = logsOf('throw'), start = weekStart();
+  const weeks = Array.from({ length: 8 }, (_, k) => {
+    const from = addDays(start, (k - 7) * 7), to = ymd(addDays(from, 6)), f = ymd(from);
+    return { label: fmtDate(from, { month: 'numeric', day: 'numeric' }), full: `Week of ${fmtDate(from, { month: 'short', day: 'numeric' })}`, v: sum(all.filter(l => l.date >= f && l.date <= to), l => l.count || 0) };
+  });
+  if (all.length) later(() => barChart('#chart-throws', weeks, { cls: 'throw', unit: 'throws', label: 'Throws per week' }));
+  return `<section class="card stack">
+    <div class="card-title">Throwing log</div>
+    ${all.length ? `<div class="chart" id="chart-throws"></div>
+      <div class="stack-sm">${all.slice(-8).reverse().map(l => `<div class="log-row"><span class="grow small">${shortDate(l.date)} · ${esc(throwText(l))}${l.note ? `<br><span class="muted">${esc(l.note)}</span>` : ''}</span>
+        <button class="btn btn-icon sm btn-ghost" data-action="deleteLog" data-id="${l.id}" aria-label="Delete">${icon('trash', 'sm')}</button></div>`).join('')}</div>`
+      : '<p class="hint">Your weekly throwing totals show up here. Big jumps in throwing from one week to the next are a common cause of arm trouble — build up gradually.</p>'}
+    <details class="table-toggle"><summary>Healthy-arm guidelines</summary><ul class="steps">
+      <li>Build up throwing gradually after a break — no big jumps in volume from week to week.</li>
+      <li>Don't pitch on back-to-back days, and don't pitch and catch in the same game.</li>
+      <li>Take at least 2–3 months a year off from overhead throwing (4 months off pitching).</li>
+      <li>Avoid pitching on more than one team at the same time. Follow your league's pitch-count rules.</li>
+      <li>Soreness that fades in a day is normal. Pain, numbness or elbow/shoulder pain that lingers is not — stop and get checked.</li>
+    </ul></details>
+  </section>`;
+}
+
+actions.logThrow = () => openSheet('Log throwing', `<form class="form" novalidate data-submit="saveThrow">
+  <label class="field"><span>Type</span><select name="type">${THROW_TYPES.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></label>
+  <div class="form-grid">
+    <label class="field"><span>Throws / pitches</span><input name="count" inputmode="numeric" autocomplete="off" placeholder="e.g. 40"></label>
+    <label class="field"><span>Longest throw (ft)</span><input name="dist" inputmode="numeric" autocomplete="off" placeholder="optional"></label>
+  </div>
+  <div class="field"><span>How does your arm feel?</span>
+    <div class="feel">${[5, 4, 3, 2, 1].map(v => `<label class="feel-opt"><input type="radio" name="feel" value="${v}" ${v === 4 ? 'checked' : ''}><span>${FEEL[v]}</span></label>`).join('')}</div></div>
+  <div class="form-grid">
+    <label class="field"><span>Date</span><input name="date" type="date" value="${ymd()}" max="${ymd()}"></label>
+    <label class="field"><span>Notes</span><input name="note" maxlength="120" autocomplete="off" placeholder="optional"></label>
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">Save</button>
+</form>`);
+submits.saveThrow = f => {
+  const d = formData(f), count = Math.round(num(d.count) || 0), dist = Math.round(num(d.dist) || 0);
+  if (!(count >= 1 && count <= 500)) { toast('Enter how many throws or pitches (1–500)'); return; }
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(d.date) && d.date <= ymd() ? d.date : ymd();
+  const l = { id: uid(), kind: 'throw', date, type: THROW_LABEL[d.type] ? d.type : 'catch', count, dist: dist || null, feel: clamp(parseInt(d.feel, 10) || 4, 1, 5), note: String(d.note || '').trim(), at: Date.now() };
+  putLog(l);
+  closeSheet(); render();
+  const rule = pitchRule(S.settings.profile && S.settings.profile.age);
+  if (PITCHING.includes(l.type) && rule && count > rule.max) toast(`That's over the Pitch Smart daily limit for your age (${rule.max}). Rest up!`);
+  else if (PITCHING.includes(l.type) && rule) { const r = restDays(rule, count); toast(r ? `Saved — ${r} day${r === 1 ? '' : 's'} of rest before pitching again` : 'Saved — no rest day needed'); }
+  else toast(l.feel === 1 ? 'Saved — please get that arm checked' : 'Throwing saved');
 };
 
 /* ============================== 10. SETTINGS + BACKUP ============================== */
