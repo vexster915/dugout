@@ -1,13 +1,21 @@
 /* app.js — everything you see and tap in Dugout.
 
-   Sections:
-     1. Helpers            6. Rest timer, sound, screen-awake
-     2. Icons              7. Plan tab
-     3. State & saving     8. Diet tab
-     4. App shell          9. Progress tab (charts + history)
-     5. Today tab + workout in progress
-                          10. Settings tab + backup
-                          11. Start-up                                   */
+   Sections (search for the numbered banners):
+     1. Helpers, theme           7. Plan tab — programs, exercise library, day editing
+     2. Icons                    8. Diet tab — food log + search, favorites, recent foods, water,
+     3. State & saving              sweat test, goals + calculator, week totals, meal plan,
+     4. App shell (sheets,          game-day timeline, week ahead + shopping list, recipes
+        toasts, one listener     9. Progress tab — lift charts, records, calendar, badges,
+        for every tap)              body weight, recovery
+     5. Today tab — week          9b. Baseball — tests, games + season stats, skills practice,
+        review, check-in,            arm care + Pitch Smart, pitch counter, stopwatch
+        workout, coaching tips  10. Settings — backup, share cards, CSV export, help
+     6. Rest timer, sound,       11. Start-up — loading + cleaning saved data, day rollover
+        screen-awake            12. Sign-in, first-run setup, what's new
+
+   Data lives in plan.js (programs), exercises.js (how-tos), meals.js (recipes + tips) and
+   foods.js (food list). Every tap goes through data-action="…" → actions.…; forms through
+   data-submit → submits.…; typing through data-input → inputs.…; changes through data-change → changes.… */
 
 'use strict';
 
