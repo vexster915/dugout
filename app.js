@@ -1002,8 +1002,8 @@ actions.toggleSet = el => {
   const exDone = e.sets.every(x => x.done);
   const { total, done } = workoutProgress();
   if (S.settings.autoRest && e.rest > 0 && done < total) {
-    const next = exDone ? S.active.exercises.find(x => x.sets.some(y => !y.done)) : null;
-    startTimer(e.rest, next ? `Next: ${next.name}` : `Rest · ${e.name}`);
+    const next = exDone ? S.active.exercises.find(x => x.sets.some(y => !y.done)) : null, nextSet = e.sets.findIndex(x => !x.done);
+    startTimer(e.rest, next ? `Next: ${next.name}` : nextSet >= 0 ? `${e.name} · next: set ${nextSet + 1} of ${e.sets.length}` : `Rest · ${e.name}`);
   }
   if (exDone) {
     S.openEx = null;
@@ -1544,6 +1544,8 @@ function renderPlan() {
       <button class="btn btn-sm btn-ghost" data-action="programs">${icon('refresh', 'sm')} ${esc(program().name)}</button></div>
     ${modeToggle()}
     <div class="days">${chips}</div>
+    <div class="small muted center">${(() => { const days = planFor(mode).filter(d => d.type !== 'rest' && d.exercises.length), mins = sum(days, d => estMinutes(d));
+      return `${days.length} training day${days.length === 1 ? '' : 's'} · about ${mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`} a week`; })()}</div>
     <section class="card hero">
       <div class="spread">
         <span class="badge accent">${icon(m.icon)} ${m.label} · ${DAYS[di]}</span>
@@ -3639,7 +3641,7 @@ function renderSettings() {
       <label class="btn btn-ghost btn-block" for="import-file" data-external>${icon('upload', 'sm')} Import backup</label>
       <button class="btn btn-ghost btn-block" data-action="csvMenu">${icon('share', 'sm')} Export spreadsheets (CSV)</button>
       <input class="vh" type="file" id="import-file" accept=".json,application/json,text/plain" data-change="importFile">
-      <div class="hint center">${S.workouts.length} workouts · ${S.meals.length} food entries · ${S.foods.length} favorites saved</div>
+      <div class="hint center">${S.workouts.length} workouts · ${S.meals.length} food entries · ${S.foods.length} favorites · ${S.logs.length} tracking entries saved</div>
     </div>
 
     <div class="section-title">Plan</div>
