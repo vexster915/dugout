@@ -414,6 +414,14 @@ i.t-rest { background: var(--muted); }
 .lib-row small { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 1px; }
 .lib-row .i { color: var(--muted); }
 
+/* Game-day timeline */
+.timeline { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--line); }
+.timeline .field { margin-bottom: 8px; }
+.tl-row { display: flex; gap: 12px; align-items: baseline; padding: 7px 0; font-size: 14px; color: var(--text-2); }
+.tl-time { flex: none; width: 72px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.tl-row b { color: var(--text); }
+.tl-row small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+
 /* Programs sheet */
 .program.current { border-color: var(--accent); }
 

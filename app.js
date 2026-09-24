@@ -2324,6 +2324,33 @@ function upNextMeal() {
   return items.find(x => order.indexOf(x.slot) >= now && !logged.has(x.slot)) || null;
 }
 
+// Game day: when to eat and drink, counted back from first pitch.
+function gameTimeline(mp, items) {
+  const gt = /^\d{2}:\d{2}$/.test(mp.gameTime || '') ? mp.gameTime : S.settings.workoutTime;
+  const [h, m] = gt.split(':').map(Number), start = h * 60 + m;
+  const at = mins => { const t = (((start + mins) % 1440) + 1440) % 1440; return clockTime(`${pad(Math.floor(t / 60))}:${pad(t % 60)}`); };
+  const rec = slot => { const x = items.find(i => i.slot === slot); return x ? x.r.name : ''; };
+  const rows = [
+    [-210, 'Pre-game meal', rec(start - 210 < 630 ? 'breakfast' : 'lunch'), 'Carbs plus lean protein, easy on fat and fiber. Be done eating about 3 hours before.'],
+    [-120, 'Drink 16 oz of water', '', "Add a sports drink if it's hot."],
+    [-60, 'Top-off snack', rec('pre'), 'Something small and carb-based, 30–60 minutes before.'],
+    [-15, 'Drink another 8 oz', '', ''],
+    [0, 'First pitch', '', "Sip water every half-inning — sports drink when it's hot or it's a doubleheader."],
+    [180, 'Recovery snack', rec('post'), 'Within an hour of the final out.'],
+    [240, 'Dinner', rec('dinner'), 'A full plate: protein, carbs and vegetables.']
+  ];
+  return `<div class="timeline">
+    <label class="field"><span>First pitch</span><input type="time" value="${esc(gt)}" data-change="gameTime"></label>
+    ${rows.map(([mins, what, r, tip]) => `<div class="tl-row"><span class="tl-time">${at(mins)}</span>
+      <span class="grow"><b>${what}</b>${r ? ` · ${esc(r)}` : ''}${tip ? `<small>${tip}</small>` : ''}</span></div>`).join('')}
+  </div>`;
+}
+changes.gameTime = el => {
+  if (!/^\d{2}:\d{2}/.test(el.value)) return;
+  saveMealPlan({ ...mealPlanToday(), gameTime: el.value.slice(0, 5) });
+  render();
+};
+
 const servingsText = n => `${fmt(n, 1)} serving${n === 1 ? '' : 's'}`;
 const loggedToday = (slot, name) => S.meals.some(m => m.date === ymd() && m.meal === slot && normName(m.name) === normName(name));
 
@@ -2355,6 +2382,7 @@ function dietMeals() {
       </div>
       <p class="text-2 small">${mp.kind === 'training' && day.type !== 'rest' ? `<b>${esc(day.title)}.</b> ` : ''}${KIND_NOTE[mp.kind]}</p>
       <div class="stack-sm">${rows}</div>
+      ${mp.kind === 'game' ? gameTimeline(mp, items) : ''}
       <div class="plan-total"><span>Plan total</span><span><b>${fmt(cal)}</b> cal · <b>${fmt(pro)}</b> g protein</span></div>
       <p class="hint">Sized to your goal of ${fmt(calGoal)} cal · ${fmt(proteinGoal)} g protein.${pro < proteinGoal - 15 ? ' Short on protein? Add a shake or a Greek yogurt bowl.' : ''} Tap a meal for the recipe and to log it; tap ${icon('refresh', 'sm')} to swap it.</p>
     </section>
