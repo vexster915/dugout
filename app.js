@@ -16,7 +16,7 @@ const APP_VERSION = '2.0.0';
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
 if (typeof FOODS === 'undefined') self.FOODS = [];
-if (typeof EXERCISE_INFO === 'undefined') self.EXERCISE_INFO = {};
+if (typeof EXERCISE_INFO === 'undefined') Object.assign(self, { EXERCISE_INFO: {}, EXERCISE_GROUPS: [] });
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -1168,9 +1168,7 @@ function openVideo(ex) {
   const link = safeUrl(normUrl(ex.video));
   let top;
   if (info) {
-    top = `<div class="video-wrap"><iframe src="https://www.youtube.com/embed/${info.id}?playsinline=1&rel=0&modestbranding=1${info.start ? `&start=${info.start}` : ''}"
-      title="${esc(ex.name)} form video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
+    top = videoEmbed(info, ex.name);
   } else if (link && !isSearchLink(link)) {
     top = `<div class="placeholder-box"><div class="bold">This link can't play inside the app</div>
       <div class="hint">Only YouTube links play here. You can still open it:</div>
@@ -1202,6 +1200,10 @@ function openVideo(ex) {
     ${info ? `<details class="table-toggle"><summary>Use a different video</summary>${form}</details>` : form}`);
 }
 
+const videoEmbed = (info, name) => `<div class="video-wrap"><iframe src="https://www.youtube.com/embed/${info.id}?playsinline=1&rel=0&modestbranding=1${info.start ? `&start=${info.start}` : ''}"
+  title="${esc(name)} form video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
+
 // How-to details from exercises.js. A renamed exercise like "Push-ups (weighted)" falls back to "Push-ups".
 const exerciseInfo = name => EXERCISE_INFO[name] || EXERCISE_INFO[String(name || '').replace(/\s*\(.*\)\s*$/, '')] || null;
 function infoBlock(name) {
@@ -1229,6 +1231,33 @@ function swapBlock(ex) {
     <div class="chips">${x.swap.map(n => `<button class="chip" data-action="swapEx" data-name="${esc(n)}" ${started ? 'disabled' : ''}>${esc(n)}</button>`).join('')}</div>
     <p class="hint">${started ? 'Swapping works before you check off any sets of this exercise.' : "Only changes today's workout — your plan stays the same."}</p>`;
 }
+// ----- Exercise library (Plan tab): browse every exercise and add one to the day you're viewing -----
+function libList(q) {
+  const words = normName(q).split(' ').filter(Boolean);
+  const match = n => { const hay = normName(n + ' ' + ((exerciseInfo(n) || {}).muscles || '')); return words.every(w => hay.includes(w)); };
+  return EXERCISE_GROUPS.map(([g, names]) => [g, names.filter(match)]).filter(([, names]) => names.length)
+    .map(([g, names]) => `<div class="section-title">${esc(g)}</div>${names.map(n => `<button class="lib-row" data-action="libOpen" data-name="${esc(n)}">
+      <span class="grow"><b>${esc(n)}</b><small>${esc((exerciseInfo(n) || {}).muscles || '')}</small></span>${icon('right', 'sm')}</button>`).join('')}`).join('')
+    || '<div class="empty">No exercises match.</div>';
+}
+actions.library = () => openSheet('Exercise library', `
+  <label class="field"><span>Search by name or muscle</span><input data-input="libSearch" placeholder="e.g. hamstrings, press, rotation" autocomplete="off" autocorrect="off"></label>
+  <div class="lib-list">${libList('')}</div>`);
+inputs.libSearch = el => { $('.lib-list').innerHTML = libList(el.value); };
+actions.libOpen = el => {
+  const name = el.dataset.name, info = ytInfo(defaultVideo(name));
+  openSheet(name, `${info ? videoEmbed(info, name) : ''}
+    ${infoBlock(name)}
+    <button class="btn btn-primary btn-block" data-action="libAdd" data-name="${esc(name)}">${icon('plus', 'sm')} Add to ${DAYS[S.planDay]} · ${MODES[S.settings.mode].label}</button>
+    <button class="btn btn-ghost btn-block" data-action="library">Back to the library</button>`);
+};
+actions.libAdd = el => {
+  const name = el.dataset.name, t = planTemplate(name);
+  dayPlan(S.planDay).exercises.push({ id: uid(), name, sets: t ? t.sets : 3, reps: t ? t.reps : '10', rest: t ? t.rest : 60, track: t ? t.track : 'reps', cues: t ? t.cues : '', video: defaultVideo(name) });
+  savePlan(); closeSheet(); render();
+  toast(`${name} added to ${DAYS[S.planDay]}`);
+};
+
 // How the starting plan sets up an exercise (cues, reps, what to log).
 function planTemplate(name) {
   for (const mode of ['gym', 'home']) for (const d of DEFAULT_PLAN[mode]) { const e = d.exercises.find(x => x.name === name); if (e) return e; }
@@ -1450,7 +1479,10 @@ function renderPlan() {
       ${n > 1 ? `<button class="btn-link" data-action="toggleReorder">${S.planReorder ? 'Done' : 'Reorder'}</button>` : ''}
     </div>
     <div class="stack">${n ? day.exercises.map((e, i) => planExCard(e, i, n)).join('') : `<div class="empty">No exercises yet — add your first one.</div>`}</div>
-    <button class="btn btn-ghost btn-block" data-action="addPlanEx">${icon('plus')} Add exercise</button>
+    <div class="grid2">
+      <button class="btn btn-ghost" data-action="library">${icon('dumbbell', 'sm')} Exercise library</button>
+      <button class="btn btn-ghost" data-action="addPlanEx">${icon('plus', 'sm')} Add your own</button>
+    </div>
     ${n ? `<button class="btn btn-primary btn-xl" data-action="startWorkout" data-day="${di}" ${S.active ? 'disabled' : ''}>${icon('play')} ${S.active ? 'Workout in progress' : 'Start this workout'}</button>` : ''}
     <p class="hint center">Tap an exercise to change its sets, reps, rest, cues or video. Gym and Home plans are completely separate — switch with the toggle at the top.</p>
   </div>`;

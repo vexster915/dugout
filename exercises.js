@@ -641,3 +641,20 @@ const EXERCISE_INFO = {
     easier: "From your knees", harder: "Wider feet, faster pace", swap: ["Plank shoulder taps"]
   }
 };
+
+// Categories for the exercise library (Plan tab → Exercise library). Every exercise above is listed once.
+const EXERCISE_GROUPS = [
+  ["Warm-up & cool-down", ["Dynamic warm-up", "Warm-up + band arm care", "Warm-up + arm circles", "Cool-down walk + stretch", "Easy walk (optional)", "Light stretching (optional)"]],
+  ["Power & jumps", ["Box jumps", "Broad jumps", "Tuck jumps", "Jumping lunges", "Single-leg hops", "Plyo push-ups", "Med ball rotational scoop toss", "Med ball overhead slams", "Kettlebell swings"]],
+  ["Legs", ["Leg press", "Single-leg leg press", "Trap bar deadlift", "Romanian deadlift", "Walking lunges (dumbbells)", "Reverse lunges", "Lateral lunges", "Dumbbell step-ups", "Step-ups (chair or bench)", "Step-ups with backpack",
+    "Seated leg curl", "Nordic hamstring curls", "Nordic curls (feet under couch)", "Leg extensions", "Hip thrust", "Single-leg glute bridge", "Single-leg hip thrust (couch)", "Single-leg RDL", "Single-leg RDL (backpack)", "Standing calf raises", "Single-leg calf raises"]],
+  ["Upper body", ["Dumbbell bench press", "Incline dumbbell press", "Push-ups", "Decline push-ups", "Diamond push-ups", "Pike push-ups", "Pull-ups", "Chest-supported row", "Single-arm dumbbell row",
+    "Table inverted rows", "Backpack bent-over rows", "Half-kneeling landmine press", "Backpack overhead press", "Chair dips"]],
+  ["Shoulders & arm care", ["Face pulls", "Rear delt fly", "Dumbbell lateral raises", "Cable external rotation", "External rotation hold (doorway)", "Prone Y-T-W raises", "Wall slides", "Up-downs (plank to push-up)"]],
+  ["Arms & grip", ["Hammer curls", "Incline dumbbell curls", "Backpack curls", "Cable triceps pushdown", "Wrist curls + reverse wrist curls", "Towel wringing", "Farmer's carry"]],
+  ["Core & rotation", ["Pallof press", "Hanging knee raises", "Cable woodchop (high to low)", "Landmine rotations", "Ab wheel rollouts", "Plank shoulder taps", "Dead bugs", "Russian twists (backpack)",
+    "Superman hold", "Side plank hip dips", "Hollow body hold", "Copenhagen plank", "Copenhagen plank (couch)"]],
+  ["Speed & agility", ["A-skips & B-skips", "Agility ladder drills", "Pro agility shuttle (5-10-5)", "5-10-5 shuttle", "Sled push", "Lateral skater bounds", "Base-stealing starts (crossover)", "Crossover sprint starts", "Drop-step sprints", "Line hops", "Lateral shuffles"]],
+  ["Mobility & recovery", ["Foam roll", "Ball rolling (tennis or lacrosse ball)", "90/90 hip switches", "World's greatest stretch", "Couch stretch (hip flexors)", "Thoracic open books", "Cross-body shoulder stretch",
+    "Lat stretch on rack", "Band hamstring stretch", "Towel hamstring stretch", "Pigeon stretch", "Wrist & forearm stretch", "Cat-cow + deep breathing", "Doorway chest stretch"]]
+];

@@ -405,6 +405,14 @@ i.t-rest { background: var(--muted); }
 .pc-btn.ball { background: rgba(57, 135, 229, 0.16); color: #7cb4f5; border-color: rgba(57, 135, 229, 0.4); }
 .sw-time { text-align: center; font-size: 84px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
+/* Exercise library */
+.lib-list { display: flex; flex-direction: column; }
+.lib-list .section-title { margin: 14px 4px 6px; }
+.lib-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 4px; background: none; border: 0; border-top: 1px solid var(--line); color: inherit; text-align: left; }
+.lib-row b { display: block; font-size: 15px; }
+.lib-row small { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 1px; }
+.lib-row .i { color: var(--muted); }
+
 /* Programs sheet */
 .program.current { border-color: var(--accent); }
 
