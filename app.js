@@ -205,7 +205,8 @@ const DEFAULT_SETTINGS = {
   fatGoal: 0,
   waterGoal: 100,         // ounces
   program: 'offseason',   // which starting plan (plan.js PROGRAMS) resets go back to
-  profile: null           // goal calculator answers: { sex, age, ft, inch, cm, weight, activity, goal }
+  profile: null,          // goal calculator answers: { sex, age, ft, inch, cm, weight, activity, goal }
+  badges: null            // badge ids already celebrated
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -232,6 +233,7 @@ const S = {
   progRange: 'all',
   progView: 'lifts',   // Progress tab: lifts, body or baseball
   editCheckin: false,  // Today: daily check-in form open
+  calMonth: null,      // Progress calendar month ("YYYY-MM"), null = this month
   histLimit: 15,
   openEx: null         // which exercise card is open during a workout (null = automatic)
 };
@@ -321,6 +323,7 @@ function render({ keepScroll = true } = {}) {
   renderTabbar();
   const queue = postRender; postRender = [];
   queue.forEach(fn => fn());
+  checkBadges();
 }
 
 actions.tab = el => {
@@ -2622,6 +2625,8 @@ function renderProgress() {
       ${chart}
     </section>
     ${prCard(exList, mode)}
+    ${calendarCard(ws)}
+    ${badgesCard()}
     <div class="section-title">${m.label} workout history</div>
     ${historyList(ws)}
   </div>`;
@@ -2656,6 +2661,104 @@ function prCard(exList, mode) {
       <span><b>${fmt(r.best.w, 1)} ${S.settings.unit}</b> <span class="muted">× ${r.best.r ?? '?'} · ${shortDate(r.best.date)}</span></span>
     </button>`).join('')}
   </section>`;
+}
+
+// ----- Training calendar (Progress → Lifts) -----
+const monthKeyOf = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+function calendarCard(ws) {
+  const cur = monthKeyOf(), mk = S.calMonth && S.calMonth <= cur ? S.calMonth : cur;
+  const [y, m] = mk.split('-').map(Number), first = new Date(y, m - 1, 1), days = new Date(y, m, 0).getDate(), today = ymd();
+  const byDate = {};
+  for (const w of ws) (byDate[w.date] = byDate[w.date] || []).push(w);
+  const count = ws.filter(w => w.date.startsWith(mk)).length;
+  const cells = Array.from({ length: dayIdx(first) }, () => '<span></span>');
+  for (let d = 1; d <= days; d++) {
+    const key = `${mk}-${pad(d)}`, list = byDate[key] || [], cls = `cal-day ${key === today ? 'today' : ''} ${key > today ? 'future' : ''}`;
+    cells.push(list.length
+      ? `<button class="${cls} has" data-action="calDay" data-date="${key}" aria-label="${fmtDate(parseYmd(key))}: ${list.length} workout${list.length > 1 ? 's' : ''}">${d}<i class="t-${esc(list[0].type || 'strength')}"></i></button>`
+      : `<span class="${cls}">${d}</span>`);
+  }
+  return `<section class="card stack">
+    <div class="spread">
+      <button class="btn btn-icon sm btn-ghost" data-action="calStep" data-d="-1" aria-label="Previous month">${icon('left', 'sm')}</button>
+      <div class="center"><div class="card-title">${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
+        <div class="small muted">${count} workout${count === 1 ? '' : 's'}</div></div>
+      <button class="btn btn-icon sm btn-ghost" data-action="calStep" data-d="1" aria-label="Next month" ${mk === cur ? 'disabled' : ''}>${icon('right', 'sm')}</button>
+    </div>
+    <div class="cal">${DAYS_SHORT.map(d => `<b>${d[0]}</b>`).join('')}${cells.join('')}</div>
+    <div class="cal-key"><span><i class="t-strength"></i>Lift</span><span><i class="t-agility"></i>Speed</span><span><i class="t-mobility"></i>Mobility</span><span><i class="t-rest"></i>Recovery</span></div>
+  </section>`;
+}
+actions.calStep = el => {
+  const [y, m] = (S.calMonth || monthKeyOf()).split('-').map(Number), k = monthKeyOf(new Date(y, m - 1 + Number(el.dataset.d), 1));
+  if (k > monthKeyOf()) return;
+  S.calMonth = k; render();
+};
+actions.calDay = el => {
+  const list = S.workouts.filter(w => w.date === el.dataset.date && w.mode === S.settings.mode);
+  if (list.length === 1) { actions.showWorkout({ dataset: { id: list[0].id } }); return; }
+  openSheet(fmtDate(parseYmd(el.dataset.date), { weekday: 'long', month: 'long', day: 'numeric' }), `<div class="stack">${list.map(w => `<button class="hist" data-action="showWorkout" data-id="${w.id}">
+    <div><div class="hist-title">${esc(w.title)}</div><div class="hist-sub">${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)} · ${setsDone(w)} sets</div></div>
+    <div class="hist-right">${icon('right', 'sm')}</div></button>`).join('')}</div>`);
+};
+
+// ----- Badges: milestones that make the grind visible -----
+function badgeStats() {
+  const day = {};
+  for (const m of S.meals) day[m.date] = (day[m.date] || 0) + (m.pro || 0);
+  const proDays = Object.values(day).filter(p => p >= S.settings.proteinGoal).length;
+  const waterDays = logsOf('water').filter(l => l.oz >= S.settings.waterGoal).length;
+  let record = false;
+  const best = {};
+  for (const w of [...S.workouts].reverse()) for (const e of w.exercises) {
+    if (e.track !== 'weight') continue;
+    const k = w.mode + ':' + normName(e.name), top = Math.max(0, ...e.sets.filter(s => s.done).map(s => s.w || 0));
+    if (top > 0 && best[k] != null && top > best[k]) record = true;
+    if (top > 0) best[k] = Math.max(best[k] || 0, top);
+  }
+  const tests = logsOf('test'), testBest = TESTS.some(t => { const l = tests.filter(x => x.test === t.id); return l.length > 1 && bestOf(t, l) !== l[0]; });
+  return { n: S.workouts.length, streak: weekStreak(S.workouts), proDays, waterDays, record, testBest,
+    tests: tests.length, throws: logsOf('throw').length, checkins: logsOf('checkin').length, weighIns: logsOf('weight').length };
+}
+const BADGES = [
+  ['first', 'First workout', 'Finish your first workout', s => s.n >= 1],
+  ['w10', '10 workouts', 'Finish 10 workouts', s => s.n >= 10],
+  ['w50', '50 workouts', 'Finish 50 workouts', s => s.n >= 50],
+  ['w100', '100 club', 'Finish 100 workouts', s => s.n >= 100],
+  ['streak4', 'Month of work', 'Train every week for 4 weeks in a row', s => s.streak >= 4],
+  ['streak12', 'Iron habit', 'Train every week for 12 weeks in a row', s => s.streak >= 12],
+  ['record', 'Record breaker', 'Beat your heaviest weight on any lift', s => s.record],
+  ['protein7', 'Protein pro', 'Hit your protein goal on 7 days', s => s.proDays >= 7],
+  ['water7', 'Hydrated', 'Hit your water goal on 7 days', s => s.waterDays >= 7],
+  ['checkin7', 'Tuned in', 'Do 7 daily check-ins', s => s.checkins >= 7],
+  ['weigh8', 'Weigh-in habit', 'Log 8 weigh-ins', s => s.weighIns >= 8],
+  ['tested', 'Tested', 'Log a baseball test', s => s.tests >= 1],
+  ['faster', 'Faster, stronger', 'Beat one of your test results', s => s.testBest],
+  ['arm10', 'Arm care', 'Log 10 throwing sessions', s => s.throws >= 10]
+];
+function earnedBadges() { const s = badgeStats(); return BADGES.filter(b => b[3](s)).map(b => b[0]); }
+function badgesCard() {
+  const got = new Set(earnedBadges());
+  return `<section class="card stack">
+    <div class="spread"><div class="card-title row">${icon('trophy')} Badges</div><span class="muted small bold">${got.size} of ${BADGES.length}</span></div>
+    <div class="badges">${BADGES.map(([id, name, how]) => `<div class="badge-tile ${got.has(id) ? 'got' : ''}">
+      ${icon(got.has(id) ? 'star' : 'shield', 'sm')}<b>${esc(name)}</b><small>${esc(how)}</small></div>`).join('')}</div>
+  </section>`;
+}
+// Called after each render: celebrate badges you just earned (the first check only remembers them quietly).
+let badgeSig = '';
+function checkBadges() {
+  const sig = `${S.workouts.length}:${S.meals.length}:${S.logs.length}:${S.settings.proteinGoal}:${S.settings.waterGoal}`;
+  if (sig === badgeSig) return;
+  badgeSig = sig;
+  const got = earnedBadges(), known = S.settings.badges;
+  if (!Array.isArray(known)) { S.settings.badges = got; saveSettings(); return; }
+  const fresh = got.filter(id => !known.includes(id));
+  if (!fresh.length) return;
+  S.settings.badges = [...known, ...fresh];
+  saveSettings();
+  const b = BADGES.find(x => x[0] === fresh[0]);
+  setTimeout(() => toast(`Badge earned: ${b[1]}!`), 700);
 }
 
 // ----- Body weight -----
@@ -3196,6 +3299,7 @@ function cleanSettings(st) {
   out.proteinGoal = clamp(Math.round(out.proteinGoal) || DEFAULT_SETTINGS.proteinGoal, 10, 500);
   out.waterGoal = clamp(Math.round(out.waterGoal) || DEFAULT_SETTINGS.waterGoal, 16, 400);
   for (const k of ['profile', 'mealPlan']) if (!isObj(out[k])) out[k] = null;
+  if (!Array.isArray(out.badges)) out.badges = null;
   return out;
 }
 function cleanExerciseData(e) {
@@ -3432,6 +3536,7 @@ async function lockApp(message) {
   $('#toast').classList.remove('show');
   toastAct = null;
   DB.lock();
+  badgeSig = '';
   Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null });
   render();
   if (message) toast(message);
