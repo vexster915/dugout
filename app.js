@@ -1693,6 +1693,8 @@ actions.editDay = () => {
       <select name="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${day.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="field"><span>Focus / notes</span><textarea name="focus" maxlength="400">${esc(day.focus)}</textarea></label>
     <button class="btn btn-primary btn-block" type="submit">Save</button>
+    <label class="field"><span>Copy another day's workout here</span>
+      <select data-change="copyDayFrom"><option value="">Choose a day…</option>${planFor().map((d, i) => (i === S.planDay ? '' : `<option value="${i}">${DAYS[i]} — ${esc(d.title)}</option>`)).join('')}</select></label>
     <button class="btn btn-ghost btn-block" type="button" data-action="resetDay">${icon('refresh', 'sm')} Reset this day to the starting plan</button>
   </form>`);
 };
@@ -1702,6 +1704,15 @@ submits.saveDay = f => {
   day.type = TYPES[d.type] ? d.type : day.type;
   day.focus = String(d.focus || '').trim();
   savePlan(); closeSheet(); render(); toast('Day saved');
+};
+changes.copyDayFrom = async el => {
+  const from = Number(el.value), to = S.planDay, list = planFor();
+  if (!el.value || !list[from]) return;
+  if (!(await confirmBox(`Copy ${DAYS[from]} to ${DAYS[to]}?`, `${DAYS[to]}'s exercises will be replaced with a copy of ${DAYS[from]} (${list[from].title}). Your workout history is kept.`, { ok: 'Copy' }))) return;
+  const src = clone(list[from]);
+  src.exercises.forEach(e => { e.id = uid(); });
+  list[to] = src;
+  savePlan(); render(); toast(`${DAYS[from]} copied to ${DAYS[to]}`);
 };
 actions.resetDay = async () => {
   const mode = S.settings.mode, di = S.planDay;
