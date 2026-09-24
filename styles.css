@@ -441,6 +441,7 @@ i.t-rest { background: var(--muted); }
 
 /* Games & season stats */
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.stats.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .stat { background: var(--surface-2); border-radius: 12px; padding: 10px 4px; text-align: center; }
 .stat b { display: block; font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .stat small { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: var(--muted); }

@@ -2773,7 +2773,7 @@ function renderProgress() {
   const head = `<div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
     <div class="seg" role="group" aria-label="What to show">${PROG_VIEWS.map(([k, l]) => `<button class="${S.progView === k ? 'on' : ''}" data-action="progView" data-v="${k}" aria-pressed="${S.progView === k}">${l}</button>`).join('')}</div>`;
   if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${recoveryCard()}${goalsCard()}</div>`;
-  if (S.progView === 'baseball') return `<div class="page">${head}${toolsCard()}${gamesCard()}${testsCard()}${armCard()}${throwCard()}</div>`;
+  if (S.progView === 'baseball') return `<div class="page">${head}${toolsCard()}${gamesCard()}${skillsCard()}${testsCard()}${armCard()}${throwCard()}</div>`;
   const mode = S.settings.mode, m = MODES[mode];
   const ws = S.workouts.filter(w => w.mode === mode);
   const weekKey = ymd(weekStart()), monthKey = ymd().slice(0, 7);
@@ -2914,7 +2914,8 @@ function badgeStats() {
   }
   const tests = logsOf('test'), testBest = TESTS.some(t => { const l = tests.filter(x => x.test === t.id); return l.length > 1 && bestOf(t, l) !== l[0]; });
   return { n: S.workouts.length, streak: weekStreak(S.workouts), proDays, waterDays, record, testBest,
-    tests: tests.length, throws: logsOf('throw').length, checkins: logsOf('checkin').length, weighIns: logsOf('weight').length };
+    tests: tests.length, throws: logsOf('throw').length, checkins: logsOf('checkin').length, weighIns: logsOf('weight').length,
+    skills: logsOf('skill').length, games: logsOf('game').length };
 }
 const BADGES = [
   ['first', 'First workout', 'Finish your first workout', s => s.n >= 1],
@@ -2930,7 +2931,9 @@ const BADGES = [
   ['weigh8', 'Weigh-in habit', 'Log 8 weigh-ins', s => s.weighIns >= 8],
   ['tested', 'Tested', 'Log a baseball test', s => s.tests >= 1],
   ['faster', 'Faster, stronger', 'Beat one of your test results', s => s.testBest],
-  ['arm10', 'Arm care', 'Log 10 throwing sessions', s => s.throws >= 10]
+  ['arm10', 'Arm care', 'Log 10 throwing sessions', s => s.throws >= 10],
+  ['grinder', 'Grinder', 'Log 20 skills practice sessions', s => s.skills >= 20],
+  ['gamer', 'Gamer', 'Log 10 games', s => s.games >= 10]
 ];
 function earnedBadges() { const s = badgeStats(); return BADGES.filter(b => b[3](s)).map(b => b[0]); }
 function badgesCard() {
@@ -3348,6 +3351,48 @@ actions.deleteGame = async el => {
   removeLog(g.id); render(); toast('Game deleted');
 };
 
+// ----- Skills practice: hitting and fielding reps -----
+const SKILLS = [['tee', 'Tee work', 'swings'], ['toss', 'Front / soft toss', 'swings'], ['cage', 'Cage or machine', 'swings'], ['bp', 'Live BP', 'swings'],
+  ['ground', 'Ground balls', 'fielding'], ['fly', 'Fly balls', 'fielding'], ['bunt', 'Bunting', 'swings'], ['bases', 'Base running', 'running'], ['catcher', 'Catching / blocking', 'fielding']];
+const SKILL = Object.fromEntries(SKILLS.map(([k, l, g]) => [k, { l, g }]));
+const skillText = l => `${(SKILL[l.type] || { l: 'Practice' }).l}${l.reps ? ` · ${fmt(l.reps)} ${SKILL[l.type] && SKILL[l.type].g === 'swings' ? 'swings' : 'reps'}` : ''}${l.min ? ` · ${fmt(l.min)} min` : ''}`;
+function skillsCard() {
+  const all = logsOf('skill'), from = ymd(weekStart()), week = all.filter(l => l.date >= from);
+  const tot = g => sum(week.filter(l => SKILL[l.type] && SKILL[l.type].g === g), l => l.reps || 0);
+  return `<section class="card stack">
+    <div class="spread"><div class="card-title">Skills practice</div>
+      <button class="btn btn-sm btn-ghost" data-action="logSkill">${icon('plus', 'sm')} Log</button></div>
+    ${all.length ? `<div class="stats three">
+        <div class="stat"><b>${fmt(tot('swings'))}</b><small>SWINGS</small></div>
+        <div class="stat"><b>${fmt(tot('fielding'))}</b><small>FIELDING REPS</small></div>
+        <div class="stat"><b>${fmt(sum(week, l => l.min || 0))}</b><small>MINUTES</small></div></div>
+      <div class="small muted center">This week · ${week.length} session${week.length === 1 ? '' : 's'}</div>
+      <div class="stack-sm">${all.slice(-6).reverse().map(l => `<div class="log-row"><span class="grow small">${shortDate(l.date)} · ${esc(skillText(l))}${l.note ? `<br><span class="muted">${esc(l.note)}</span>` : ''}</span>
+        <button class="btn btn-icon sm btn-ghost" data-action="deleteLog" data-id="${l.id}" aria-label="Delete">${icon('trash', 'sm')}</button></div>`).join('')}</div>`
+      : '<p class="hint">Log tee work, cage sessions, ground balls and more. Quality reps with a purpose beat mindless volume — pick one thing to work on each session.</p>'}
+  </section>`;
+}
+actions.logSkill = () => openSheet('Log practice', `<form class="form" novalidate data-submit="saveSkill">
+  <label class="field"><span>What did you work on?</span><select name="type">${SKILLS.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></label>
+  <div class="form-grid">
+    <label class="field"><span>Swings / reps</span><input name="reps" inputmode="numeric" autocomplete="off" placeholder="e.g. 75"></label>
+    <label class="field"><span>Minutes</span><input name="min" inputmode="numeric" autocomplete="off" placeholder="optional"></label>
+  </div>
+  <div class="form-grid">
+    <label class="field"><span>Date</span><input name="date" type="date" value="${ymd()}" max="${ymd()}"></label>
+    <label class="field"><span>Focus / notes</span><input name="note" maxlength="120" autocomplete="off" placeholder="e.g. stay through the ball"></label>
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">Save</button>
+</form>`);
+submits.saveSkill = f => {
+  const d = formData(f), reps = Math.round(num(d.reps) || 0), min = Math.round(num(d.min) || 0);
+  if (!reps && !min) { toast('Enter your swings/reps or minutes'); return; }
+  if (reps > 2000 || min > 600) { toast('That looks too high — check the numbers'); return; }
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(d.date) && d.date <= ymd() ? d.date : ymd();
+  putLog({ id: uid(), kind: 'skill', date, type: SKILL[d.type] ? d.type : 'tee', reps: reps || null, min: min || null, note: String(d.note || '').trim(), at: Date.now() });
+  closeSheet(); render(); toast('Practice saved');
+};
+
 // ----- Live pitch counter (kept in settings so it survives closing the app mid-game) -----
 function pitchState() {
   let p = S.settings.pitch;
@@ -3600,7 +3645,7 @@ const CSV = {
   food: ['Food log', () => [['Date', 'Time', 'Meal', 'Food', 'Servings', 'Serving size', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'],
     ...[...S.meals].sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1))
       .map(m => [m.date, m.time || '', MEAL_LABEL[m.meal] || '', m.name, m.servings || 1, m.serving || '', m.cal, m.pro, m.carb ?? '', m.fat ?? ''])]],
-  tracking: ['Weight, water, tests, games, throwing and check-ins', () => {
+  tracking: ['Weight, water, tests, games, practice, throwing and check-ins', () => {
     const rows = [['Date', 'Type', 'What', 'Value', 'Unit', 'Details']];
     for (const l of [...S.logs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) {
       if (l.kind === 'weight') rows.push([l.date, 'Body weight', '', l.w, S.settings.unit, '']);
@@ -3609,6 +3654,7 @@ const CSV = {
       else if (l.kind === 'throw') rows.push([l.date, 'Throwing', THROW_LABEL[l.type] || l.type, l.count, PITCHING.includes(l.type) ? 'pitches' : 'throws', [l.dist ? `${l.dist} ft` : '', l.feel ? `arm ${FEEL[l.feel].toLowerCase()}` : '', l.note || ''].filter(Boolean).join('; ')]);
       else if (l.kind === 'game') rows.push([l.date, 'Game', [l.opp && `vs ${l.opp}`, l.result, l.score].filter(Boolean).join(' '), '', '',
         [`${l.bat.h}-for-${l.bat.ab}`, ...BAT.slice(2).filter(([k]) => l.bat[k]).map(([k, n]) => `${l.bat[k]} ${n}`), l.pitch ? `pitching ${ipText(l.pitch.outs)} IP ${PITCH.map(([k, n]) => `${l.pitch[k]} ${n}`).join(' ')}` : '', l.note].filter(Boolean).join('; ')]);
+      else if (l.kind === 'skill') rows.push([l.date, 'Practice', (SKILL[l.type] || {}).l || l.type, l.reps ?? '', l.reps ? 'reps' : '', [l.min ? `${l.min} min` : '', l.note || ''].filter(Boolean).join('; ')]);
       else if (l.kind === 'checkin') rows.push([l.date, 'Check-in', 'Readiness', readiness(l), '/100', `sleep ${l.sleep} h; energy ${l.energy}/5; soreness ${l.sore}/5`]);
     }
     return rows;
