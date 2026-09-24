@@ -19,12 +19,13 @@
 
 'use strict';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
 if (typeof FOODS === 'undefined') self.FOODS = [];
 if (typeof EXERCISE_INFO === 'undefined') Object.assign(self, { EXERCISE_INFO: {}, EXERCISE_GROUPS: [] });
+if (typeof LIGHT_WORKOUT === 'undefined') self.LIGHT_WORKOUT = { gym: REST_DAY, home: REST_DAY };   // older plan.js
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -229,7 +230,8 @@ const DEFAULT_SETTINGS = {
   profile: null,          // goal calculator answers: { sex, age, ft, inch, cm, weight, activity, goal }
   badges: null,           // badge ids already celebrated
   reviewSeen: '',         // week (Monday "YYYY-MM-DD") whose review card you closed
-  seenVersion: ''         // last "What's new" shown
+  seenVersion: '',        // last "What's new" shown
+  intensity: null         // today's Light / Moderate / Heavy pick: { date, level }
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -284,18 +286,37 @@ let saveActiveTimer = null;
 const saveActiveSoon = () => { clearTimeout(saveActiveTimer); saveActiveTimer = setTimeout(saveActive, 400); };
 
 // Makes a fresh copy of the starting plan (from plan.js) with an id on every exercise.
+// Besides the 7 days, each mode has a Light workout (plan.js LIGHT_WORKOUT) you can pick on any day.
 function buildPlan(src) {
-  const p = clone({ gym: src.gym, home: src.home });
-  for (const mode of ['gym', 'home']) for (const day of p[mode]) for (const e of day.exercises) e.id = uid();
+  const p = clone({ gym: src.gym, home: src.home, light: src.light || LIGHT_WORKOUT });
+  for (const mode of ['gym', 'home']) for (const day of [...p[mode], p.light[mode]]) for (const e of day.exercises) e.id = uid();
   return p;
 }
+const LIGHT = 7;                  // the Light workout's "day number" (Monday–Sunday are 0–6)
 const planFor = (mode = S.settings.mode) => S.plan[mode];
 const program = () => PROGRAMS[S.settings.program] || PROGRAMS.offseason;
-const dayPlan = (i, mode = S.settings.mode) => S.plan[mode][i];
+const dayPlan = (i, mode = S.settings.mode) => (i === LIGHT ? S.plan.light[mode] : S.plan[mode][i]);
+const dayName = i => (i === LIGHT ? 'Light workout' : DAYS[i]);
+function setDayPlan(i, day, mode = S.settings.mode) { if (i === LIGHT) S.plan.light[mode] = day; else S.plan[mode][i] = day; }
+
+// ----- Light / Moderate / Heavy: how hard you want to go today (picked on the Today screen) -----
+const LEVELS = {
+  light: { label: 'Light', sub: 'Recovery', hint: 'Your Light workout instead: mobility, arm care and core. Good the day after a game, sprinting or a hard practice.',
+    during: 'Light day: keep everything easy. You should feel better when you finish than when you started.' },
+  moderate: { label: 'Moderate', sub: 'Fewer sets', hint: "Today's workout with about ⅔ of the sets, and weights around 90% of last time.",
+    during: 'Moderate day: weights start at about 90% of last time. Stop each set with 2–3 good reps left.' },
+  heavy: { label: 'Heavy', sub: 'Full workout', hint: 'The full workout: every set at your working weights.', during: '' }
+};
+const todayLevel = () => { const x = S.settings.intensity; return isObj(x) && x.date === ymd() && LEVELS[x.level] ? x.level : 'heavy'; };
+// Starting a planned day uses today's pick (Light swaps in the Light workout, so planned days then run in full).
+const startLevel = di => (di === LIGHT ? 'light' : todayLevel() === 'moderate' ? 'moderate' : 'heavy');
+const modSets = n => Math.max(1, Math.round((n * 2) / 3));                  // 4 → 3, 3 → 2, 2 → 1
+const levelDay = (day, level) => (level === 'moderate' ? { ...day, exercises: day.exercises.map(e => ({ ...e, sets: modSets(e.sets) })) } : day);
+const isEasy = w => w.intensity === 'light' || w.intensity === 'moderate';
 
 function findPlanEx(id) {
   if (!id) return null;
-  for (const mode of ['gym', 'home']) for (const day of S.plan[mode]) {
+  for (const mode of ['gym', 'home']) for (const day of [...S.plan[mode], S.plan.light[mode]]) {
     const e = day.exercises.find(x => x.id === id);
     if (e) return e;
   }
@@ -303,14 +324,19 @@ function findPlanEx(id) {
 }
 
 // The most recent time you did this exercise (same Gym/Home mode) — for "Last time" and pre-filled weights.
+// Light and moderate days are skipped when there's a full (heavy) session, so easy days don't drag your weights down.
 function lastSetsFor(name, mode) {
   const key = normName(name);
+  let easy = null;
   for (const w of S.workouts) {
     if (w.mode !== mode) continue;
     const e = w.exercises.find(x => normName(x.name) === key);
-    if (e && e.sets.some(s => s.done)) return { date: w.date, sets: e.sets.filter(s => s.done) };
+    if (!e || !e.sets.some(s => s.done)) continue;
+    const found = { date: w.date, sets: e.sets.filter(s => s.done) };
+    if (!isEasy(w)) return found;
+    if (!easy) easy = found;
   }
-  return null;
+  return easy;
 }
 
 /* ============================== 4. APP SHELL ============================== */
@@ -518,24 +544,33 @@ function renderToday() {
   </div>`;
 }
 
-function todayCard(day, di, doneToday) {
+function todayCard(planned, di, doneToday) {
   const m = MODES[S.settings.mode];
+  const isRest = planned.type === 'rest', canPick = !isRest && planned.exercises.length > 0;
+  const level = canPick ? todayLevel() : 'heavy';
+  // What you'll actually do today: the Light workout, a trimmed (moderate) day, or the full plan.
+  const day = level === 'light' ? dayPlan(LIGHT) : levelDay(planned, level), startDay = level === 'light' ? LIGHT : di;
   const n = day.exercises.length;
-  const isRest = day.type === 'rest';
   const preview = day.exercises.slice(0, 5).map(e => `<div><span>${esc(e.name)}</span><span>${e.sets} × ${esc(e.reps)}</span></div>`).join('')
     + (n > 5 ? `<div><span class="muted">+ ${n - 5} more</span><span></span></div>` : '');
-  const startLabel = isRest ? 'Start optional recovery' : doneToday ? 'Train again' : `Start ${m.label} workout`;
+  const startLabel = isRest ? 'Start optional recovery' : doneToday ? 'Train again' : `Start ${LEVELS[level].label.toLowerCase()} workout`;
   const check = checkinOf(ymd()), lowReady = check && readiness(check) < 50 ? readiness(check) : null;
   return `<section class="card hero">
     <div class="spread">
       <span class="badge accent">${icon(m.icon)} ${m.label} · ${TYPES[day.type] || 'Workout'}</span>
       ${doneToday ? `<span class="badge good">${icon('check')} Done</span>` : ''}
     </div>
+    ${canPick ? `<div class="stack-sm">
+      <div class="seg level-seg" role="group" aria-label="How hard today">${Object.entries(LEVELS).map(([k, v]) =>
+        `<button class="${k === level ? 'on' : ''} lv-${k}" data-action="setLevel" data-k="${k}" aria-pressed="${k === level}">${v.label}<small>${v.sub}</small></button>`).join('')}</div>
+      <p class="small muted">${LEVELS[level].hint}</p>
+    </div>` : ''}
     <div>
       <h2 class="day-title">${esc(day.title)}</h2>
+      ${level === 'light' ? `<p class="small muted" style="margin-top:6px">Instead of ${esc(planned.title)}</p>` : ''}
       ${day.focus ? `<p class="text-2 small" style="margin-top:8px">${esc(day.focus)}</p>` : ''}
     </div>
-    ${lowReady != null && !isRest && !doneToday ? `<div class="banner warn">${icon('info')}<div>Readiness is ${lowReady} today. Warm up, then decide — cutting a set from each exercise, or doing the mobility day instead, is a smart call.</div></div>` : ''}
+    ${lowReady != null && canPick && level === 'heavy' && !doneToday ? `<div class="banner warn">${icon('info')}<div>Readiness is ${lowReady} today. Think about switching to <b>Moderate</b> or <b>Light</b> above, or warm up first and then decide.</div></div>` : ''}
     <div class="meta-row">
       <span>${icon('clock', 'sm')} ${clockTime(S.settings.workoutTime)}</span>
       ${n ? `<span>${n} exercise${n === 1 ? '' : 's'}</span><span>~${estMinutes(day)} min</span>` : ''}
@@ -543,11 +578,16 @@ function todayCard(day, di, doneToday) {
     ${countdown(doneToday || isRest)}
     ${n ? `<div class="preview-list">${preview}</div>` : ''}
     ${doneToday ? `<button class="btn btn-ghost btn-block" data-action="showWorkout" data-id="${doneToday.id}">See today's workout</button>` : ''}
-    ${n ? `<button class="btn ${isRest || doneToday ? 'btn-ghost' : 'btn-primary'} btn-xl" data-action="startWorkout" data-day="${di}">${icon('play')} ${startLabel}</button>`
+    ${n ? `<button class="btn ${isRest || doneToday ? 'btn-ghost' : 'btn-primary'} btn-xl" data-action="startWorkout" data-day="${startDay}">${icon('play')} ${startLabel}</button>`
         : `<p class="muted small">No exercises on this day. Add some in the Plan tab.</p>`}
     <button class="btn-link" data-action="pickDay">Do a different day's workout</button>
   </section>`;
 }
+actions.setLevel = el => {
+  if (!LEVELS[el.dataset.k]) return;
+  S.settings.intensity = { date: ymd(), level: el.dataset.k };
+  saveSettings(); render();
+};
 
 // ----- Last week in review (Today, Monday–Wednesday) -----
 function weekReview() {
@@ -731,12 +771,18 @@ function backupBanner() {
 }
 
 actions.pickDay = () => {
-  const mode = S.settings.mode, today = dayIdx();
-  openSheet(`Pick a ${MODES[mode].label.toLowerCase()} workout`, `<div class="stack">${planFor(mode).map((d, i) => `
+  const mode = S.settings.mode, today = dayIdx(), light = dayPlan(LIGHT, mode), moderate = todayLevel() === 'moderate';
+  openSheet(`Pick a ${MODES[mode].label.toLowerCase()} workout`, `<div class="stack">
+    <button class="hist" data-action="startWorkout" data-day="${LIGHT}" ${light.exercises.length ? '' : 'disabled'}>
+      <div><div class="hist-title">Light workout</div><div class="hist-sub">${esc(light.title)} · ${light.exercises.length} exercises</div></div>
+      <div class="hist-right">${icon('play')}</div>
+    </button>
+    ${planFor(mode).map((d, i) => `
     <button class="hist" data-action="startWorkout" data-day="${i}" ${d.exercises.length ? '' : 'disabled'}>
       <div><div class="hist-title">${DAYS[i]}${i === today ? ' · today' : ''}</div><div class="hist-sub">${esc(d.title)} · ${d.exercises.length} exercises</div></div>
       <div class="hist-right">${icon('play')}</div>
-    </button>`).join('')}</div>`);
+    </button>`).join('')}
+    <p class="hint">${moderate ? 'Days start as <b>Moderate</b> (fewer sets), like you picked on the Today screen.' : 'Days start as the full workout. Pick <b>Moderate</b> on the Today screen for fewer sets.'}</p></div>`);
 };
 
 actions.quickLog = () => {
@@ -756,17 +802,20 @@ function makeSets(count, track, last) {
 
 actions.startWorkout = el => {
   if (S.active) { closeSheet(); toast('A workout is already in progress'); return; }
-  const di = Number(el.dataset.day), mode = S.settings.mode;
+  const di = Number(el.dataset.day), mode = S.settings.mode, level = startLevel(di);
   const day = dayPlan(di, mode);
   if (!day || !day.exercises.length) { toast('Add exercises to this day in the Plan tab first'); return; }
   closeSheet();
+  const kg = S.settings.unit === 'kg';
   S.active = {
-    id: uid(), mode, dayIndex: di, title: day.title, type: day.type,
+    id: uid(), mode, dayIndex: di, title: day.title, type: day.type, intensity: level,
     date: ymd(), startedAt: Date.now(), finishedAt: null,
-    exercises: day.exercises.map(e => ({
-      planId: e.id, name: e.name, reps: e.reps, rest: e.rest, track: e.track, cues: e.cues, video: e.video,
-      sets: makeSets(e.sets, e.track, lastSetsFor(e.name, mode))
-    }))
+    exercises: levelDay(day, level).exercises.map(e => {
+      const sets = makeSets(e.sets, e.track, lastSetsFor(e.name, mode));
+      // Moderate: start from about 90% of your last full-effort weights
+      if (level === 'moderate' && e.track === 'weight') sets.forEach(st => { if (st.w > 0) st.w = Math.max(kg ? 2.5 : 5, roundTo(st.w * 0.9, kg ? 2.5 : 5)); });
+      return { planId: e.id, name: e.name, reps: e.reps, rest: e.rest, track: e.track, cues: e.cues, video: e.video, sets };
+    })
   };
   S.openEx = null;
   S.tab = 'today';
@@ -800,13 +849,14 @@ function renderWorkout() {
             <span class="wo-clock" id="wo-clock">${clock((Date.now() - a.startedAt) / 1000)}</span>
             <span class="wo-clock" id="wo-count">${done}/${total} sets</span>
           </div>
-          <div class="wo-title" style="margin-top:6px">${esc(a.title)}</div>
+          <div class="wo-title" style="margin-top:6px">${esc(a.title)}${levelTag(a)}</div>
         </div>
         <button class="btn btn-icon btn-ghost" data-action="workoutMenu" aria-label="Workout options">${icon('more')}</button>
       </div>
       <div class="wo-bar"><span id="wo-bar" style="width:${total ? (done / total) * 100 : 0}%"></span></div>
     </div>
     <div class="wo-list">
+      ${a.intensity && LEVELS[a.intensity] && LEVELS[a.intensity].during ? `<div class="banner">${icon('info')}<div>${LEVELS[a.intensity].during}</div></div>` : ''}
       ${Date.now() - (a.lastAt || a.startedAt) > 4 * 3600000 ? `<div class="banner warn">${icon('clock')}
         <div class="grow">Started ${fmtDate(new Date(a.startedAt), { weekday: 'short', hour: 'numeric', minute: '2-digit' })}. Forgot to finish? Your time is saved up to your last set.</div>
         <button class="btn btn-sm btn-primary" data-action="finishWorkout">Finish</button></div>` : ''}
@@ -815,6 +865,9 @@ function renderWorkout() {
       <button class="btn btn-primary btn-xl" data-action="finishWorkout">${icon('check')} Finish workout</button>
     </div>`;
 }
+
+// "Light" / "Moderate" label for workouts that weren't the full (heavy) version
+const levelTag = w => (isEasy(w) ? ` <span class="lvl-tag lv-${w.intensity}">${LEVELS[w.intensity].label}</span>` : '');
 
 function setText(s, track) {
   if (track === 'weight') return `${s.w != null ? fmt(s.w, 1) : 'BW'} × ${s.r != null ? fmt(s.r) : '?'}`;
@@ -866,7 +919,7 @@ function warmupSets(e, work) {
 }
 function coachTips(e, i, last) {
   if (e.track !== 'weight') return '';
-  const nw = nextWeight(e, last), u = S.settings.unit;
+  const nw = S.active && isEasy(S.active) ? null : nextWeight(e, last), u = S.settings.unit;
   const firstW = (e.sets.find(st => st.w > 0) || {}).w;
   const work = nw ? nw.to : firstW || (last ? Math.max(0, ...last.sets.map(st => st.w || 0)) : 0);
   const warm = e.sets.some(st => st.done) ? '' : warmupSets(e, work);
@@ -1342,7 +1395,7 @@ actions.libOpen = el => {
   openSheet(name, `${info ? videoEmbed(info, name) : ''}
     ${infoBlock(name)}
     ${libSwap && S.active ? `<button class="btn btn-primary btn-block" data-action="swapEx" data-name="${esc(name)}">${icon('refresh', 'sm')} Swap for today</button>`
-      : `<button class="btn btn-primary btn-block" data-action="libAdd" data-name="${esc(name)}">${icon('plus', 'sm')} Add to ${DAYS[S.planDay]} · ${MODES[S.settings.mode].label}</button>`}
+      : `<button class="btn btn-primary btn-block" data-action="libAdd" data-name="${esc(name)}">${icon('plus', 'sm')} Add to ${dayName(S.planDay)} · ${MODES[S.settings.mode].label}</button>`}
     <button class="btn btn-ghost btn-block" data-action="libBack">Back to the library</button>`);
 };
 actions.libBack = () => openLibrary();
@@ -1350,7 +1403,7 @@ actions.libAdd = el => {
   const name = el.dataset.name, t = planTemplate(name);
   dayPlan(S.planDay).exercises.push({ id: uid(), name, sets: t ? t.sets : 3, reps: t ? t.reps : '10', rest: t ? t.rest : 60, track: t ? t.track : 'reps', cues: t ? t.cues : '', video: defaultVideo(name) });
   savePlan(); closeSheet(); render();
-  toast(`${name} added to ${DAYS[S.planDay]}`);
+  toast(`${name} added to ${dayName(S.planDay)}`);
 };
 
 // How the starting programs set up an exercise (cues, reps, what to log). Library-only exercises carry
@@ -1555,7 +1608,10 @@ function renderPlan() {
   const chips = planFor(mode).map((d, i) => `
     <button class="day-chip ${i === di ? 'on' : ''} ${i === today ? 'today' : ''}" data-action="planDay" data-i="${i}" aria-pressed="${i === di}" aria-label="${DAYS[i]}: ${esc(d.title)}">
       ${DAYS_SHORT[i]}<small>${TYPE_SHORT[d.type] || ''}</small>
-    </button>`).join('');
+    </button>`).join('') + `
+    <button class="day-chip light-chip ${di === LIGHT ? 'on' : ''}" data-action="planDay" data-i="${LIGHT}" aria-pressed="${di === LIGHT}" aria-label="Light workout: ${esc(dayPlan(LIGHT).title)}">
+      Light workout<small>Pick it any day on Today</small>
+    </button>`;
   return `<div class="page">
     <div class="page-head"><div><div class="eyebrow">Weekly plan</div><h1 class="page-title">Plan</h1></div>
       <button class="btn btn-sm btn-ghost" data-action="programs">${icon('refresh', 'sm')} ${esc(program().name)}</button></div>
@@ -1565,7 +1621,7 @@ function renderPlan() {
       return `${days.length} training day${days.length === 1 ? '' : 's'} · about ${mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`} a week`; })()}</div>
     <section class="card hero">
       <div class="spread">
-        <span class="badge accent">${icon(m.icon)} ${m.label} · ${DAYS[di]}</span>
+        <span class="badge accent">${icon(m.icon)} ${m.label} · ${di === LIGHT ? 'Light' : DAYS[di]}</span>
         <button class="btn btn-sm btn-ghost" data-action="editDay">${icon('edit', 'sm')} Edit day</button>
       </div>
       <div>
@@ -1583,8 +1639,8 @@ function renderPlan() {
       <button class="btn btn-ghost" data-action="library">${icon('dumbbell', 'sm')} Exercise library</button>
       <button class="btn btn-ghost" data-action="addPlanEx">${icon('plus', 'sm')} Add your own</button>
     </div>
-    ${n ? `<button class="btn btn-primary btn-xl" data-action="startWorkout" data-day="${di}" ${S.active ? 'disabled' : ''}>${icon('play')} ${S.active ? 'Workout in progress' : 'Start this workout'}</button>` : ''}
-    <p class="hint center">Tap an exercise to change its sets, reps, rest, cues or video. Gym and Home plans are completely separate — switch with the toggle at the top.</p>
+    ${n ? `<button class="btn btn-primary btn-xl" data-action="startWorkout" data-day="${di}" ${S.active ? 'disabled' : ''}>${icon('play')} ${S.active ? 'Workout in progress' : di === LIGHT ? 'Start the Light workout' : 'Start this workout'}</button>` : ''}
+    <p class="hint center">${di === LIGHT ? 'Your easy day. Pick <b>Light</b> on the Today screen to do this instead of the planned workout — the day after a game, sprinting or a hard practice. ' : ''}Tap an exercise to change its sets, reps, rest, cues or video. Gym and Home plans are completely separate — switch with the toggle at the top.</p>
   </div>`;
 }
 
@@ -1620,13 +1676,13 @@ actions.programs = () => openSheet('Programs', `<div class="stack">
     <p class="text-2 small">${esc(p.about)}</p>
     ${S.settings.program === k ? '' : `<button class="btn btn-primary btn-block" data-action="useProgram" data-k="${k}">Switch to ${esc(p.name)}</button>`}
   </div>`).join('')}
-  <p class="hint">Switching replaces both your gym and home weekly plans (including your edits). Your workout history, charts and records stay.</p>
+  <p class="hint">Switching replaces both your gym and home weekly plans (including your edits). Your Light workout, workout history, charts and records stay.</p>
 </div>`);
 actions.useProgram = async el => {
   const k = el.dataset.k, p = PROGRAMS[k];
   if (!p) return;
   if (!(await confirmBox(`Switch to ${p.name}?`, 'Your gym and home weekly plans will be replaced with this program. Workout history is kept.', { ok: 'Switch' }))) return;
-  S.plan = buildPlan(p.plan);
+  S.plan = { ...buildPlan(p.plan), light: S.plan.light };      // your Light workout stays the same
   S.settings.program = k;
   savePlan(); saveSettings(); render({ keepScroll: false });
   toast(`${p.name} program ready`);
@@ -1684,7 +1740,7 @@ actions.editPlanEx = el => {
 };
 actions.addPlanEx = () => {
   editIndex = null;
-  openSheet(`Add to ${DAYS[S.planDay]}`, exerciseForm(
+  openSheet(`Add to ${dayName(S.planDay)}`, exerciseForm(
     { name: '', sets: 3, reps: '10', rest: 60, track: S.settings.mode === 'gym' ? 'weight' : 'reps', cues: '', video: '' },
     { submit: 'savePlanEx', isNew: true }));
 };
@@ -1700,21 +1756,21 @@ submits.savePlanEx = f => {
 actions.deletePlanEx = async () => {
   const list = dayPlan(S.planDay).exercises, i = editIndex, e = list[i];
   if (!e) return;
-  if (!(await confirmBox('Delete exercise?', `Remove "${e.name}" from ${DAYS[S.planDay]}? Your workout history is kept.`, { ok: 'Delete', danger: true }))) return;
+  if (!(await confirmBox('Delete exercise?', `Remove "${e.name}" from ${dayName(S.planDay)}? Your workout history is kept.`, { ok: 'Delete', danger: true }))) return;
   list.splice(i, 1);
   savePlan(); render(); toast('Exercise deleted');
 };
 
 actions.editDay = () => {
   const day = dayPlan(S.planDay);
-  openSheet(`${DAYS[S.planDay]} · ${MODES[S.settings.mode].label}`, `<form class="form" novalidate data-submit="saveDay">
+  openSheet(`${dayName(S.planDay)} · ${MODES[S.settings.mode].label}`, `<form class="form" novalidate data-submit="saveDay">
     <label class="field"><span>Workout name</span><input name="title" value="${esc(day.title)}" maxlength="60" required autocomplete="off"></label>
     <label class="field"><span>Type of day</span>
       <select name="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${day.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="field"><span>Focus / notes</span><textarea name="focus" maxlength="400">${esc(day.focus)}</textarea></label>
     <button class="btn btn-primary btn-block" type="submit">Save</button>
     <label class="field"><span>Copy another day's workout here</span>
-      <select data-change="copyDayFrom"><option value="">Choose a day…</option>${planFor().map((d, i) => (i === S.planDay ? '' : `<option value="${i}">${DAYS[i]} — ${esc(d.title)}</option>`)).join('')}</select></label>
+      <select data-change="copyDayFrom"><option value="">Choose a day…</option>${[...planFor().keys(), LIGHT].map(i => (i === S.planDay ? '' : `<option value="${i}">${dayName(i)} — ${esc(dayPlan(i).title)}</option>`)).join('')}</select></label>
     <button class="btn btn-ghost btn-block" type="button" data-action="resetDay">${icon('refresh', 'sm')} Reset this day to the starting plan</button>
   </form>`);
 };
@@ -1726,18 +1782,19 @@ submits.saveDay = f => {
   savePlan(); closeSheet(); render(); toast('Day saved');
 };
 changes.copyDayFrom = async el => {
-  const from = Number(el.value), to = S.planDay, list = planFor();
-  if (!el.value || !list[from]) return;
-  if (!(await confirmBox(`Copy ${DAYS[from]} to ${DAYS[to]}?`, `${DAYS[to]}'s exercises will be replaced with a copy of ${DAYS[from]} (${list[from].title}). Your workout history is kept.`, { ok: 'Copy' }))) return;
-  const src = clone(list[from]);
+  const from = Number(el.value), to = S.planDay, fromDay = el.value !== '' && from !== to ? dayPlan(from) : null;
+  if (!fromDay) return;
+  if (!(await confirmBox(`Copy ${dayName(from)} to ${dayName(to)}?`, `${dayName(to)}'s exercises will be replaced with a copy of ${dayName(from)} (${fromDay.title}). Your workout history is kept.`, { ok: 'Copy' }))) return;
+  const src = clone(fromDay);
   src.exercises.forEach(e => { e.id = uid(); });
-  list[to] = src;
-  savePlan(); render(); toast(`${DAYS[from]} copied to ${DAYS[to]}`);
+  setDayPlan(to, src);
+  savePlan(); render(); toast(`${dayName(from)} copied to ${dayName(to)}`);
 };
 actions.resetDay = async () => {
   const mode = S.settings.mode, di = S.planDay;
-  if (!(await confirmBox('Reset this day?', `${DAYS[di]} (${MODES[mode].label}) goes back to the starting exercises and videos. Your workout history is kept.`, { ok: 'Reset', danger: true }))) return;
-  S.plan[mode][di] = buildPlan(program().plan)[mode][di];
+  if (!(await confirmBox('Reset this day?', `${dayName(di)} (${MODES[mode].label}) goes back to the starting exercises and videos. Your workout history is kept.`, { ok: 'Reset', danger: true }))) return;
+  const fresh = buildPlan(program().plan);
+  setDayPlan(di, di === LIGHT ? fresh.light[mode] : fresh[mode][di], mode);
   savePlan(); render(); toast('Day reset');
 };
 
@@ -2994,7 +3051,7 @@ actions.calDay = el => {
   const list = S.workouts.filter(w => w.date === el.dataset.date && w.mode === S.settings.mode);
   if (list.length === 1) { actions.showWorkout({ dataset: { id: list[0].id } }); return; }
   openSheet(fmtDate(parseYmd(el.dataset.date), { weekday: 'long', month: 'long', day: 'numeric' }), `<div class="stack">${list.map(w => `<button class="hist" data-action="showWorkout" data-id="${w.id}">
-    <div><div class="hist-title">${esc(w.title)}</div><div class="hist-sub">${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)} · ${setsDone(w)} sets</div></div>
+    <div><div class="hist-title">${esc(w.title)}${levelTag(w)}</div><div class="hist-sub">${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)} · ${setsDone(w)} sets</div></div>
     <div class="hist-right">${icon('right', 'sm')}</div></button>`).join('')}</div>`);
 };
 
@@ -3144,7 +3201,7 @@ function historyList(ws) {
   return `<div class="stack">${shown.map(w => {
     const vol = volumeOf(w);
     return `<button class="hist" data-action="showWorkout" data-id="${w.id}">
-      <div><div class="hist-title">${esc(w.title)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.rpe ? ` · effort ${w.rpe}/10` : ''}${w.notes ? ' · notes' : ''}</div></div>
+      <div><div class="hist-title">${esc(w.title)}${levelTag(w)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.rpe ? ` · effort ${w.rpe}/10` : ''}${w.notes ? ' · notes' : ''}</div></div>
       <div class="hist-right">${setsDone(w)} sets<small>${vol ? `${fmtK(vol)} ${S.settings.unit}` : ''}</small></div>
     </button>`;
   }).join('')}</div>
@@ -3161,6 +3218,7 @@ actions.showWorkout = el => {
       <span class="badge accent">${icon(MODES[w.mode].icon)} ${MODES[w.mode].label}</span>
       <span class="badge">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
       <span class="badge">${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}</span>
+      ${isEasy(w) ? `<span class="badge">${LEVELS[w.intensity].label} day</span>` : ''}
       ${vol ? `<span class="badge">${fmtK(vol)} ${S.settings.unit}</span>` : ''}
     </div>
     <div>${w.exercises.map(e => `<div class="detail-ex">
@@ -3177,7 +3235,7 @@ actions.repeatWorkout = el => {
   if (!w || S.active) return;
   closeSheet();
   S.active = {
-    id: uid(), mode: w.mode, dayIndex: dayIdx(), title: w.title, type: w.type, date: ymd(), startedAt: Date.now(), finishedAt: null,
+    id: uid(), mode: w.mode, dayIndex: dayIdx(), title: w.title, type: w.type, intensity: LEVELS[w.intensity] ? w.intensity : 'heavy', date: ymd(), startedAt: Date.now(), finishedAt: null,
     exercises: w.exercises.map(e => ({ planId: null, name: e.name, reps: e.reps || '10', rest: e.rest ?? 60, track: e.track, cues: e.cues || '', video: e.video || defaultVideo(e.name),
       sets: makeSets(e.sets.length, e.track, lastSetsFor(e.name, w.mode)) }))
   };
@@ -3843,7 +3901,7 @@ actions.shareWorkout = el => {
   const vol = volumeOf(w), stats = [['Time', fmtDur(w.finishedAt - w.startedAt)], ['Sets', String(setsDone(w))]];
   if (vol) stats.push(['Volume', `${fmtK(vol)} ${S.settings.unit}`]);
   if (w.rpe) stats.push(['Effort', `${w.rpe}/10`]);
-  shareCard(w.title, fmtDate(parseYmd(w.date), { weekday: 'long', month: 'long', day: 'numeric' }), stats);
+  shareCard(w.title, fmtDate(parseYmd(w.date), { weekday: 'long', month: 'long', day: 'numeric' }) + (isEasy(w) ? ` · ${LEVELS[w.intensity].label} day` : ''), stats);
 };
 
 // ----- Spreadsheets (CSV) for you or your coach — these are NOT encrypted -----
@@ -3855,9 +3913,9 @@ const csvCell = v => {
 const toCsv = rows => rows.map(r => r.map(csvCell).join(',')).join('\r\n');
 const CSV = {
   workouts: ['Workouts', () => {
-    const rows = [['Date', 'Mode', 'Workout', 'Exercise', 'Set', `Weight (${S.settings.unit})`, 'Reps or seconds', 'Done', 'Effort (1-10)', 'Workout notes']];
+    const rows = [['Date', 'Mode', 'Workout', 'Level', 'Exercise', 'Set', `Weight (${S.settings.unit})`, 'Reps or seconds', 'Done', 'Effort (1-10)', 'Workout notes']];
     for (const w of [...S.workouts].reverse()) w.exercises.forEach((e, ei) => e.sets.forEach((st, i) =>
-      rows.push([w.date, MODES[w.mode].label, w.title, e.name, i + 1, e.track === 'weight' ? st.w ?? '' : '', st.r ?? '', st.done ? 'yes' : 'no', w.rpe || '', ei === 0 && i === 0 ? w.notes || '' : ''])));
+      rows.push([w.date, MODES[w.mode].label, w.title, (LEVELS[w.intensity] || LEVELS.heavy).label, e.name, i + 1, e.track === 'weight' ? st.w ?? '' : '', st.r ?? '', st.done ? 'yes' : 'no', w.rpe || '', ei === 0 && i === 0 ? w.notes || '' : ''])));
     return rows;
   }],
   food: ['Food log', () => [['Date', 'Time', 'Meal', 'Food', 'Servings', 'Serving size', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'],
@@ -3949,8 +4007,10 @@ async function confirmRestore(data) {
 
 actions.resetPlan = async el => {
   const mode = el.dataset.mode, label = MODES[mode].label;
-  if (!(await confirmBox(`Reset ${label} plan?`, `All 7 ${label.toLowerCase()} days go back to the starting plan, replacing your ${label.toLowerCase()} edits and video links. Workout history is kept.`, { ok: 'Reset', danger: true }))) return;
-  S.plan[mode] = buildPlan(program().plan)[mode];
+  if (!(await confirmBox(`Reset ${label} plan?`, `All 7 ${label.toLowerCase()} days and the ${label.toLowerCase()} Light workout go back to the starting plan, replacing your edits and video links. Workout history is kept.`, { ok: 'Reset', danger: true }))) return;
+  const fresh = buildPlan(program().plan);
+  S.plan[mode] = fresh[mode];
+  S.plan.light[mode] = fresh.light[mode];
   savePlan(); render(); toast(`${label} plan reset`);
 };
 
@@ -3971,6 +4031,10 @@ const HELP = [
   ['Your day in Dugout', ['Open the Today tab: it shows today\'s workout, a quick check-in, your nutrition, water and what to eat next.',
     'Tap Start to begin a workout. Check off each set — the rest timer starts on its own, and your weights from last time are filled in.',
     'Tap ▶ on any exercise for a form video, step-by-step how-to, common mistakes and easier or harder versions.']],
+  ['Light, Moderate or Heavy', ['Every day you pick how hard to go, right above your workout on the Today screen. It starts on Heavy (the full workout) each morning.',
+    'Moderate keeps the same exercises with about ⅔ of the sets, and fills in weights at about 90% of last time.',
+    'Light swaps in your Light workout: mobility, arm care and core, with a form video for every exercise. Good the day after a game, sprinting or a hard practice.',
+    'Change the Light workout like any other day: Plan tab → Light workout.']],
   ['Logging food fast', ['Type a few letters to search 169 common foods, your favorites and anything you logged before. Change Servings and the numbers update.',
     'Use the Recent row, Favorites, the + on a meal, or "Copy yesterday\'s food" to log in one tap.',
     'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
@@ -4049,7 +4113,7 @@ function cleanSettings(st) {
   out.calGoal = clamp(Math.round(out.calGoal) || DEFAULT_SETTINGS.calGoal, 500, 10000);
   out.proteinGoal = clamp(Math.round(out.proteinGoal) || DEFAULT_SETTINGS.proteinGoal, 10, 500);
   out.waterGoal = clamp(Math.round(out.waterGoal) || DEFAULT_SETTINGS.waterGoal, 16, 400);
-  for (const k of ['profile', 'mealPlan']) if (!isObj(out[k])) out[k] = null;
+  for (const k of ['profile', 'mealPlan', 'intensity']) if (!isObj(out[k])) out[k] = null;
   if (!Array.isArray(out.badges)) out.badges = null;
   return out;
 }
@@ -4071,6 +4135,16 @@ function cleanPlan(plan) {
         exercises: (Array.isArray(day.exercises) ? day.exercises : []).filter(e => isObj(e) && e.name).map(cleanExerciseData)
       };
     });
+  }
+  // The Light workout (added in 2.1 — plans saved before then get the starting one)
+  const light = isObj(plan.light) ? plan.light : {}, fresh = buildPlan({ gym: [], home: [] }).light;
+  out.light = {};
+  for (const mode of ['gym', 'home']) {
+    const d = light[mode];
+    out.light[mode] = isObj(d) && Array.isArray(d.exercises) ? {
+      ...d, title: String(d.title || 'Light workout'), type: TYPES[d.type] ? d.type : 'mobility', focus: String(d.focus || ''),
+      exercises: d.exercises.filter(e => isObj(e) && e.name).map(cleanExerciseData)
+    } : fresh[mode];
   }
   return out;
 }
@@ -4120,7 +4194,7 @@ async function loadAll() {
   const cleanP = cleanPlan(plan);
   if (cleanP) {
     S.plan = cleanP;
-    const all = [...cleanP.gym, ...cleanP.home].flatMap(d => d.exercises);
+    const all = [...cleanP.gym, ...cleanP.home, cleanP.light.gym, cleanP.light.home].flatMap(d => d.exercises);
     upgradeVideos(all);                                   // placeholders → real tutorial videos
     if (JSON.stringify(cleanP) !== JSON.stringify(plan)) await DB.set('plan', S.plan);
   } else {
@@ -4260,10 +4334,15 @@ async function openApp(newUsername) {
 }
 
 // ----- What's new (shown once after an update to people who already use the app) -----
-const WHATS_NEW = '2.0';
+const WHATS_NEW = '2.1';
 function whatsNew() {
   const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
-  openSheet("What's new in Dugout 2.0", `
+  openSheet("What's new in Dugout 2.1", `
+    ${item('flame', 'Light, Moderate or Heavy', 'Pick how hard to go each day, right on the Today screen. Moderate trims the sets and weights. Light swaps in an easy recovery workout with a form video for every exercise.')}
+    ${item('dumbbell', '10 more exercises', 'Goblet squats, Bulgarian split squats, band pull-aparts and more in the exercise library.')}
+    ${item('refresh', 'Always the newest version', 'Dugout now loads the latest version every time you open it with internet.')}
+    ${item('shield', 'Fixes', 'Switching lb and kg converts what you logged, and pitch counts add up across a whole day for Pitch Smart rest days.')}
+    <details class="table-toggle"><summary>Everything new in 2.0</summary><div class="stack-sm">
     ${item('diet', 'Easier food logging', 'Search 169 foods, pick servings, and track carbs and fat. Recent foods and "copy yesterday" save taps.')}
     ${item('flame', 'Goals made for you', 'Calculate calories, protein and water from your size and training. Track water and body weight.')}
     ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 45 recipes, a game-day timeline, the week ahead and a shopping list.')}
@@ -4272,6 +4351,7 @@ function whatsNew() {
     ${item('timer', 'Baseball tests, stats and arm care', 'Progress → Baseball: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
     ${item('trophy', 'Stay on track', 'Daily readiness check-in, a weekly review, a training calendar, badges and spreadsheet export.')}
     ${item('settings', 'Light mode', 'Settings → Appearance: a bright theme that is easier to read outside at the field.')}
+    </div></details>
     <button class="btn btn-primary btn-block" data-action="closeSheet">Let's go</button>`);
 }
 

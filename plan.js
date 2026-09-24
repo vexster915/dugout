@@ -1,7 +1,8 @@
 /* plan.js — the STARTING weekly plan.
    You can change everything inside the app (Plan tab), so you never need to edit
    this file. It is only used the first time the app opens, or when you tap
-   "Reset plan" in Settings.
+   "Reset plan" in Settings. LIGHT_WORKOUT (near the bottom) is the easy day you can pick
+   on the Today screen instead of the planned workout.
 
    Each exercise:  ex(name, sets, reps, rest in seconds, what to log, form cues)
    What to log:    "weight" = weight + reps    "reps" = reps only
@@ -463,6 +464,38 @@ const PRE_SEASON_PLAN = {
         like("Pigeon stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
     REST_DAY
   ]
+};
+
+/* ============================ LIGHT WORKOUT ============================
+   Pick "Light" on the Today screen any day you need an easy session instead of your planned
+   workout — the day after a game, hard sprinting or a tough practice. Mobility, arm care and
+   core, nothing heavy. Every exercise has a form video. (Change it in the app: Plan tab → Light.) */
+const easy = (name, sets, reps, rest, cues) => ({ ...like(name, sets, reps, rest), ...(cues ? { cues } : {}) });
+const LIGHT_WORKOUT = {
+  gym: { title: "Light Day: Recover + Move", type: "mobility",
+    focus: "Easy pace, nothing heavy. You should feel better when you finish than when you started.",
+    exercises: [
+      easy("Dynamic warm-up", 1, "6 min", 0, "Easy bike or walk for 3 minutes, then leg swings, arm circles and a few relaxed skips."),
+      easy("World's greatest stretch", 2, "5/side", 20),
+      easy("90/90 hip switches", 2, "8/side", 20),
+      easy("Face pulls", 2, "15", 45, "Light weight. Pull the rope to your forehead, elbows high, and squeeze your upper back."),
+      easy("Cable external rotation", 2, "12/arm", 30, "Very light weight. Elbow tucked at your side, rotate out slowly and control it back."),
+      easy("Dead bugs", 2, "8/side", 30),
+      easy("Single-leg glute bridge", 2, "10/leg", 30),
+      easy("Foam roll", 1, "6 min", 0, "Calves, quads, glutes, lats and upper back — about 45 seconds each. Easy pressure.")
+    ] },
+  home: { title: "Light Day: Recover + Move", type: "mobility",
+    focus: "Easy pace, nothing heavy. You should feel better when you finish than when you started.",
+    exercises: [
+      easy("Warm-up + arm circles", 1, "5 min", 0, "March or walk in place for 2 minutes, then arm circles, wall slides and leg swings."),
+      easy("World's greatest stretch", 2, "5/side", 20),
+      easy("90/90 hip switches", 2, "8/side", 20),
+      easy("Prone Y-T-W raises", 2, "8 each", 30),
+      easy("External rotation hold (doorway)", 2, "20 sec/arm", 20, "Elbow bent 90° at your side, press the back of your hand gently into the door frame. Easy effort."),
+      easy("Dead bugs", 2, "8/side", 30),
+      easy("Single-leg glute bridge", 2, "10/leg", 30),
+      easy("Ball rolling (tennis or lacrosse ball)", 1, "6 min", 0, "Roll your feet, calves, glutes and the back of your shoulder. Slow, easy pressure.")
+    ] }
 };
 
 const PROGRAMS = {

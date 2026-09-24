@@ -7,6 +7,9 @@ Everything is stored only on your phone, encrypted with your login, and it works
 
 **Train**
 - Weekly gym and home (no equipment) plans — **off-season** build, **pre-season** sharpen and **in-season** maintain programs
+- **Light / Moderate / Heavy** switch on the Today screen: pick how hard to go each day. Moderate trims the sets and
+  starts weights at about 90% of last time; Light swaps in an easy recovery workout (mobility, arm care, core — every
+  exercise has a form video) that you can edit in Plan → Light workout
 - Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 113 exercises, plus a searchable exercise library
 - Next-weight suggestions, warm-up sets, plate calculator, exercise swaps, effort rating and notes
 - Daily readiness check-in (sleep, energy, soreness)
@@ -32,7 +35,7 @@ Everything is stored only on your phone, encrypted with your login, and it works
 | --- | --- |
 | `index.html` | The page that loads everything |
 | `app.js` | All the screens and features |
-| `plan.js` | Starting workout programs and tutorial video links |
+| `plan.js` | Starting workout programs, the Light workout and tutorial video links |
 | `exercises.js` | How-to details for every exercise |
 | `meals.js` | Recipes and eating tips |
 | `foods.js` | Built-in food list |
