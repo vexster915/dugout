@@ -4020,6 +4020,26 @@ const cleanFood = f => (isObj(f) && f.id && f.name ? Object.assign(f, {
 }) : null);
 const cleanMeal = m => (cleanFood(m) && /^\d{4}-\d{2}-\d{2}$/.test(m.date) ? m : null);
 
+// Tracking entries: make sure every number the screens use is really a number.
+const n0 = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
+function cleanLog(l) {
+  if (!isObj(l) || !l.id || typeof l.kind !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(l.date)) return null;
+  switch (l.kind) {
+    case 'weight': return Number(l.w) > 0 ? { ...l, w: Number(l.w) } : null;
+    case 'water': return { ...l, oz: Math.max(0, n0(l.oz)) };
+    case 'test': return TEST_BY_ID[l.test] && Number(l.v) > 0 ? { ...l, v: Number(l.v) } : null;
+    case 'throw': return Number(l.count) > 0 ? { ...l, count: Number(l.count), feel: clamp(parseInt(l.feel, 10) || 4, 1, 5), dist: optNum(l.dist) } : null;
+    case 'checkin': return { ...l, sleep: clamp(n0(l.sleep) || 8, 5, 9), energy: clamp(n0(l.energy) || 3, 1, 5), sore: clamp(n0(l.sore) || 2, 1, 5) };
+    case 'skill': return { ...l, reps: optNum(l.reps), min: optNum(l.min) };
+    case 'game': {
+      const bat = Object.fromEntries(BAT.map(([k]) => [k, Math.max(0, n0(isObj(l.bat) ? l.bat[k] : 0))]));
+      const pitch = isObj(l.pitch) && n0(l.pitch.outs) > 0 ? { outs: n0(l.pitch.outs), ...Object.fromEntries(PITCH.map(([k]) => [k, Math.max(0, n0(l.pitch[k]))])) } : null;
+      return { ...l, bat, pitch, opp: String(l.opp || ''), result: ['W', 'L', 'T'].includes(l.result) ? l.result : '', score: String(l.score || ''), note: String(l.note || '') };
+    }
+    default: return l;                      // kinds from a newer version: keep them untouched
+  }
+}
+
 async function loadAll() {
   const [settings, plan, active, workouts, meals, foods, logs] = await Promise.all([
     DB.get('settings'), DB.get('plan'), DB.get('active'), DB.all('workouts'), DB.all('meals'), DB.all('foods'), DB.all('logs')
@@ -4040,7 +4060,7 @@ async function loadAll() {
   S.workouts = (workouts || []).map(cleanWorkout).filter(Boolean).sort((a, b) => b.startedAt - a.startedAt);
   S.meals = (meals || []).map(cleanMeal).filter(Boolean);
   S.foods = (foods || []).map(cleanFood).filter(Boolean);
-  S.logs = (logs || []).filter(l => isObj(l) && l.id && typeof l.kind === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date));
+  S.logs = (logs || []).map(cleanLog).filter(Boolean);
   S.openEx = null;
   S.progEx = null;
   S.progMetric = null;
