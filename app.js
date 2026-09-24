@@ -873,10 +873,16 @@ function coachTips(e, i, last) {
   return `${nw ? `<div class="wo-tip">${icon('up', 'sm')}<span class="grow">Every set hit ${targetNum(e.reps)}+ reps at ${fmt(nw.from, 1)} ${u} last time — try <b>${fmt(nw.to, 1)} ${u}</b> today.</span>
       <button class="btn btn-sm btn-ghost" data-action="useWeight" data-i="${i}" data-w="${nw.to}">Use it</button></div>` : ''}
     ${warm ? `<div class="wo-warm"><span class="grow">Warm-up first: <b>${warm}</b></span>
-      <button class="btn-link" data-action="plateCalc" data-w="${work}" data-bar="${barFor(e.name)}">Plates</button></div>` : ''}`;
+      ${barFor(e.name) != null ? `<button class="btn-link" data-action="plateCalc" data-w="${work}" data-bar="${barFor(e.name)}">Plates</button>` : ''}</div>` : ''}`;
 }
-// Which bar a lift usually uses (for the plate calculator): machines load plates only.
-const barFor = name => { const kg = S.settings.unit === 'kg'; return /leg press|sled/i.test(name) ? 0 : /trap bar/i.test(name) ? (kg ? 25 : 60) : (kg ? 20 : 45); };
+// Which bar a lift usually uses (for the plate calculator): plate-loaded machines use plates only, and
+// dumbbell, kettlebell, cable, machine-stack and bodyweight lifts have no plate math at all (null).
+const NO_PLATES = /dumbbell|kettlebell|cable|backpack|landmine|band|pull-up|chin-up|lunge|step-up|split squat|goblet|carry|chest-supported|leg curl|leg extension|pulldown|pushdown|raise|fly|curls?\b|pallof/i;
+const barFor = name => {
+  const kg = S.settings.unit === 'kg';
+  if (NO_PLATES.test(name) && !/leg press/i.test(name)) return null;
+  return /leg press|sled/i.test(name) ? 0 : /trap bar/i.test(name) ? (kg ? 25 : 60) : (kg ? 20 : 45);
+};
 actions.useWeight = el => {
   if (!S.active) return;
   const i = +el.dataset.i, e = S.active.exercises[i], w = num(el.dataset.w);
@@ -3628,7 +3634,7 @@ function renderSettings() {
         <input class="input" type="time" value="${esc(st.workoutTime)}" data-change="setTime" aria-label="Workout time"></div>
       <div class="set-item"><div class="grow"><div>Appearance</div><div class="hint">Light is easier to read outside</div></div>
         <div class="seg" style="width:190px">${THEMES.map(([k, l]) => `<button class="${themePref() === k ? 'on' : ''}" data-action="setTheme" data-k="${k}" aria-pressed="${themePref() === k}">${l}</button>`).join('')}</div></div>
-      <div class="set-item"><div class="grow"><div>Weight units</div><div class="hint">Changes labels only</div></div>
+      <div class="set-item"><div class="grow"><div>Weight units</div><div class="hint">Water shows in liters with kg</div></div>
         <div class="seg" style="width:120px">${['lb', 'kg'].map(u => `<button class="${st.unit === u ? 'on' : ''}" data-action="setUnit" data-u="${u}" aria-pressed="${st.unit === u}">${u}</button>`).join('')}</div></div>
       ${toggle('autoRest', 'Auto-start rest timer', 'Starts when you check off a set')}
       ${toggle('sound', 'Timer beep', "Won't play when your phone is on silent")}
@@ -3697,7 +3703,46 @@ actions.setTheme = el => {
   try { localStorage.setItem('dugout-theme', el.dataset.k); } catch (e) { /* private mode: just this session */ }
   applyTheme(); render();
 };
-actions.setUnit = el => { S.settings.unit = el.dataset.u; saveSettings(); render(); };
+// Switching lb ↔ kg: offer to convert what's already logged, so a 185 lb squat doesn't turn into 185 kg.
+const hasWeights = () => logsOf('weight').length > 0 || !!(S.settings.profile && S.settings.profile.weight)
+  || [...S.workouts, ...(S.active ? [S.active] : [])].some(w => w.exercises.some(e => e.sets.some(s => s.w != null && s.w !== 0)));
+actions.setUnit = el => {
+  const u = el.dataset.u, from = S.settings.unit;
+  if (!['lb', 'kg'].includes(u) || u === from) return;
+  if (!hasWeights()) { S.settings.unit = u; saveSettings(); render(); return; }
+  openSheet(`Switch to ${u}?`, `<div class="stack">
+    <p class="text-2">You've logged weights in ${from}. Convert them to ${u} (${from === 'lb' ? '185 lb → 83.9 kg' : '80 kg → 176.4 lb'})? That covers your lifts, body weight and goal answers.</p>
+    <button class="btn btn-primary btn-block" data-action="unitSwitch" data-u="${u}" data-convert="1">Convert my numbers to ${u}</button>
+    <button class="btn btn-ghost btn-block" data-action="unitSwitch" data-u="${u}">Just change the label</button>
+    <p class="hint">Only change the label if the numbers you typed were really ${u} all along.</p>
+  </div>`);
+};
+actions.unitSwitch = el => {
+  const u = el.dataset.u;
+  if (!['lb', 'kg'].includes(u) || u === S.settings.unit) { closeSheet(); return; }
+  if (el.dataset.convert) convertWeights(u);
+  S.settings.unit = u;
+  saveSettings(); closeSheet(); render();
+  toast(el.dataset.convert ? `Converted everything to ${u}` : `Weights now show in ${u}`);
+};
+function convertWeights(to) {
+  const f = to === 'kg' ? LB : 1 / LB;
+  // Two decimals so switching back and forth doesn't drift (135 lb → 61.23 kg → 135 lb); screens show one.
+  const cv = v => { if (v == null || !Number.isFinite(v)) return v; const r2 = Math.round(v * f * 100) / 100, r1 = Math.round(r2 * 10) / 10; return Math.abs(r2 - r1) <= 0.011 ? r1 : r2; };
+  const fixSets = w => w.exercises.forEach(e => e.sets.forEach(st => { st.w = cv(st.w); }));
+  S.workouts.forEach(fixSets);
+  if (S.workouts.length) save(() => DB.putMany('workouts', S.workouts));
+  if (S.active) { fixSets(S.active); saveActive(); }
+  const ws = S.logs.filter(l => l.kind === 'weight');
+  ws.forEach(l => { l.w = cv(l.w); });
+  if (ws.length) save(() => DB.putMany('logs', ws));
+  const p = S.settings.profile;
+  if (p) {
+    if (p.weight) p.weight = cv(p.weight);
+    if (to === 'kg' && p.ft) p.cm = Math.round((p.ft * 12 + (p.inch || 0)) * 2.54);
+    if (to === 'lb' && p.cm) { const inch = Math.round(p.cm / 2.54); p.ft = Math.floor(inch / 12); p.inch = inch % 12; }
+  }
+}
 // ----- Backup file -----
 function backupData() {
   return {
