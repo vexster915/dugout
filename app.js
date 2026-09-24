@@ -1273,7 +1273,8 @@ function swapBlock(ex) {
   if (!x || !x.swap || !x.swap.length) return '';
   const started = ex.sets.some(st => st.done);
   return `<div class="section-title">Equipment taken? Swap it for today</div>
-    <div class="chips">${x.swap.map(n => `<button class="chip" data-action="swapEx" data-name="${esc(n)}" ${started ? 'disabled' : ''}>${esc(n)}</button>`).join('')}</div>
+    <div class="chips">${x.swap.map(n => `<button class="chip" data-action="swapEx" data-name="${esc(n)}" ${started ? 'disabled' : ''}>${esc(n)}</button>`).join('')}
+      <button class="chip" data-action="library" data-swap="1" ${started ? 'disabled' : ''}>More options…</button></div>
     <p class="hint">${started ? 'Swapping works before you check off any sets of this exercise.' : "Only changes today's workout — your plan stays the same."}</p>`;
 }
 // ----- Exercise library (Plan tab): browse every exercise and add one to the day you're viewing -----
@@ -1285,7 +1286,9 @@ function libList(q) {
       <span class="grow"><b>${esc(n)}</b><small>${esc((exerciseInfo(n) || {}).muscles || '')}</small></span>${icon('right', 'sm')}</button>`).join('')}`).join('')
     || '<div class="empty">No exercises match.</div>';
 }
-actions.library = () => openSheet('Exercise library', `
+let libSwap = false;   // true when the library was opened to swap an exercise in a workout
+actions.library = el => { libSwap = !!(el && el.dataset.swap); openLibrary(); };
+const openLibrary = () => openSheet(libSwap ? 'Swap for today' : 'Exercise library', `
   <label class="field"><span>Search by name or muscle</span><input data-input="libSearch" placeholder="e.g. hamstrings, press, rotation" autocomplete="off" autocorrect="off"></label>
   <div class="lib-list">${libList('')}</div>`);
 inputs.libSearch = el => { $('.lib-list').innerHTML = libList(el.value); };
@@ -1293,9 +1296,11 @@ actions.libOpen = el => {
   const name = el.dataset.name, info = ytInfo(defaultVideo(name));
   openSheet(name, `${info ? videoEmbed(info, name) : ''}
     ${infoBlock(name)}
-    <button class="btn btn-primary btn-block" data-action="libAdd" data-name="${esc(name)}">${icon('plus', 'sm')} Add to ${DAYS[S.planDay]} · ${MODES[S.settings.mode].label}</button>
-    <button class="btn btn-ghost btn-block" data-action="library">Back to the library</button>`);
+    ${libSwap && S.active ? `<button class="btn btn-primary btn-block" data-action="swapEx" data-name="${esc(name)}">${icon('refresh', 'sm')} Swap for today</button>`
+      : `<button class="btn btn-primary btn-block" data-action="libAdd" data-name="${esc(name)}">${icon('plus', 'sm')} Add to ${DAYS[S.planDay]} · ${MODES[S.settings.mode].label}</button>`}
+    <button class="btn btn-ghost btn-block" data-action="libBack">Back to the library</button>`);
 };
+actions.libBack = () => openLibrary();
 actions.libAdd = el => {
   const name = el.dataset.name, t = planTemplate(name);
   dayPlan(S.planDay).exercises.push({ id: uid(), name, sets: t ? t.sets : 3, reps: t ? t.reps : '10', rest: t ? t.rest : 60, track: t ? t.track : 'reps', cues: t ? t.cues : '', video: defaultVideo(name) });
