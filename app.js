@@ -2577,7 +2577,7 @@ function renderProgress() {
   const head = `<div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
     <div class="seg" role="group" aria-label="What to show">${PROG_VIEWS.map(([k, l]) => `<button class="${S.progView === k ? 'on' : ''}" data-action="progView" data-v="${k}" aria-pressed="${S.progView === k}">${l}</button>`).join('')}</div>`;
   if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${recoveryCard()}${goalsCard()}</div>`;
-  if (S.progView === 'baseball') return `<div class="page">${head}${testsCard()}${armCard()}${throwCard()}</div>`;
+  if (S.progView === 'baseball') return `<div class="page">${head}${toolsCard()}${testsCard()}${armCard()}${throwCard()}</div>`;
   const mode = S.settings.mode, m = MODES[mode];
   const ws = S.workouts.filter(w => w.mode === mode);
   const weekKey = ymd(weekStart()), monthKey = ymd().slice(0, 7);
@@ -3031,6 +3031,108 @@ submits.saveThrow = f => {
   else if (PITCHING.includes(l.type) && rule) { const r = restDays(rule, count); toast(r ? `Saved — ${r} day${r === 1 ? '' : 's'} of rest before pitching again` : 'Saved — no rest day needed'); }
   else toast(l.feel === 1 ? 'Saved — please get that arm checked' : 'Throwing saved');
 };
+
+// ----- Live pitch counter (kept in settings so it survives closing the app mid-game) -----
+function pitchState() {
+  let p = S.settings.pitch;
+  if (!isObj(p) || p.date !== ymd() || !Array.isArray(p.inn) || !Array.isArray(p.seq)) { p = S.settings.pitch = { date: ymd(), type: 'game', s: 0, b: 0, inn: [0], seq: [] }; saveSettings(); }
+  return p;
+}
+function pitchBody() {
+  const p = pitchState(), total = p.s + p.b, rule = pitchRule(S.settings.profile && S.settings.profile.age);
+  const rest = rule ? restDays(rule, total) : 0, level = !rule ? '' : total >= rule.max ? 'over' : total >= rule.max - 10 ? 'near' : '';
+  return `<div class="pc-total ${level}">${total}<small>pitches${rule ? ` · limit ${rule.max}` : ''}</small></div>
+    ${rule ? `<div class="meter pc ${level}"><span style="width:${Math.min(100, (total / rule.max) * 100)}%"></span></div>
+      <p class="small text-2 center">${total >= rule.max ? '<b>Daily limit reached — time to come out.</b> ' : ''}${total ? `If you stop now: <b>${rest} day${rest === 1 ? '' : 's'}</b> of rest` : 'Pitch Smart limit for your age shown above'}</p>`
+      : '<p class="hint center"><button class="btn-link inline-link" data-action="calcGoals">Add your age</button> to see your pitch limit and rest days.</p>'}
+    <div class="pc-btns">
+      <button class="btn pc-btn strike" data-action="pitch" data-k="s">Strike<b>${p.s}</b></button>
+      <button class="btn pc-btn ball" data-action="pitch" data-k="b">Ball<b>${p.b}</b></button>
+    </div>
+    <div class="grid2">
+      <button class="btn btn-ghost" data-action="pitchUndo" ${total ? '' : 'disabled'}>Undo</button>
+      <button class="btn btn-ghost" data-action="pitchInning">Next inning</button>
+    </div>
+    <div class="small muted center">Inning ${p.inn.map((n, i) => `${i + 1}: <b>${n}</b>`).join(' · ')}${total ? ` · ${Math.round((p.s / total) * 100)}% strikes` : ''}</div>
+    <div class="field"><span>Save as</span><div class="choice">${[['game', 'Game'], ['bullpen', 'Bullpen']].map(([v, l]) =>
+      `<label class="feel-opt"><input type="radio" name="pc-type" value="${v}" ${p.type === v ? 'checked' : ''} data-change="pitchType"><span>${l}</span></label>`).join('')}</div></div>
+    <button class="btn btn-primary btn-block" data-action="pitchSave" ${total ? '' : 'disabled'}>Save to throwing log</button>
+    <button class="btn-link center" data-action="pitchReset" ${total ? '' : 'disabled'}>Start over</button>`;
+}
+const redrawPitch = () => { const b = $('#sheet-root .sheet-body'); if (b) b.innerHTML = pitchBody(); };
+actions.pitchCounter = () => openSheet('Pitch counter', pitchBody());
+actions.pitch = el => {
+  const p = pitchState(), k = el.dataset.k === 'b' ? 'b' : 's';
+  p[k]++; p.inn[p.inn.length - 1]++; p.seq.push([k, p.inn.length - 1]);
+  if (navigator.vibrate) navigator.vibrate(12);
+  saveSettings(); redrawPitch();
+};
+actions.pitchUndo = () => {
+  const p = pitchState(), last = p.seq.pop();
+  if (!last) return;
+  p[last[0]]--; p.inn[last[1]]--;
+  if (p.inn.length > 1 && p.inn[p.inn.length - 1] === 0 && last[1] < p.inn.length - 1) p.inn.pop();
+  saveSettings(); redrawPitch();
+};
+actions.pitchInning = () => { const p = pitchState(); if (p.inn[p.inn.length - 1] > 0) { p.inn.push(0); saveSettings(); } redrawPitch(); };
+changes.pitchType = el => { pitchState().type = el.value === 'bullpen' ? 'bullpen' : 'game'; saveSettings(); };
+actions.pitchReset = async () => {
+  if (!(await confirmBox('Start over?', 'The pitch count for today goes back to zero.', { ok: 'Start over', danger: true }))) { actions.pitchCounter(); return; }
+  S.settings.pitch = null; saveSettings(); actions.pitchCounter();
+};
+actions.pitchSave = () => {
+  const p = pitchState(), total = p.s + p.b;
+  if (!total) return;
+  const innings = p.inn.filter(n => n > 0).length;
+  putLog({ id: uid(), kind: 'throw', date: p.date, type: p.type, count: total, dist: null, feel: 4, at: Date.now(),
+    note: `${p.s} strikes, ${p.b} balls (${Math.round((p.s / total) * 100)}%)${p.type === 'game' ? ` · ${innings} inning${innings === 1 ? '' : 's'}` : ''}` });
+  S.settings.pitch = null; saveSettings();
+  closeSheet(); render();
+  const rule = pitchRule(S.settings.profile && S.settings.profile.age), r = rule ? restDays(rule, total) : null;
+  toast(r ? `Saved ${total} pitches — ${r} day${r === 1 ? '' : 's'} of rest` : `Saved ${total} pitches`);
+};
+
+// ----- Sprint stopwatch: a partner times you, then save it as a test result -----
+const SW = { start: 0, elapsed: 0, id: null };
+const swText = () => ((SW.elapsed + (SW.id ? performance.now() - SW.start : 0)) / 1000).toFixed(2);
+function stopSw() { if (SW.id) { SW.elapsed += performance.now() - SW.start; clearInterval(SW.id); SW.id = null; } }
+actions.stopwatch = () => {
+  stopSw(); SW.elapsed = 0;
+  openSheet('Sprint stopwatch', `<div class="sw-time" id="sw-time">0.00</div>
+    <button class="btn btn-primary btn-xl" data-action="swToggle" id="sw-btn">Start</button>
+    <button class="btn btn-ghost btn-block" data-action="swReset">Reset</button>
+    <div class="form-grid">
+      <label class="field"><span>Save as</span><select id="sw-test">${TESTS.filter(t => t.unit === 's').map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
+      <div class="field"><span>&nbsp;</span><button class="btn btn-ghost" data-action="swSave">Save time</button></div>
+    </div>
+    <p class="hint">Your partner starts the watch on your first movement and stops it as you cross the line. Hand times usually come out a little faster than laser timing.</p>`,
+  { onClose: stopSw });
+};
+actions.swToggle = el => {
+  if (SW.id) { stopSw(); el.textContent = 'Start'; $('#sw-time').textContent = swText(); return; }
+  SW.start = performance.now();
+  SW.id = setInterval(() => { const t = $('#sw-time'); if (t) t.textContent = swText(); else stopSw(); }, 31);
+  el.textContent = 'Stop';
+};
+actions.swReset = () => { stopSw(); SW.elapsed = 0; const t = $('#sw-time'), b = $('#sw-btn'); if (t) t.textContent = '0.00'; if (b) b.textContent = 'Start'; };
+actions.swSave = () => {
+  stopSw();
+  const v = Number(swText()), t = TEST_BY_ID[$('#sw-test').value];
+  if (!t || !(v > 0.5)) { toast('Time a run first'); return; }
+  const prev = bestOf(t, testLogs(t.id));
+  putLog({ id: uid(), kind: 'test', test: t.id, date: ymd(), v, at: Date.now() });
+  actions.swReset(); render();
+  toast(prev && v < prev.v ? `New best ${t.name.toLowerCase()}: ${testFmt(t, v)}!` : `Saved ${testFmt(t, v)}`);
+};
+function toolsCard() {
+  return `<section class="card stack-sm">
+    <div class="card-title">Game-day tools</div>
+    <div class="grid2">
+      <button class="btn btn-ghost" data-action="pitchCounter">${icon('shield', 'sm')} Pitch counter</button>
+      <button class="btn btn-ghost" data-action="stopwatch">${icon('timer', 'sm')} Stopwatch</button>
+    </div>
+  </section>`;
+}
 
 /* ============================== 10. SETTINGS + BACKUP ============================== */
 
