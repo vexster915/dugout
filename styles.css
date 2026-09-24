@@ -649,6 +649,7 @@ i.t-rest { background: var(--muted); }
 }
 #sheet-root.show .sheet-backdrop { opacity: 1; }
 #sheet-root.show .sheet { transform: none; }
+.sheet:focus { outline: none; }
 .sheet-grab { width: 40px; height: 5px; border-radius: 99px; background: var(--line-2); margin: 8px auto 0; flex: none; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 18px; flex: none; }
 .sheet-title { font-size: 20px; font-weight: 800; line-height: 1.2; }

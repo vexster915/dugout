@@ -11,7 +11,7 @@
 
 'use strict';
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '2.0.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
@@ -349,12 +349,13 @@ actions.setMode = el => {
 };
 
 // ----- Bottom sheets (pop-up panels) -----
-let sheetOnClose = null;
+let sheetOnClose = null, sheetReturnFocus = null;
 function openSheet(title, body, { onClose } = {}) {
   const root = $('#sheet-root');
+  if (!root.classList.contains('open')) sheetReturnFocus = document.activeElement;   // put focus back here on close
   root.innerHTML = `
     <div class="sheet-backdrop" data-action="closeSheet"></div>
-    <div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}" tabindex="-1">
       <div class="sheet-grab"></div>
       <div class="sheet-head">
         <div class="sheet-title">${esc(title)}</div>
@@ -366,6 +367,7 @@ function openSheet(title, body, { onClose } = {}) {
   void root.offsetHeight;           // let the browser notice, so the slide-up animation plays
   root.classList.add('show');
   sheetOnClose = onClose || null;
+  $('.sheet', root).focus({ preventScroll: true });           // screen readers start reading the sheet
 }
 function closeSheet() {
   const root = $('#sheet-root');
@@ -373,6 +375,8 @@ function closeSheet() {
   root.classList.remove('show');
   const cb = sheetOnClose; sheetOnClose = null;
   setTimeout(() => { if (!root.classList.contains('show')) { root.classList.remove('open'); root.innerHTML = ''; } }, 300);
+  const back = sheetReturnFocus; sheetReturnFocus = null;
+  if (back && back !== document.body && document.contains(back)) back.focus({ preventScroll: true });
   if (cb) cb();
 }
 actions.closeSheet = () => closeSheet();
@@ -431,6 +435,7 @@ document.addEventListener('submit', e => {
   if (submits[f.dataset.submit]) submits[f.dataset.submit](f, e);
 });
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#sheet-root').classList.contains('open')) { closeSheet(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-action]:not(button):not(a):not(input):not(select):not(textarea)')) {
     e.preventDefault();
     e.target.click();
@@ -3551,6 +3556,10 @@ async function boot() {
 
   // Offline support
   if ('serviceWorker' in navigator) {
+    const updating = !!navigator.serviceWorker.controller;     // no controller yet = first install, not an update
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (updating && !S.locked) toast('A new version of Dugout is ready', { action: () => location.reload(), label: 'Reload' });
+    });
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Offline mode unavailable:', err));
   }
 }
