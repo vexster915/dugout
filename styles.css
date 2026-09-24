@@ -348,7 +348,8 @@ h1, h2, h3, h4, p { margin: 0; }
 .test-row .up { color: #4ade80; }
 .test-row .down { color: #fca5a5; }
 .chart .bar.throw { fill: var(--accent); }
-.feel { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+.feel, .choice { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+.choice { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
 .feel-opt { position: relative; }
 .feel-opt input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 .feel-opt span { display: flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--text-2); }

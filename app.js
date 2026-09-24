@@ -3317,6 +3317,7 @@ submits.createLogin = async f => {
     S.vault = await DB.createVault(user, pass);
     await openApp(user);
     toast('Login created — your data is encrypted');
+    actions.onboard();
   } catch (e) {
     setBusy(f, false);
     authError(f, 'Could not create your login: ' + (e.message || e));
@@ -3408,6 +3409,30 @@ submits.changeLogin = async f => {
   closeSheet();
   render();
   toast('Login updated');
+};
+
+// ----- First-run setup (right after creating a login) -----
+const choice = (name, opts, cur) => `<div class="choice">${opts.map(([v, l]) => `<label class="feel-opt"><input type="radio" name="${name}" value="${v}" ${v === cur ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
+actions.onboard = () => openSheet('Welcome to Dugout', `<form class="form" novalidate data-submit="onboard">
+  <p class="text-2">Let's set up your training. You can change any of this later in Settings.</p>
+  <div class="field"><span>Where will you train?</span>${choice('mode', [['gym', 'Gym'], ['home', 'Home (no equipment)']], S.settings.mode)}</div>
+  <div class="field"><span>What part of the year is it?</span>${choice('program', [['offseason', 'Off-season'], ['inseason', 'In-season']], S.settings.program)}
+    <small>Off-season builds strength and speed. In-season keeps them with 2 short lifts so you're fresh for games.</small></div>
+  <div class="form-grid">
+    <label class="field"><span>Usual workout time</span><input name="time" type="time" value="${esc(S.settings.workoutTime)}"></label>
+    <div class="field"><span>Weights in</span>${choice('unit', [['lb', 'lb'], ['kg', 'kg']], S.settings.unit)}</div>
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">Next: my nutrition goals</button>
+  <button class="btn btn-ghost btn-block" type="button" data-action="closeSheet">Skip — use the defaults</button>
+</form>`);
+submits.onboard = f => {
+  const d = formData(f);
+  if (MODES[d.mode]) S.settings.mode = d.mode;
+  if (['lb', 'kg'].includes(d.unit)) S.settings.unit = d.unit;
+  if (/^\d{2}:\d{2}/.test(d.time || '')) S.settings.workoutTime = d.time.slice(0, 5);
+  if (PROGRAMS[d.program] && d.program !== S.settings.program) { S.settings.program = d.program; S.plan = buildPlan(PROGRAMS[d.program].plan); savePlan(); }
+  saveSettings(); render({ keepScroll: false });
+  actions.calcGoals();
 };
 
 actions.forgotPw = () => openSheet('Forgot your password?', `
