@@ -421,9 +421,55 @@ const IN_SEASON_PLAN = {
   ]
 };
 
+// Pre-season: the ~6 weeks before opening day. Heavy but lower-rep strength, more power and speed, arm ramp-up.
+const PRE_SEASON_PLAN = {
+  gym: [
+    { title: "Lower Power + Strength", type: "strength", focus: "Fewer reps, more speed. Move every rep as fast as you can with good form.",
+      exercises: [WARMUP(8), like("Box jumps", 4, "3", 90), like("Trap bar deadlift", 4, "3", 180), like("Walking lunges (dumbbells)", 3, "6/leg", 90),
+        like("Lateral skater bounds", 3, "4/side", 60), like("Nordic hamstring curls", 2, "5", 90), like("Pallof press", 2, "10/side", 45)] },
+    { title: "Speed + Base Running", type: "agility", focus: "Game-speed starts and cuts. Full rest between reps — every rep should be your fastest.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 3, "20 yd", 45), like("Base-stealing starts (crossover)", 6, "15 yd", 75), like("Pro agility shuttle (5-10-5)", 5, "1", 90),
+        like("Drop-step sprints", 5, "20 yd", 60), like("Copenhagen plank", 2, "25 sec/side", 45), COOLDOWN] },
+    { title: "Arm Care + Mobility", type: "mobility", focus: "Your arm is ramping up for the season. Take care of it every week.",
+      exercises: [like("Warm-up + band arm care", 1, "10 min", 0), like("Face pulls", 3, "15", 45), like("Cable external rotation", 2, "12/arm", 30),
+        like("Thoracic open books", 2, "10/side", 15), like("90/90 hip switches", 2, "10", 30), like("Cross-body shoulder stretch", 2, "30 sec/side", 15)] },
+    { title: "Upper Power + Strength", type: "strength", focus: "Rotational power and pulling strength for bat speed and a healthy arm.",
+      exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Med ball rotational scoop toss", 4, "5/side", 60), like("Plyo push-ups", 3, "5", 60),
+        like("Dumbbell bench press", 4, "5", 120), like("Pull-ups", 4, "5", 120), like("Chest-supported row", 3, "8", 90), like("Landmine rotations", 3, "6/side", 60)] },
+    { title: "Speed Tune-Up", type: "agility", focus: "Short and sharp. Stay fresh for scrimmages.",
+      exercises: [WARMUP(10), like("Agility ladder drills", 4, "1 pattern", 30), like("Crossover sprint starts", 4, "10 yd", 60), like("Lateral shuffles", 3, "10 yd each way", 45), COOLDOWN] },
+    { title: "Scrimmage Prep: Mobility", type: "mobility", focus: "Loosen up before the weekend. Nothing hard.",
+      exercises: [like("Foam roll", 1, "8 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
+        like("Pigeon stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    REST_DAY
+  ],
+  home: [
+    { title: "Lower Power + Strength", type: "strength", focus: "Fewer reps, more speed. A loaded backpack makes it harder.",
+      exercises: [WARMUP(8), like("Broad jumps", 4, "3", 60), like("Jumping lunges", 3, "4/leg", 60), like("Single-leg RDL (backpack)", 3, "6/leg", 60),
+        like("Lateral skater bounds", 3, "4/side", 60), like("Nordic curls (feet under couch)", 2, "5", 90), like("Dead bugs", 2, "8/side", 45)] },
+    { title: "Speed + Base Running", type: "agility", focus: "Game-speed starts and cuts in the driveway or park. Rest fully between reps.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 3, "20 yd", 45), like("Crossover sprint starts", 6, "15 yd", 75), like("5-10-5 shuttle", 5, "1", 90),
+        like("Drop-step sprints", 5, "20 yd", 60), like("Copenhagen plank (couch)", 2, "25 sec/side", 45), COOLDOWN] },
+    { title: "Arm Care + Mobility", type: "mobility", focus: "Your arm is ramping up for the season. Take care of it every week.",
+      exercises: [like("Warm-up + arm circles", 1, "10 min", 0), like("Prone Y-T-W raises", 3, "8 each", 45), like("External rotation hold (doorway)", 2, "20 sec/arm", 30),
+        like("Wall slides", 2, "10", 30), like("Thoracic open books", 2, "10/side", 15), like("90/90 hip switches", 2, "10", 30)] },
+    { title: "Upper Power + Strength", type: "strength", focus: "Explosive pushing plus pulling strength for your swing and throw.",
+      exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("Plyo push-ups", 4, "5", 60), like("Pike push-ups", 3, "6", 60),
+        like("Table inverted rows", 4, "8", 75), like("Backpack bent-over rows", 3, "10", 60), like("Russian twists (backpack)", 3, "16", 45)] },
+    { title: "Speed Tune-Up", type: "agility", focus: "Short and sharp. Stay fresh for scrimmages.",
+      exercises: [WARMUP(10), like("Line hops", 3, "20 sec", 30), like("Crossover sprint starts", 4, "10 yd", 60), like("Lateral shuffles", 3, "10 yd each way", 45), COOLDOWN] },
+    { title: "Scrimmage Prep: Mobility", type: "mobility", focus: "Loosen up before the weekend. Nothing hard.",
+      exercises: [like("Ball rolling (tennis or lacrosse ball)", 1, "8 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
+        like("Pigeon stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    REST_DAY
+  ]
+};
+
 const PROGRAMS = {
   offseason: { name: "Off-season build", tag: "5 training days", plan: DEFAULT_PLAN,
-    about: "Build strength, power and speed when you're not playing games: 3 lifts, a speed day and a mobility day each week." },
+    about: "Late summer to winter, when you're not playing games: build strength, power and speed with 3 lifts, a speed day and a mobility day each week." },
+  preseason: { name: "Pre-season sharpen", tag: "Power + speed", plan: PRE_SEASON_PLAN,
+    about: "The last ~6 weeks before opening day: heavy but lower-rep lifting, more power and game-speed sprinting, and a steady arm-care ramp-up." },
   inseason: { name: "In-season maintain", tag: "2 lifts + speed", plan: IN_SEASON_PLAN,
     about: "Keep your strength and speed during the season without being sore for games: 2 short lifts, a speed tune-up, arm care and mobility. Move days around your game schedule." }
 };

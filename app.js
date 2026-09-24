@@ -3646,7 +3646,7 @@ function renderSettings() {
 
     <div class="section-title">Plan</div>
     <div class="set-list">
-      <button class="set-item as-btn" data-action="programs"><div class="grow"><div>Program: ${esc(program().name)}</div><div class="hint">Switch between off-season and in-season plans</div></div>${icon('plan')}</button>
+      <button class="set-item as-btn" data-action="programs"><div class="grow"><div>Program: ${esc(program().name)}</div><div class="hint">Off-season, pre-season or in-season plans</div></div>${icon('plan')}</button>
       <button class="set-item as-btn" data-action="resetPlan" data-mode="gym"><div class="grow"><div>Reset Gym plan</div><div class="hint">Back to the ${esc(program().name)} gym plan</div></div>${icon('refresh')}</button>
       <button class="set-item as-btn" data-action="resetPlan" data-mode="home"><div class="grow"><div>Reset Home plan</div><div class="hint">Back to the ${esc(program().name)} home plan</div></div>${icon('refresh')}</button>
     </div>
@@ -4196,7 +4196,7 @@ function whatsNew() {
     ${item('flame', 'Goals made for you', 'Calculate calories, protein and water from your size and training. Track water and body weight.')}
     ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 45 recipes, a game-day timeline, the week ahead and a shopping list.')}
     ${item('dumbbell', 'Smarter workouts', 'How-tos for every exercise, a library, swaps, next-weight tips, warm-up sets, a plate calculator and effort notes.')}
-    ${item('plan', 'In-season program', 'Switch programs on the Plan tab: two short lifts a week to stay strong during the season.')}
+    ${item('plan', 'In-season program', 'Plan tab → Programs: off-season, pre-season and in-season plans, including two short lifts a week to stay strong during the season.')}
     ${item('timer', 'Baseball tests, stats and arm care', 'Progress → Baseball: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
     ${item('trophy', 'Stay on track', 'Daily readiness check-in, a weekly review, a training calendar, badges and spreadsheet export.')}
     ${item('settings', 'Light mode', 'Settings → Appearance: a bright theme that is easier to read outside at the field.')}
@@ -4312,8 +4312,8 @@ const choice = (name, opts, cur) => `<div class="choice">${opts.map(([v, l]) => 
 actions.onboard = () => openSheet('Welcome to Dugout', `<form class="form" novalidate data-submit="onboard">
   <p class="text-2">Let's set up your training. You can change any of this later in Settings.</p>
   <div class="field"><span>Where will you train?</span>${choice('mode', [['gym', 'Gym'], ['home', 'Home (no equipment)']], S.settings.mode)}</div>
-  <div class="field"><span>What part of the year is it?</span>${choice('program', [['offseason', 'Off-season'], ['inseason', 'In-season']], S.settings.program)}
-    <small>Off-season builds strength and speed. In-season keeps them with 2 short lifts so you're fresh for games.</small></div>
+  <div class="field"><span>What part of the year is it?</span>${choice('program', [['offseason', 'Off-season'], ['preseason', 'Pre-season'], ['inseason', 'In-season']], S.settings.program)}
+    <small>Off-season builds strength and speed. Pre-season (about 6 weeks before games) sharpens power and speed. In-season keeps them with 2 short lifts so you're fresh for games.</small></div>
   <div class="form-grid">
     <label class="field"><span>Usual workout time</span><input name="time" type="time" value="${esc(S.settings.workoutTime)}"></label>
     <div class="field"><span>Weights in</span>${choice('unit', [['lb', 'lb'], ['kg', 'kg']], S.settings.unit)}</div>
