@@ -2446,9 +2446,9 @@ function buildMealPlan(mp) {
     const i = hashStr(mp.date + slot) + mp.seed + ((mp.swaps || {})[slot] || 0);
     let r = list[i % list.length];
     for (let k = 1; used.has(r.id) && k < list.length; k++) r = list[(i + k) % list.length];
-    used.add(r.id);
+    used.add(r && r.id);
     return { slot, r, servings: 1 };
-  });
+  }).filter(x => x.r);   // no recipes for a meal (e.g. meals.js didn't load) → leave it out
   const goal = S.settings.calGoal, total = () => sum(items, x => x.r.cal * x.servings);
   const order = [...items].sort((a, b) => GROW_ORDER.indexOf(a.slot) - GROW_ORDER.indexOf(b.slot));
   for (let grew = true; grew;) {
