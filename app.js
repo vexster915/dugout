@@ -1183,6 +1183,7 @@ function showSummary(w, prs) {
     ${prs.length ? `<div class="card stack-sm"><div class="card-title row">${icon('trophy')} New personal records</div>${prs.map(p => `<div class="small text-2">${esc(p)}</div>`).join('')}</div>` : ''}
     ${effortBlock(w)}
     <p class="text-2 small">Saved to your history on the Progress tab.</p>
+    <button class="btn btn-ghost btn-block" data-action="shareWorkout" data-id="${w.id}" data-external>${icon('share', 'sm')} Share this workout</button>
     <div class="sheet-actions">
       <button class="btn btn-ghost" data-action="quickLog">Log a meal</button>
       <button class="btn btn-primary" data-action="closeSheet">Done</button>
@@ -3207,7 +3208,8 @@ function testsCard() {
   }).join('');
   return `<section class="card stack">
     <div class="spread"><div class="card-title row">${icon('timer')} Baseball tests</div>
-      <button class="btn btn-sm btn-ghost" data-action="logTest">${icon('plus', 'sm')} Log</button></div>
+      <div class="row" style="gap:6px">${logsOf('test').length ? `<button class="btn btn-icon sm btn-ghost" data-action="shareTests" data-external aria-label="Share best marks">${icon('share', 'sm')}</button>` : ''}
+      <button class="btn btn-sm btn-ghost" data-action="logTest">${icon('plus', 'sm')} Log</button></div></div>
     ${rows || `<p class="hint">Track the numbers scouts and coaches look at — 60-yard dash, exit velo, throwing velo, pop time and more. Test every 4–6 weeks to see your training pay off.</p>`}
   </section>`;
 }
@@ -3371,7 +3373,8 @@ function gamesCard() {
   const tile = (label, v) => `<div class="stat"><b>${v}</b><small>${label}</small></div>`;
   return `<section class="card stack">
     <div class="spread"><div class="card-title row">${icon('trophy')} ${year} season</div>
-      <button class="btn btn-sm btn-ghost" data-action="logGame">${icon('plus', 'sm')} Log game</button></div>
+      <div class="row" style="gap:6px">${games.length ? `<button class="btn btn-icon sm btn-ghost" data-action="shareSeason" data-external aria-label="Share season stats">${icon('share', 'sm')}</button>` : ''}
+      <button class="btn btn-sm btn-ghost" data-action="logGame">${icon('plus', 'sm')} Log game</button></div></div>
     ${games.length ? `
       <div class="stats">${tile('AVG', avgText(st.avg))}${tile('OBP', avgText(st.obp))}${tile('SLG', avgText(st.slg))}${tile('OPS', st.obp == null ? '–' : avgText(st.obp + st.slg))}</div>
       <div class="small muted center">${st.games} game${st.games === 1 ? '' : 's'} · ${st.b.h}-for-${st.b.ab} · ${st.b.hr} HR · ${st.b.rbi} RBI · ${st.b.r} R · ${st.b.sb} SB · ${st.b.bb} BB · ${st.b.k} K</div>
@@ -3720,6 +3723,56 @@ actions.exportBackup = async () => {
   try { json = JSON.stringify(await DB.sealBackup(backupData())); }      // encrypted with your login
   catch (e) { toast('Backup failed: ' + (e.message || e)); return; }
   if (await shareFile(`dugout-backup-${ymd()}.json`, json, 'application/json', 'Dugout backup')) markBackedUp();
+};
+
+// ----- Share cards: turn your numbers into an image to send to a coach, parent or teammates -----
+async function shareCard(title, sub, stats) {
+  const lines = String(title).toUpperCase().match(/.{1,18}(\s|$)/g) || [String(title)];
+  const tilesTop = 250 + lines.length * 100 + 90, rows = Math.ceil(Math.min(stats.length, 8) / 2);
+  const W = 1080, H = Math.max(1350, tilesTop + rows * 220 + 140), c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d'), font = (w, px, it = '') => `${it} ${w} ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  const accent = (getComputedStyle(document.body).getPropertyValue('--accent') || '#ff7a1a').trim();
+  const box = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  g.fillStyle = '#07090d'; g.fillRect(0, 0, W, H);
+  const glow = g.createRadialGradient(W * 0.15, 0, 0, W * 0.15, 0, 900);
+  glow.addColorStop(0, accent + '66'); glow.addColorStop(1, '#07090d00');
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  g.fillStyle = accent; g.font = font(900, 40); g.fillText('DUGOUT', 80, 120);
+  g.fillStyle = '#f2f5f9'; g.font = font(900, 92, 'italic');
+  let y = 250;
+  for (const line of lines) { g.fillText(line.trim(), 80, y); y += 100; }
+  g.fillStyle = '#b4bfcd'; g.font = font(600, 40); g.fillText(sub, 80, y + 10);
+  stats.slice(0, 8).forEach(([label, value], i) => {
+    const x = 80 + (i % 2) * 470, top = tilesTop + Math.floor(i / 2) * 220;
+    g.fillStyle = '#10151d'; box(x, top, 440, 190, 28); g.fill();
+    g.fillStyle = '#f2f5f9'; g.font = font(900, value.length > 7 ? 60 : 78); g.fillText(value, x + 36, top + 105);
+    g.fillStyle = '#7d8a9c'; g.font = font(800, 28); g.fillText(label.toUpperCase(), x + 36, top + 155);
+  });
+  g.fillStyle = '#7d8a9c'; g.font = font(600, 30); g.fillText(fmtDate(new Date(), { month: 'long', day: 'numeric', year: 'numeric' }), 80, H - 70);
+  const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+  if (blob) await shareFile(`dugout-${ymd()}.png`, blob, 'image/png', title);
+}
+actions.shareSeason = () => {
+  const year = String(new Date().getFullYear()), st = seasonStats(logsOf('game').filter(g => g.date.startsWith(year)));
+  const stats = [['AVG', avgText(st.avg)], ['OBP', avgText(st.obp)], ['SLG', avgText(st.slg)], ['OPS', st.obp == null ? '–' : avgText(st.obp + st.slg)],
+    ['Home runs', String(st.b.hr)], ['RBI', String(st.b.rbi)]];
+  if (st.pitched) stats.push(['ERA', st.era == null ? '–' : st.era.toFixed(2)], ['Strikeouts', String(st.p.k)]);
+  else stats.push(['Stolen bases', String(st.b.sb)], ['Hits', String(st.b.h)]);
+  shareCard(`${year} season`, `${st.games} game${st.games === 1 ? '' : 's'} · ${st.b.h}-for-${st.b.ab}`, stats);
+};
+actions.shareTests = () => {
+  const stats = TESTS.map(t => { const b = bestOf(t, testLogs(t.id)); return b ? [t.name, testFmt(t, b.v)] : null; }).filter(Boolean);
+  if (!stats.length) { toast('Log a test first'); return; }
+  shareCard('My best marks', 'Baseball tests', stats);
+};
+actions.shareWorkout = el => {
+  const w = S.workouts.find(x => x.id === el.dataset.id);
+  if (!w) return;
+  const vol = volumeOf(w), stats = [['Time', fmtDur(w.finishedAt - w.startedAt)], ['Sets', String(setsDone(w))]];
+  if (vol) stats.push(['Volume', `${fmtK(vol)} ${S.settings.unit}`]);
+  if (w.rpe) stats.push(['Effort', `${w.rpe}/10`]);
+  shareCard(w.title, fmtDate(parseYmd(w.date), { weekday: 'long', month: 'long', day: 'numeric' }), stats);
 };
 
 // ----- Spreadsheets (CSV) for you or your coach — these are NOT encrypted -----
