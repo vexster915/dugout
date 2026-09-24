@@ -13,6 +13,9 @@
 
 const APP_VERSION = '1.3.0';
 
+// If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
+if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
+
 /* ============================== 1. HELPERS ============================== */
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -21,7 +24,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const uid = () => (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
 const clone = o => JSON.parse(JSON.stringify(o));
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const num = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+// Typed numbers: "1,200" → 1200 (thousands), "2,5" → 2.5 (decimal comma), "abc" → null
+const num = v => {
+  let s = String(v ?? '').trim().replace(/\s/g, '');
+  s = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+};
 const fmt = (n, d = 0) => n == null || !Number.isFinite(n) ? '–' : Number(n).toLocaleString('en-US', { maximumFractionDigits: d });
 const fmtK = n => Math.abs(n) >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : fmt(n);
 const pad = n => String(n).padStart(2, '0');
@@ -556,7 +565,7 @@ function backupBanner() {
   if (days != null && days < 7) return '';
   return `<div class="banner warn">${icon('shield')}
     <div class="grow">${days == null ? "You haven't backed up yet." : `Last backup: ${days} days ago.`} Save a copy so you never lose your data.</div>
-    <button class="btn btn-sm btn-primary" data-action="exportBackup">Back up</button>
+    <button class="btn btn-sm btn-primary" data-action="exportBackup" data-external>Back up</button>
   </div>`;
 }
 
@@ -964,7 +973,7 @@ function openVideo(ex) {
   } else if (link && !isSearchLink(link)) {
     top = `<div class="placeholder-box"><div class="bold">This link can't play inside the app</div>
       <div class="hint">Only YouTube links play here. You can still open it:</div>
-      <a class="btn btn-primary" href="${esc(link)}" target="_blank" rel="noopener">${icon('video', 'sm')} Open link</a></div>`;
+      <a class="btn btn-primary" href="${esc(link)}" target="_blank" rel="noopener" data-external>${icon('video', 'sm')} Open link</a></div>`;
   } else {
     top = `<div class="placeholder-box">
       <div class="bold">No video picked yet — this is a placeholder</div>
@@ -973,7 +982,7 @@ function openVideo(ex) {
         <li>Open a good one, then tap <b>Share → Copy link</b>.</li>
         <li>Come back here, tap <b>Paste</b>, then <b>Save link</b>.</li>
       </ol>
-      <a class="btn btn-primary" href="${esc(link || placeholderVideo(ex.name))}" target="_blank" rel="noopener">${icon('video', 'sm')} Find a video</a>
+      <a class="btn btn-primary" href="${esc(link || placeholderVideo(ex.name))}" target="_blank" rel="noopener" data-external>${icon('video', 'sm')} Find a video</a>
     </div>`;
   }
   openSheet(ex.name, `${top}
@@ -985,7 +994,7 @@ function openVideo(ex) {
         <button type="button" class="btn btn-ghost" data-action="pasteLink">${icon('copy', 'sm')} Paste</button>
         <button type="submit" class="btn btn-primary">Save link</button>
       </div>
-      ${info ? `<a class="btn-link center" href="${esc(link)}" target="_blank" rel="noopener">Open in YouTube</a>` : ''}
+      ${info ? `<a class="btn-link center" href="${esc(link)}" target="_blank" rel="noopener" data-external>Open in YouTube</a>` : ''}
     </form>`);
 }
 
@@ -1140,17 +1149,22 @@ async function keepAwake(on) {
 }
 
 // Auto-lock: if Dugout sat in the background longer than your Auto-lock setting, sign out.
-let hiddenAt = 0;
+// Opening the share sheet, the file picker or YouTube sends Dugout to the background for a
+// moment on purpose — don't lock for that (unless you stay away more than 10 minutes).
+let hiddenAt = 0, externalAt = 0;
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-external]')) externalAt = Date.now(); }, true);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
-  const away = hiddenAt ? Date.now() - hiddenAt : 0;
+  const wentAt = hiddenAt, away = hiddenAt ? Date.now() - hiddenAt : 0;
   hiddenAt = 0;
   if (S.locked) return;
-  if (away && away >= (S.settings.autoLock ?? 5) * 60000) { lockApp(); return; }
+  const onPurpose = externalAt && wentAt - externalAt < 5000 && away < 10 * 60000;
+  if (away && !onPurpose && away >= (S.settings.autoLock ?? 5) * 60000) { lockApp(); return; }
   if (S.active) keepAwake(true);
   try { if (audioCtx && audioCtx.state !== 'running') audioCtx.resume(); } catch (e) { /* ignore */ }
   timerTick();
-  if (S.plan && S.tab === 'today' && !S.active && !$('#sheet-root').classList.contains('open')) render();
+  const newDay = rollDay();
+  if (S.plan && (S.tab === 'today' || newDay) && !S.active && !$('#sheet-root').classList.contains('open')) render();
 });
 document.addEventListener('pointerdown', () => {
   try { if (audioCtx && audioCtx.state !== 'running') audioCtx.resume(); } catch (e) { /* ignore */ }
@@ -1451,16 +1465,23 @@ function openFoodSheet(meal = null) {
 actions.logFood = () => openFoodSheet();
 actions.editMeal = el => { const m = S.meals.find(x => x.id === el.dataset.id); if (m) openFoodSheet(m); };
 
-// Typing a food you've logged before fills in its calories and protein.
+// Typing a food you've logged before fills in its calories and protein. If you keep typing
+// and the name stops matching, the filled-in numbers are cleared (numbers you typed yourself stay).
 inputs.foodName = el => {
-  const f = el.form, key = normName(el.value);
-  if (!key || f.elements.cal.value) return;
-  const hit = S.foods.find(x => normName(x.name) === key)
-    || [...S.meals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).find(x => normName(x.name) === key);
-  if (!hit) return;
+  const f = el.form, { cal, pro } = f.elements, key = normName(el.value);
+  const auto = f.dataset.auto ? JSON.parse(f.dataset.auto) : null;
+  const untouched = !!auto && cal.value === auto.cal && pro.value === auto.pro;
+  if (cal.value && !untouched) return;
+  const hit = key && (S.foods.find(x => normName(x.name) === key)
+    || [...S.meals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).find(x => normName(x.name) === key));
+  if (!hit) {
+    if (untouched) { cal.value = ''; pro.value = ''; delete f.dataset.auto; }
+    return;
+  }
   const per = hit.servings && hit.servings !== 1 ? 1 / hit.servings : 1;
-  f.elements.cal.value = Math.round(hit.cal * per);
-  f.elements.pro.value = Math.round(hit.pro * per * 10) / 10;
+  cal.value = Math.round(hit.cal * per);
+  pro.value = Math.round(hit.pro * per * 10) / 10;
+  f.dataset.auto = JSON.stringify({ cal: cal.value, pro: pro.value });
 };
 
 submits.saveMeal = f => {
@@ -1709,7 +1730,7 @@ const hashStr = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.cha
 // Today's plan choices. Each day starts fresh: training or rest comes from today's workout in the Plan tab.
 function mealPlanToday() {
   const mp = S.settings.mealPlan;
-  if (mp && mp.date === ymd() && KIND_SLOTS[mp.kind]) return mp;
+  if (isObj(mp) && mp.date === ymd() && KIND_SLOTS[mp.kind] && Number.isFinite(mp.seed)) return { ...mp, swaps: isObj(mp.swaps) ? mp.swaps : {} };
   return { date: ymd(), kind: dayPlan(dayIdx()).type === 'rest' ? 'rest' : 'training', seed: 0, swaps: {} };
 }
 const saveMealPlan = mp => { S.settings.mealPlan = mp; saveSettings(); };
@@ -2235,8 +2256,8 @@ function renderSettings() {
         <div class="bold">${last}</div>
         <div class="hint">Everything is stored only on this phone. About once a week, tap Export and choose <b>Save to Files</b> (iCloud Drive) or email it to yourself. Backup files are encrypted — opening one needs your username and password. Import brings it all back, even on a new phone.</div>
       </div></div>
-      <button class="btn btn-primary btn-block" data-action="exportBackup">${icon('download', 'sm')} Export backup</button>
-      <label class="btn btn-ghost btn-block" for="import-file">${icon('upload', 'sm')} Import backup</label>
+      <button class="btn btn-primary btn-block" data-action="exportBackup" data-external>${icon('download', 'sm')} Export backup</button>
+      <label class="btn btn-ghost btn-block" for="import-file" data-external>${icon('upload', 'sm')} Import backup</label>
       <input class="vh" type="file" id="import-file" accept=".json,application/json,text/plain" data-change="importFile">
       <div class="hint center">${S.workouts.length} workouts · ${S.meals.length} food entries · ${S.foods.length} favorites saved</div>
     </div>
@@ -2437,24 +2458,85 @@ actions.eraseAll = async () => {
 
 /* ============================== 11. START-UP ============================== */
 
+// Keep "today" screens on today: after midnight, or when you unlock on a new day.
+// (Otherwise food logged the next morning would land on yesterday.)
+let shownDay = ymd();
+function rollDay(force = false) {
+  const today = ymd(), was = shownDay;
+  if (!force && today === was) return false;
+  shownDay = today;
+  if (force || S.dietDate === was) S.dietDate = today;
+  if (force || S.dietWeek === ymd(weekStart(parseYmd(was)))) S.dietWeek = ymd(weekStart());
+  if (force || S.planDay === dayIdx(parseYmd(was))) S.planDay = dayIdx();
+  return true;
+}
+
+// Data from an older version or a hand-edited backup can have missing or odd pieces.
+// These fill them in with safe defaults so the app never crashes on load.
+const isObj = o => !!o && typeof o === 'object' && !Array.isArray(o);
+function cleanSettings(st) {
+  const out = { ...DEFAULT_SETTINGS, ...(isObj(st) ? st : {}) };
+  for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) if (v !== null && typeof out[k] !== typeof v) out[k] = v;
+  if (!/^\d{2}:\d{2}$/.test(out.workoutTime)) out.workoutTime = DEFAULT_SETTINGS.workoutTime;
+  if (!MODES[out.mode]) out.mode = 'gym';
+  if (!['lb', 'kg'].includes(out.unit)) out.unit = 'lb';
+  out.calGoal = clamp(Math.round(out.calGoal) || DEFAULT_SETTINGS.calGoal, 500, 10000);
+  out.proteinGoal = clamp(Math.round(out.proteinGoal) || DEFAULT_SETTINGS.proteinGoal, 10, 500);
+  return out;
+}
+function cleanExerciseData(e) {
+  return {
+    ...e, id: e.id || uid(), name: String(e.name), sets: clamp(parseInt(e.sets, 10) || 1, 1, 20),
+    reps: String(e.reps ?? '10'), rest: clamp(parseInt(e.rest, 10) || 0, 0, 900), track: TRACKS[e.track] ? e.track : 'weight',
+    cues: String(e.cues || ''), video: typeof e.video === 'string' && e.video ? e.video : defaultVideo(e.name)
+  };
+}
+function cleanPlan(plan) {
+  if (!isObj(plan) || !['gym', 'home'].every(m => Array.isArray(plan[m]) && plan[m].length === 7)) return null;
+  const out = {};
+  for (const mode of ['gym', 'home']) {
+    out[mode] = plan[mode].map((d, i) => {
+      const day = isObj(d) ? d : {};
+      return {
+        ...day, title: String(day.title || DAYS[i]), type: TYPES[day.type] ? day.type : 'strength', focus: String(day.focus || ''),
+        exercises: (Array.isArray(day.exercises) ? day.exercises : []).filter(e => isObj(e) && e.name).map(cleanExerciseData)
+      };
+    });
+  }
+  return out;
+}
+const cleanWorkout = w => {
+  if (!isObj(w) || !w.id || !w.startedAt || !Array.isArray(w.exercises)) return null;
+  w.exercises = w.exercises.filter(e => isObj(e) && e.name && Array.isArray(e.sets));
+  w.exercises.forEach(e => { e.sets = e.sets.filter(isObj); if (!TRACKS[e.track]) e.track = 'weight'; });
+  if (!MODES[w.mode]) w.mode = 'gym';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(w.date)) w.date = ymd(new Date(w.startedAt));
+  w.title = String(w.title || 'Workout');
+  return w;
+};
+const cleanFood = f => (isObj(f) && f.id && f.name ? Object.assign(f, { name: String(f.name), cal: Number(f.cal) || 0, pro: Number(f.pro) || 0 }) : null);
+const cleanMeal = m => (cleanFood(m) && /^\d{4}-\d{2}-\d{2}$/.test(m.date) ? m : null);
+
 async function loadAll() {
   const [settings, plan, active, workouts, meals, foods] = await Promise.all([
     DB.get('settings'), DB.get('plan'), DB.get('active'), DB.all('workouts'), DB.all('meals'), DB.all('foods')
   ]);
-  S.settings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
-  if (plan && Array.isArray(plan.gym) && Array.isArray(plan.home) && plan.gym.length === 7 && plan.home.length === 7) {
-    S.plan = plan;
-    const all = [...plan.gym, ...plan.home].flatMap(d => d.exercises);
-    if (upgradeVideos(all)) await DB.set('plan', S.plan);          // placeholders → real tutorial videos
+  S.settings = cleanSettings(settings);
+  const cleanP = cleanPlan(plan);
+  if (cleanP) {
+    S.plan = cleanP;
+    const all = [...cleanP.gym, ...cleanP.home].flatMap(d => d.exercises);
+    upgradeVideos(all);                                   // placeholders → real tutorial videos
+    if (JSON.stringify(cleanP) !== JSON.stringify(plan)) await DB.set('plan', S.plan);
   } else {
     S.plan = buildPlan(DEFAULT_PLAN);
     await DB.set('plan', S.plan);
   }
-  S.active = active || null;
+  S.active = cleanWorkout(isObj(active) ? { id: 'active', ...active } : null);
   if (S.active && upgradeVideos(S.active.exercises)) await DB.set('active', S.active);
-  S.workouts = (workouts || []).filter(w => w && w.startedAt).sort((a, b) => b.startedAt - a.startedAt);
-  S.meals = meals || [];
-  S.foods = foods || [];
+  S.workouts = (workouts || []).map(cleanWorkout).filter(Boolean).sort((a, b) => b.startedAt - a.startedAt);
+  S.meals = (meals || []).map(cleanMeal).filter(Boolean);
+  S.foods = (foods || []).map(cleanFood).filter(Boolean);
   S.openEx = null;
   S.progEx = null;
   S.progMetric = null;
@@ -2478,15 +2560,19 @@ async function boot() {
   render({ keepScroll: false });       // shows "Sign in" (or "Create your login" the first time)
 
   // Every second: tick the workout clock. Every 30 s: refresh Today's countdown (and the date after midnight).
-  let ticks = 0, shownDay = ymd();
+  let ticks = 0, stale = false;
   setInterval(() => {
     if (S.locked) return;
     ticks++;
     if (S.active) {
       const c = $('#wo-clock');
       if (c) c.textContent = clock((Date.now() - S.active.startedAt) / 1000);
-    } else if (ticks % 30 === 0 && S.tab === 'today') {
-      if (shownDay !== ymd()) { shownDay = ymd(); render(); return; }
+    }
+    if (ticks % 30) return;
+    if (rollDay()) stale = true;
+    if (S.active || $('#sheet-root').classList.contains('open')) return;
+    if (stale) { stale = false; render(); return; }
+    if (S.tab === 'today') {
       const cd = $('.countdown');
       if (cd) { const html = countdown(false); if (html) cd.outerHTML = html; else cd.remove(); }
     }
@@ -2560,6 +2646,7 @@ async function openApp(newUsername) {
   await DB.encryptOldData();
   await loadAll();
   if (newUsername) { S.settings.username = newUsername; await DB.set('settings', S.settings); }
+  rollDay(true);
   S.locked = false;
   S.tab = 'today';
   render({ keepScroll: false });
