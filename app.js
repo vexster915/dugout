@@ -19,13 +19,14 @@
 
 'use strict';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
 if (typeof FOODS === 'undefined') self.FOODS = [];
 if (typeof EXERCISE_INFO === 'undefined') Object.assign(self, { EXERCISE_INFO: {}, EXERCISE_GROUPS: [] });
 if (typeof LIGHT_WORKOUT === 'undefined') self.LIGHT_WORKOUT = { gym: REST_DAY, home: REST_DAY };   // older plan.js
+if (typeof DRILLS === 'undefined') Object.assign(self, { DRILLS: [], DRILL_BY_ID: {}, DRILL_POSITIONS: [], SWING_FAULTS: {} });
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -193,7 +194,8 @@ const ICONS = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   drop: '<path d="M12 3.5c3 3.6 6 7 6 10.3a6 6 0 0 1-12 0C6 10.5 9 7.1 12 3.5z"/>',
-  scale: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0l-2.2 2.2"/>'
+  scale: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0l-2.2 2.2"/>',
+  baseball: '<circle cx="12" cy="12" r="9"/><path d="M6.3 5.2c1.9 1.8 3 4.2 3 6.8s-1.1 5-3 6.8M17.7 5.2c-1.9 1.8-3 4.2-3 6.8s1.1 5 3 6.8"/>'
 };
 const FILLED = new Set(['play', 'more']);
 const icon = (name, cls = '') => `<svg class="i ${FILLED.has(name) ? 'fill' : ''} ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -231,7 +233,11 @@ const DEFAULT_SETTINGS = {
   badges: null,           // badge ids already celebrated
   reviewSeen: '',         // week (Monday "YYYY-MM-DD") whose review card you closed
   seenVersion: '',        // last "What's new" shown
-  intensity: null         // today's Light / Moderate / Heavy pick: { date, level }
+  intensity: null,        // today's Light / Moderate / Heavy pick: { date, level }
+  drillPlan: [],          // drill ids you starred (or the Swing lab picked for you)
+  drillPlanFrom: '',      // date of the swing analysis that built the plan, if it did
+  drillVideos: {},        // drill id → a YouTube link you saved for it
+  bats: 'R'               // which side you hit from (Swing lab)
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -259,6 +265,11 @@ const S = {
   progView: 'lifts',   // Progress tab: lifts, body or baseball
   editCheckin: false,  // Today: daily check-in form open
   calMonth: null,      // Progress calendar month ("YYYY-MM"), null = this month
+  ballView: 'drills',  // Baseball tab: drills, swing (Swing lab) or stats
+  drillWho: 'solo',    // Drills: alone or with a partner
+  drillPos: 'all',     // Drills: position filter
+  drillQ: '',          // Drills: search text
+  swingOpen: null,     // Swing lab: the swing report being shown (id)
   histLimit: 15,
   openEx: null         // which exercise card is open during a workout (null = automatic)
 };
@@ -345,7 +356,7 @@ const actions = {}, inputs = {}, changes = {}, submits = {};
 let postRender = [];
 const later = fn => postRender.push(fn);
 
-const TABS = [['today', 'Today'], ['plan', 'Plan'], ['diet', 'Diet'], ['progress', 'Progress'], ['settings', 'Settings']];
+const TABS = [['today', 'Today'], ['plan', 'Plan'], ['baseball', 'Baseball'], ['diet', 'Diet'], ['progress', 'Progress'], ['settings', 'Settings']];
 
 function renderTabbar() {
   $('#tabbar').innerHTML = TABS.map(([id, label]) => `
@@ -366,7 +377,7 @@ function render({ keepScroll = true } = {}) {
   $('#tabbar').hidden = false;
   document.body.dataset.mode = S.active ? S.active.mode : S.settings.mode;
   const top = view.scrollTop;
-  const views = { today: renderToday, plan: renderPlan, diet: renderDiet, progress: renderProgress, settings: renderSettings };
+  const views = { today: renderToday, plan: renderPlan, baseball: renderBaseball, diet: renderDiet, progress: renderProgress, settings: renderSettings };
   view.innerHTML = views[S.tab]();
   view.scrollTop = keepScroll ? top : 0;
   renderTabbar();
@@ -844,14 +855,17 @@ function renderWorkout() {
     <div class="wo-head">
       <div class="spread">
         <div class="grow">
-          <div class="row" style="gap:10px">
+          <div class="row wo-meta">
             <span class="badge solid">${icon(m.icon)} ${m.label}</span>
             <span class="wo-clock" id="wo-clock">${clock((Date.now() - a.startedAt) / 1000)}</span>
             <span class="wo-clock" id="wo-count">${done}/${total} sets</span>
           </div>
           <div class="wo-title" style="margin-top:6px">${esc(a.title)}${levelTag(a)}</div>
         </div>
-        <button class="btn btn-icon btn-ghost" data-action="workoutMenu" aria-label="Workout options">${icon('more')}</button>
+        <div class="row wo-head-btns">
+          <button class="btn btn-sm btn-ghost" data-action="exitWorkout">${icon('x', 'sm')} End</button>
+          <button class="btn btn-icon btn-ghost" data-action="workoutMenu" aria-label="Workout options">${icon('more')}</button>
+        </div>
       </div>
       <div class="wo-bar"><span id="wo-bar" style="width:${total ? (done / total) * 100 : 0}%"></span></div>
     </div>
@@ -863,6 +877,7 @@ function renderWorkout() {
       ${a.exercises.map((e, i) => woExercise(e, i, i === open)).join('')}
       <button class="btn btn-ghost btn-block" data-action="addWorkoutExercise">${icon('plus')} Add exercise</button>
       <button class="btn btn-primary btn-xl" data-action="finishWorkout">${icon('check')} Finish workout</button>
+      <button class="btn-link center" data-action="exitWorkout">End early or cancel</button>
     </div>`;
 }
 
@@ -1145,7 +1160,7 @@ actions.workoutMenu = () => openSheet('Workout options', `<div class="stack">
   <div class="field"><span>Quick timer</span>
     <div class="chips">${[30, 45, 60, 90, 120, 180].map(s => `<button class="chip" data-action="customTimer" data-s="${s}">${restLabel(s)}</button>`).join('')}</div>
   </div>
-  <button class="btn btn-danger btn-block" data-action="discardWorkout">${icon('trash', 'sm')} Discard workout</button>
+  <button class="btn btn-ghost btn-block" data-action="exitWorkout">${icon('x', 'sm')} End early or cancel</button>
 </div>`);
 actions.customTimer = el => { closeSheet(); unlockAudio(); startTimer(+el.dataset.s, 'Timer'); };
 
@@ -1174,22 +1189,40 @@ const lowerIsBetter = e => e.track === 'time' && repSeconds(e.reps) == null;   /
 const volumeOf = w => sum(w.exercises.filter(e => e.track === 'weight'), e => sum(e.sets.filter(s => s.done), s => (s.w || 0) * (s.r || 0)));
 const setsDone = w => sum(w.exercises, e => e.sets.filter(s => s.done).length);
 
-actions.finishWorkout = async () => {
+actions.finishWorkout = () => {
   if (!S.active) return;
   const { total, done } = workoutProgress();
-  if (done === 0) {
-    if (await confirmBox('Nothing checked off', "You haven't checked off any sets. Discard this workout?", { ok: 'Discard', danger: true })) endWorkout(false);
-    return;
-  }
-  if (done < total) {
-    const left = total - done;
-    if (!(await confirmBox('Finish workout?', `${left} set${left === 1 ? ' is' : 's are'} not checked off. They'll be saved as skipped.`, { ok: 'Finish' }))) return;
-  } else closeSheet();
+  if (done < total) { actions.exitWorkout(); return; }       // sets left: same choices as the End button
+  closeSheet();
   endWorkout(true);
 };
-actions.discardWorkout = async () => {
-  if (await confirmBox('Discard workout?', 'Everything logged in this workout will be deleted.', { ok: 'Discard', danger: true })) endWorkout(false);
+// ----- Stop early: keep what you did, or cancel the whole workout (with Undo) -----
+actions.exitWorkout = () => {
+  if (!S.active) return;
+  const { total, done } = workoutProgress(), left = total - done, took = fmtDur(Date.now() - S.active.startedAt);
+  const s = n => (n === 1 ? '' : 's');
+  openSheet(!done ? 'Cancel this workout?' : left ? 'End workout early?' : 'Finish workout?', `<div class="stack">
+    <p class="text-2">${done ? `You've done <b>${done} of ${total} set${s(total)}</b> in ${took}.` : `You haven't checked off any sets yet (${took}).`}</p>
+    ${done ? `<div class="stack-sm">
+      <button class="btn btn-primary btn-block" data-action="endEarly">${icon('check', 'sm')} ${left ? 'Save and end now' : 'Finish and save'}</button>
+      <p class="hint">${left ? `Keeps the ${done} set${s(done)} you checked off, and the other ${left} ${left === 1 ? 'is' : 'are'} marked as skipped.` : 'Every set is done.'} It goes into your history and progress charts.</p>
+    </div>` : ''}
+    <div class="stack-sm">
+      <button class="btn btn-danger btn-block" data-action="cancelWorkout">${icon('trash', 'sm')} Cancel workout</button>
+      <p class="hint">Nothing from this workout is saved. You can undo it right after.</p>
+    </div>
+    <button class="btn btn-ghost btn-block" data-action="closeSheet">Keep going</button>
+  </div>`);
 };
+actions.endEarly = () => { if (!S.active) return; closeSheet(); endWorkout(true); };
+actions.cancelWorkout = () => { if (!S.active) return; closeSheet(); endWorkout(false); };
+// Undo a cancel: the workout comes back exactly as it was.
+function resumeWorkout(a) {
+  if (S.active) { toast('Another workout is already going'); return; }
+  S.active = a; S.openEx = null; S.tab = 'today';
+  saveActive(); render({ keepScroll: false }); keepAwake(true);
+  toast('Workout back — keep going');
+}
 
 async function endWorkout(keep) {
   const a = S.active;
@@ -1201,6 +1234,7 @@ async function endWorkout(keep) {
   let prs = [];
   if (keep) {
     a.finishedAt = Date.now();
+    a.early = a.exercises.some(e => e.sets.some(st => !st.done));   // stopped before every set was done
     // Forgot to tap Finish? End the workout a minute after your last checked set instead of now.
     if (a.lastAt && a.finishedAt - a.lastAt > 3 * 3600000) a.finishedAt = a.lastAt + 60000;
     prs = findPRs(a);
@@ -1209,7 +1243,8 @@ async function endWorkout(keep) {
   }
   await saveActive();
   render({ keepScroll: false });
-  if (keep) showSummary(a, prs); else toast('Workout discarded');
+  if (keep) showSummary(a, prs);
+  else toast('Workout canceled — nothing saved', { action: () => resumeWorkout(a), label: 'Undo' });
 }
 
 // New bests compared with every earlier workout in the same mode.
@@ -1240,8 +1275,9 @@ function findPRs(w) {
 }
 
 function showSummary(w, prs) {
-  const vol = volumeOf(w);
-  openSheet('Workout complete', `
+  const vol = volumeOf(w), total = sum(w.exercises, e => e.sets.length);
+  openSheet(w.early ? 'Workout saved' : 'Workout complete', `
+    ${w.early ? `<p class="text-2 small">Ended early: ${setsDone(w)} of ${total} sets done. Good call if your body needed it.</p>` : ''}
     <div class="tiles">
       <div class="tile"><div class="tile-label">Time</div><div class="tile-value">${fmtDur(w.finishedAt - w.startedAt)}</div></div>
       <div class="tile"><div class="tile-label">Sets done</div><div class="tile-value">${setsDone(w)}</div></div>
@@ -2901,7 +2937,7 @@ function weekStreak(ws) {
   return n;
 }
 
-const PROG_VIEWS = [['lifts', 'Lifts'], ['body', 'Body'], ['baseball', 'Baseball']];
+const PROG_VIEWS = [['lifts', 'Lifts'], ['body', 'Body']];
 actions.progView = el => { S.progView = el.dataset.v; render({ keepScroll: false }); };
 function recoveryCard() {
   const list = logsOf('checkin'), today = checkinOf(ymd());
@@ -2931,7 +2967,6 @@ function renderProgress() {
   const head = `<div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
     <div class="seg" role="group" aria-label="What to show">${PROG_VIEWS.map(([k, l]) => `<button class="${S.progView === k ? 'on' : ''}" data-action="progView" data-v="${k}" aria-pressed="${S.progView === k}">${l}</button>`).join('')}</div>`;
   if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${recoveryCard()}${goalsCard()}</div>`;
-  if (S.progView === 'baseball') return `<div class="page">${head}${toolsCard()}${gamesCard()}${skillsCard()}${testsCard()}${armCard()}${throwCard()}</div>`;
   const mode = S.settings.mode, m = MODES[mode];
   const ws = S.workouts.filter(w => w.mode === mode);
   const weekKey = ymd(weekStart()), monthKey = ymd().slice(0, 7);
@@ -3202,7 +3237,7 @@ function historyList(ws) {
   return `<div class="stack">${shown.map(w => {
     const vol = volumeOf(w);
     return `<button class="hist" data-action="showWorkout" data-id="${w.id}">
-      <div><div class="hist-title">${esc(w.title)}${levelTag(w)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.rpe ? ` · effort ${w.rpe}/10` : ''}${w.notes ? ' · notes' : ''}</div></div>
+      <div><div class="hist-title">${esc(w.title)}${levelTag(w)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.early ? ' · ended early' : ''}${w.rpe ? ` · effort ${w.rpe}/10` : ''}${w.notes ? ' · notes' : ''}</div></div>
       <div class="hist-right">${setsDone(w)} sets<small>${vol ? `${fmtK(vol)} ${S.settings.unit}` : ''}</small></div>
     </button>`;
   }).join('')}</div>
@@ -3220,6 +3255,7 @@ actions.showWorkout = el => {
       <span class="badge">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
       <span class="badge">${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}</span>
       ${isEasy(w) ? `<span class="badge">${LEVELS[w.intensity].label} day</span>` : ''}
+      ${w.early ? '<span class="badge">Ended early</span>' : ''}
       ${vol ? `<span class="badge">${fmtK(vol)} ${S.settings.unit}</span>` : ''}
     </div>
     <div>${w.exercises.map(e => `<div class="detail-ex">
@@ -3520,7 +3556,8 @@ actions.deleteGame = async el => {
 
 // ----- Skills practice: hitting and fielding reps -----
 const SKILLS = [['tee', 'Tee work', 'swings'], ['toss', 'Front / soft toss', 'swings'], ['cage', 'Cage or machine', 'swings'], ['bp', 'Live BP', 'swings'],
-  ['ground', 'Ground balls', 'fielding'], ['fly', 'Fly balls', 'fielding'], ['bunt', 'Bunting', 'swings'], ['bases', 'Base running', 'running'], ['catcher', 'Catching / blocking', 'fielding']];
+  ['ground', 'Ground balls', 'fielding'], ['fly', 'Fly balls', 'fielding'], ['bunt', 'Bunting', 'swings'], ['bases', 'Base running', 'running'], ['catcher', 'Catching / blocking', 'fielding'],
+  ['pdrill', 'Pitching drills', 'throwing'], ['tdrill', 'Throwing drills', 'throwing']];
 const SKILL = Object.fromEntries(SKILLS.map(([k, l, g]) => [k, { l, g }]));
 const skillText = l => `${(SKILL[l.type] || { l: 'Practice' }).l}${l.reps ? ` · ${fmt(l.reps)} ${SKILL[l.type] && SKILL[l.type].g === 'swings' ? 'swings' : 'reps'}` : ''}${l.min ? ` · ${fmt(l.min)} min` : ''}`;
 function skillsCard() {
@@ -3539,18 +3576,18 @@ function skillsCard() {
       : '<p class="hint">Log tee work, cage sessions, ground balls and more. Quality reps with a purpose beat mindless volume — pick one thing to work on each session.</p>'}
   </section>`;
 }
-actions.logSkill = () => openSheet('Log practice', `<form class="form" novalidate data-submit="saveSkill">
-  <label class="field"><span>What did you work on?</span><select name="type">${SKILLS.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></label>
+actions.logSkill = el => { const pre = (el && el.dataset) || {}; openSheet('Log practice', `<form class="form" novalidate data-submit="saveSkill">
+  <label class="field"><span>What did you work on?</span><select name="type">${SKILLS.map(([k, l]) => `<option value="${k}" ${k === pre.type ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
   <div class="form-grid">
     <label class="field"><span>Swings / reps</span><input name="reps" inputmode="numeric" autocomplete="off" placeholder="e.g. 75"></label>
     <label class="field"><span>Minutes</span><input name="min" inputmode="numeric" autocomplete="off" placeholder="optional"></label>
   </div>
   <div class="form-grid">
     <label class="field"><span>Date</span><input name="date" type="date" value="${ymd()}" max="${ymd()}"></label>
-    <label class="field"><span>Focus / notes</span><input name="note" maxlength="120" autocomplete="off" placeholder="e.g. stay through the ball"></label>
+    <label class="field"><span>Focus / notes</span><input name="note" maxlength="120" autocomplete="off" placeholder="e.g. stay through the ball" value="${esc(pre.note || '')}"></label>
   </div>
   <button class="btn btn-primary btn-block" type="submit">Save</button>
-</form>`);
+</form>`); };
 submits.saveSkill = f => {
   const d = formData(f), reps = Math.round(num(d.reps) || 0), min = Math.round(num(d.min) || 0);
   if (!reps && !min) { toast('Enter your swings/reps or minutes'); return; }
@@ -3668,6 +3705,684 @@ function toolsCard() {
     </div>
   </section>`;
 }
+
+/* ============================== 9c. BASEBALL TAB + DRILLS ============================== */
+
+const BALL_VIEWS = [['drills', 'Drills'], ['swing', 'Swing lab'], ['stats', 'Games & arm']];
+function renderBaseball() {
+  const v = BALL_VIEWS.some(([k]) => k === S.ballView) ? S.ballView : 'drills';
+  const body = v === 'swing' ? swingView() : v === 'stats' ? toolsCard() + gamesCard() + skillsCard() + testsCard() + armCard() + throwCard() : drillsView();
+  return `<div class="page">
+    <div class="page-head"><div><div class="eyebrow">Skills, drills and games</div><h1 class="page-title">Baseball</h1></div></div>
+    <div class="seg" role="group" aria-label="Baseball sections">${BALL_VIEWS.map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-action="ballView" data-v="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div>
+    ${body}
+  </div>`;
+}
+actions.ballView = el => { S.ballView = el.dataset.v; S.swingOpen = null; render({ keepScroll: false }); };
+
+// ----- Drills: alone or with a partner, for every position (drills.js) -----
+const POS_LABEL = Object.fromEntries(DRILL_POSITIONS);
+const drillPosText = d => (d.pos.length > 2 ? 'Every infielder' : d.pos.map(p => POS_LABEL[p] || p).join(', '));
+const drillGroup = d => (d.pos.length > 1 ? 'infield' : d.pos[0]);
+const DRILL_GROUPS = [['hitting', 'Hitting'], ['pitching', 'Pitching'], ['catcher', 'Catcher'], ['infield', 'Infield (every position)'], ['first', 'First base'],
+  ['middle', 'Second base / shortstop'], ['third', 'Third base'], ['outfield', 'Outfield'], ['throwing', 'Throwing (everyone)'], ['running', 'Base running']];
+const inDrillPlan = id => S.settings.drillPlan.includes(id);
+function drillMatches(d, q) {
+  if (!q) return true;
+  const hay = normName([d.n, d.why, d.gear, drillPosText(d), ...d.steps, ...d.cues, ...d.fixes.map(f => (SWING_FAULTS[f] || {}).name || '')].join(' '));
+  return q.split(' ').every(w => hay.includes(w));
+}
+const drillRow = d => `<button class="lib-row" data-action="openDrill" data-id="${d.id}">
+  <span class="grow"><b>${esc(d.n)}</b><small>${esc(drillPosText(d))} · ${esc(d.dose)}</small></span>
+  ${inDrillPlan(d.id) ? `<span class="plan-star" title="In your plan">${icon('star', 'sm')}</span>` : ''}${icon('right', 'sm')}</button>`;
+function drillList() {
+  const who = S.drillWho === 'partner' ? 'partner' : 'solo', pos = S.drillPos || 'all', q = normName(S.drillQ);
+  const list = DRILLS.filter(d => d.who === who && (pos === 'all' || d.pos.includes(pos)) && drillMatches(d, q));
+  if (!list.length) return `<div class="empty">No ${who === 'solo' ? 'solo' : 'partner'} drills match. Try the other tab or clear the search.</div>`;
+  if (pos !== 'all' || q) return list.map(drillRow).join('');
+  return DRILL_GROUPS.map(([g, label]) => { const l = list.filter(d => drillGroup(d) === g); return l.length ? `<div class="section-title">${esc(label)}</div>${l.map(drillRow).join('')}` : ''; }).join('');
+}
+function drillsView() {
+  const who = S.drillWho === 'partner' ? 'partner' : 'solo', pos = S.drillPos || 'all';
+  const count = w => DRILLS.filter(d => d.who === w && (pos === 'all' || d.pos.includes(pos))).length;
+  const plan = S.settings.drillPlan.map(id => DRILL_BY_ID[id]).filter(Boolean);
+  const chip = (k, label) => `<button class="chip ${pos === k ? 'on' : ''}" data-action="drillPos" data-k="${k}" aria-pressed="${pos === k}">${esc(label)}</button>`;
+  return `${plan.length ? `<section class="card stack-sm">
+      <div class="spread"><div class="card-title row">${icon('star')} My drill plan</div><button class="btn-link" data-action="clearDrillPlan">Clear</button></div>
+      ${S.settings.drillPlanFrom ? `<p class="hint">Picked for you by your swing analysis on ${shortDate(S.settings.drillPlanFrom)}. Do them 3 times a week.</p>` : '<p class="hint">Drills you starred. Tap one to see how to do it.</p>'}
+      <div>${plan.map(drillRow).join('')}</div>
+    </section>` : ''}
+    <div class="seg" role="group" aria-label="Drills alone or with a partner">
+      <button class="${who === 'solo' ? 'on' : ''}" data-action="drillWho" data-k="solo" aria-pressed="${who === 'solo'}">Alone <small class="seg-count">${count('solo')}</small></button>
+      <button class="${who === 'partner' ? 'on' : ''}" data-action="drillWho" data-k="partner" aria-pressed="${who === 'partner'}">With a partner <small class="seg-count">${count('partner')}</small></button>
+    </div>
+    <div class="chip-row">${chip('all', 'All positions')}${DRILL_POSITIONS.map(([k, l]) => chip(k, l)).join('')}</div>
+    <label class="field"><span>Search drills</span><input data-input="drillSearch" value="${esc(S.drillQ)}" placeholder="e.g. casting, backhand, bunt" autocomplete="off" autocorrect="off"></label>
+    <p class="hint">${who === 'solo' ? 'Drills you can do by yourself with a tee, a net, a wall or a fence.' : 'Drills with a coach, parent or teammate tossing, throwing or hitting to you.'}</p>
+    <div id="drill-list">${drillList()}</div>`;
+}
+actions.drillWho = el => { S.drillWho = el.dataset.k === 'partner' ? 'partner' : 'solo'; render(); };
+actions.drillPos = el => { S.drillPos = el.dataset.k; render(); };
+inputs.drillSearch = el => { S.drillQ = el.value; const box = $('#drill-list'); if (box) box.innerHTML = drillList(); };
+actions.clearDrillPlan = () => { S.settings.drillPlan = []; S.settings.drillPlanFrom = ''; saveSettings(); render(); toast('Drill plan cleared'); };
+
+actions.openDrill = el => openDrill(DRILL_BY_ID[el.dataset.id]);
+function openDrill(d) {
+  if (!d) return;
+  const saved = S.settings.drillVideos[d.id], info = saved ? ytInfo(saved) : null, list = (tag, items) => `<${tag} class="steps">${items.map(x => `<li>${esc(x)}</li>`).join('')}</${tag}>`;
+  openSheet(d.n, `
+    <div class="row wrap" style="gap:6px"><span class="badge accent">${d.who === 'solo' ? 'Alone' : 'With a partner'}</span><span class="badge">${esc(drillPosText(d))}</span></div>
+    ${info ? videoEmbed(info, d.n) : ''}
+    <p class="text-2">${esc(d.why)}</p>
+    <div class="grid2">
+      <div class="tile"><div class="tile-label">You need</div><div class="small">${esc(d.gear)}</div></div>
+      <div class="tile"><div class="tile-label">How much</div><div class="small">${esc(d.dose)}</div></div>
+    </div>
+    <div class="section-title">How to do it</div>${list('ol', d.steps)}
+    <div class="section-title">Coaching points</div>${list('ul', d.cues)}
+    <div class="section-title">Watch out for</div>${list('ul', d.avoid)}
+    <div class="tile"><div class="tile-label">Make it harder</div><div class="small">${esc(d.harder)}</div></div>
+    ${d.fixes.length ? `<p class="small text-2"><b>Helps fix:</b> ${esc(d.fixes.map(f => ((SWING_FAULTS[f] || {}).name || f).toLowerCase()).join(', '))}</p>` : ''}
+    <div class="grid2">
+      <button class="btn btn-primary" data-action="logDrill" data-id="${d.id}">${icon('check', 'sm')} Log it</button>
+      <button class="btn btn-ghost" data-action="toggleDrillPlan" data-id="${d.id}" aria-pressed="${inDrillPlan(d.id)}">${icon('star', 'sm')} ${inDrillPlan(d.id) ? 'In my plan' : 'Add to plan'}</button>
+    </div>
+    <a class="btn btn-ghost btn-block" href="${esc(ytSearch(d.yt))}" target="_blank" rel="noopener" data-external>${icon('video', 'sm')} ${info ? 'Find a different demo video' : 'Find a demo video on YouTube'}</a>
+    <details class="table-toggle"><summary>${info ? 'Change the saved video' : 'Save a video link to this drill'}</summary>
+      <form class="form" novalidate data-submit="saveDrillVideo" data-id="${d.id}">
+        <label class="field"><span>YouTube link</span><input name="video" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://youtu.be/…" value="${esc(saved || '')}"></label>
+        <div class="sheet-actions">
+          <button type="button" class="btn btn-ghost" data-action="pasteLink">${icon('copy', 'sm')} Paste</button>
+          <button type="submit" class="btn btn-primary">${saved ? 'Save' : 'Save link'}</button>
+        </div>
+        <p class="hint">Find a demo you like, tap Share → Copy link, then paste it here. It plays right here next time. Leave it empty and save to remove it.</p>
+      </form>
+    </details>`);
+}
+actions.toggleDrillPlan = el => {
+  const id = el.dataset.id, on = inDrillPlan(id);
+  S.settings.drillPlan = on ? S.settings.drillPlan.filter(x => x !== id) : [...S.settings.drillPlan, id];
+  saveSettings(); render(); openDrill(DRILL_BY_ID[id]);
+  toast(on ? 'Removed from your plan' : 'Added to your drill plan');
+};
+submits.saveDrillVideo = f => {
+  const id = f.dataset.id, url = normUrl(formData(f).video);
+  if (url && !safeUrl(url)) { toast('Paste a full link that starts with https://'); return; }
+  if (url) S.settings.drillVideos[id] = url; else delete S.settings.drillVideos[id];
+  saveSettings(); openDrill(DRILL_BY_ID[id]);
+  toast(url ? (ytInfo(url) ? 'Video saved — it plays right here' : 'Link saved') : 'Video removed');
+};
+// "Log it" adds the drill to your practice log.
+const drillLogType = d => d.pos.includes('hitting') ? ({ bunting: 'bunt', 'live-timing': 'bp' }[d.id] || (d.who === 'solo' ? 'tee' : 'toss'))
+  : d.pos.includes('catcher') ? 'catcher' : d.pos.includes('outfield') ? 'fly' : d.pos.includes('running') ? 'bases'
+  : d.pos.includes('pitching') ? 'pdrill' : d.pos.includes('throwing') ? 'tdrill' : 'ground';
+actions.logDrill = el => { const d = DRILL_BY_ID[el.dataset.id]; if (d) actions.logSkill({ dataset: { type: drillLogType(d), note: d.n } }); };
+
+/* ============================== 9d. SWING LAB ============================== */
+// Film a swing → swing.js tracks your body on the phone and measures the swing → a report with your priorities,
+// drills, pictures of your key positions, charts and a replay. Reports are saved as "swing" entries in the tracking
+// log (encrypted like everything else). The video itself is never saved or uploaded.
+
+const SW_VIEWS = [['auto', 'Auto'], ['side', 'Side'], ['front', 'Front'], ['back', 'Back']];
+const SW_VIEW_TEXT = { side: 'from the side', front: 'from the front', back: 'from behind' };
+const SW_VIEW_SHORT = { side: 'Side view', front: 'Front view', back: 'Back view' };
+const SW_SPEEDS = [['auto', 'Auto'], ['1', 'Normal'], ['4', '4× slow'], ['8', '8× slow']];
+const SW_KEYS = [['setup', 'Stance'], ['load', 'Load'], ['footPlant', 'Foot down'], ['contact', 'Contact'], ['finish', 'Finish']];
+const SW_STATUS = { good: 'Great', ok: 'OK', work: 'Work on it', check: 'Other angle', info: '', na: '–' };
+const SW_SEV = { 3: 'Big', 2: 'Medium', 1: 'Small' };
+const SW_REL = { high: 'very reliable', med: 'fairly reliable', low: 'hard to see' };
+const SW_HELP = {
+  stance_width: 'How far apart your feet are in your stance, compared with your shoulders.',
+  knee_setup: 'How bent your knees are while you wait for the pitch (180° = straight). An athletic stance has some bend.',
+  hinge_setup: 'How far your chest tilts forward over the plate in your stance.',
+  load_hands: 'How far your hands move back toward the catcher as you load.',
+  coil: 'How much your front shoulder turns in toward the plate during your load.',
+  stride_len: 'How far your front foot travels toward the pitcher. The target is based on your height.',
+  stride_dir: 'Whether your stride goes straight at the pitcher (0°), opens away from the plate (+) or closes toward it (−).',
+  weight_fp: 'Where your hips are between your feet when your front foot lands: 0% = over your back foot, 100% = over your front foot.',
+  sep_fp: 'How far your hips have turned ahead of your shoulders when your front foot lands — the stretch that stores power.',
+  sep_max: 'The most your hips get ahead of your shoulders at any point in the swing.',
+  early_open: 'How far your shoulders have already turned toward the pitcher when your front foot lands (below 0 = still closed, which is good).',
+  sequence: 'The order your body fires. Hips should reach top turning speed first, then shoulders, then hands.',
+  speed_gain: 'How much faster your shoulders turn than your hips — a sign energy is passing up your body.',
+  hip_open_contact: 'How far your hips have turned toward the pitcher at contact.',
+  hip_speed: 'Your hips\' top turning speed.',
+  sh_speed: 'Your shoulders\' top turning speed.',
+  head_drift: 'How far your head moves toward the pitcher from your stance to contact. A still head sees the ball better.',
+  head_drop: 'How much your head (your eye level) rises or drops from your stance to contact.',
+  head_lateral: 'How far your head moves toward or away from the plate from your stance to contact.',
+  posture_change: 'How much your spine tilt changes from your stance to contact. Standing up (−) is "pulling off".',
+  tilt_contact: 'How much lower your back shoulder is than your front shoulder at contact. Some tilt is normal and matches pitch height.',
+  front_block: 'How much your front knee straightens from foot plant to contact. A firm front side stops your forward move and turns it into rotation.',
+  lead_knee_contact: 'Your front knee angle at contact (180° = straight).',
+  back_collapse: 'How much your hips drop between foot plant and contact.',
+  hands_close: 'How far your hands are from your body 60% of the way to contact, compared with when the swing started (1.0 = same distance).',
+  back_elbow_mid: 'Your back elbow angle halfway to contact. It should stay bent and tucked near your side (the "slot").',
+  extension: 'How straight your arms get just after contact.',
+  swing_time: 'Time from when your hands start forward to contact. Quicker means you can wait longer to decide.',
+  hand_speed: 'Rough top speed of your hands (not the bat head).',
+  finish_balance: 'Where your head is over your feet at the finish (0 = centered). Bigger numbers mean falling forward or back.',
+  back_foot_step: 'How far your back foot moves after contact to catch your balance.'
+};
+// Your height (from the goal calculator) makes stride and speed measurements more accurate.
+const profileHeightIn = () => {
+  const p = S.settings.profile;
+  if (!p) return null;
+  const h = S.settings.unit === 'kg' ? (p.cm ? p.cm / 2.54 : null) : (p.ft ? p.ft * 12 + (p.inch || 0) : null);
+  return h && h >= 48 && h <= 90 ? Math.round(h) : null;
+};
+const swingById = id => S.logs.find(l => l.kind === 'swing' && l.id === id) || null;
+const swViewText = r => (SW_VIEW_TEXT[r.view] || '') + (r.viewAuto ? ' (auto)' : '');
+const swScoreWord = s => (s >= 90 ? 'Excellent' : s >= 80 ? 'Very good' : s >= 70 ? 'Solid' : s >= 60 ? 'Developing' : 'Needs work');
+const swTone = s => (s >= 85 ? 'good' : s >= 65 ? 'ok' : 'work');
+const swFaultName = id => (SWING_FAULTS[id] || {}).name || id;
+function swVal(m) {
+  const v = m.value;
+  if (v == null || (typeof v === 'number' && !Number.isFinite(v))) return '–';
+  if (m.key === 'sequence') return `${Math.round(v.hipToSh)} ms`;
+  const u = m.unit;
+  if (u === '°') return `${Math.round(v)}°`;
+  if (u === '°/s') return `${fmt(v)}°/s`;
+  if (u === 'ms') return `${Math.round(v)} ms`;
+  if (u === 'mph') return `${fmt(v, 1)} mph`;
+  if (u === 'in') return `${fmt(v, 1)} in`;
+  if (u === '% forward') return `${Math.round(v)}%`;
+  return `${fmt(v, 2)}×`;
+}
+function swTarget(m) {
+  if (m.key === 'sequence') return 'Target: hips peak 5–130 ms before the shoulders';
+  if (!m.target) return '';
+  const [a, b] = m.target[0], u = m.unit;
+  const f = x => swVal({ ...m, key: '', value: x, unit: u });
+  if (['hands_close', 'back_collapse', 'back_foot_step', 'stride_len', 'back_elbow_mid'].includes(m.key)) return `Target: up to ${f(b)}`;
+  if (u === '°' && b >= 180) return `Target: ${f(a)} or more`;
+  return `Target: ${f(a)} to ${f(b)}`;
+}
+const swChip = (st, text) => `<span class="sw-chip ${st}">${esc(text ?? SW_STATUS[st] ?? '')}</span>`;
+
+// ----- The Swing lab screen: start an analysis, your latest swing, your history -----
+function swingView() {
+  if (typeof SWING === 'undefined') return '<div class="empty">The swing analyzer didn\'t load. Close Dugout completely and open it again.</div>';
+  const open = S.swingOpen && swingById(S.swingOpen);
+  if (open) return swingReport(open);
+  const list = logsOf('swing').slice().reverse(), last = list[0];
+  if (list.length > 1) later(() => lineChart('#chart-swing', logsOf('swing').slice(-30).map(l => logPoint(l, l.score)), { fmtV: v => `${Math.round(v)} / 100` }));
+  return `<section class="card hero stack-sm">
+      <div class="card-title row">${icon('video')} Swing lab</div>
+      <p class="text-2">Film one swing and get a full breakdown: your load, stride, hip and shoulder turn, the order your body fires, your head, hands and finish. Then drills that fix what it finds.</p>
+      <button class="btn btn-primary btn-block" data-action="swingNew">${icon('upload', 'sm')} Analyze a swing</button>
+      <p class="hint">Runs on your phone — your video is never uploaded or saved.</p>
+    </section>
+    ${last ? `<section class="card stack-sm">
+      <div class="spread"><div class="card-title">Your latest swing</div><span class="text-2 small">${esc(shortDate(last.date))}</span></div>
+      ${swingRowHtml(last)}
+      ${list.length > 1 ? `<div class="section-title">Score over time</div><div class="chart" id="chart-swing"></div>` : ''}
+    </section>` : ''}
+    ${list.length > 1 ? `<section class="card stack-sm"><div class="card-title">All swings</div><div>${list.slice(1).map(swingRowHtml).join('')}</div></section>` : ''}
+    <div class="guide">
+      <details${list.length ? '' : ' open'}><summary>How to film your swing</summary><ol class="steps">
+        <li><b>Side (best to start):</b> stand straight out from the plate, facing your chest, 10–15 ft away — like a first- or third-base coach's view of you.</li>
+        <li><b>Front:</b> from the pitcher's side, behind a screen or fence. Shows your stride direction, head and hips.</li>
+        <li><b>Back:</b> straight behind you (behind the catcher). Shows your stride direction and posture.</li>
+        <li>Phone at waist height, held still (lean it on something) — no zooming or following the ball.</li>
+        <li>Get your whole body and bat in the frame, head to feet, in good light. Other people are fine, but you should be the biggest.</li>
+        <li>Start recording a couple of seconds before the pitch and stop after your finish. One swing per video.</li>
+        <li>60 fps or slow motion gives the most accurate timing. Regular 30 fps video works too.</li>
+      </ol></details>
+      <details><summary>What it measures</summary><ol class="steps">
+        <li><b>Load &amp; stride:</b> how your hands load, how far and which way you stride, where your weight is when your foot lands.</li>
+        <li><b>Rotation &amp; sequence:</b> hip-shoulder separation, whether your shoulders open early, and the order your hips, shoulders and hands fire.</li>
+        <li><b>Head &amp; posture:</b> how much your head moves and whether your spine angle holds.</li>
+        <li><b>Lower half:</b> whether your front leg firms up and your back side stays tall.</li>
+        <li><b>Hands:</b> whether your hands stay inside the ball, swing time and extension.</li>
+        <li><b>Finish:</b> balance.</li>
+        <li>Each camera angle sees some things better than others — the report tells you what to film next.</li>
+      </ol></details>
+    </div>`;
+}
+function swingRowHtml(l) {
+  const pic = (l.keyframes || []).find(k => k.key === 'contact') || (l.keyframes || [])[0];
+  const top = (l.faults || [])[0];
+  return `<button class="lib-row sw-row" data-action="swingOpen" data-id="${esc(l.id)}">
+    ${pic ? `<img src="${esc(pic.img)}" alt="">` : `<span class="sw-noimg">${icon('video', 'sm')}</span>`}
+    <span class="grow"><b>${esc(shortDate(l.date))} · ${esc(SW_VIEW_SHORT[l.view] || '')}</b><small>${top ? `Work on: ${esc(swFaultName(top.id).toLowerCase())}` : 'No big problems found'}</small></span>
+    <span class="ready-dot ${swTone(l.score) === 'work' ? 'low' : swTone(l.score)}">${Math.round(l.score)}</span>${icon('right', 'sm')}</button>`;
+}
+actions.swingOpen = el => { S.swingOpen = el.dataset.id; S.ballView = 'swing'; render({ keepScroll: false }); };
+actions.swingBack = () => { S.swingOpen = null; render({ keepScroll: false }); };
+
+// ----- Start: pick the video and a few settings -----
+actions.swingNew = () => {
+  if (typeof SWING === 'undefined') { toast('The swing analyzer is still loading — try again in a moment'); return; }
+  if (swingJob) { showSwingProgress(); return; }
+  const h = profileHeightIn();
+  openSheet('Analyze a swing', `<form class="form" novalidate data-submit="swingGo">
+    <label class="field"><span>Your swing video</span><input type="file" name="video" accept="video/*" data-external></label>
+    <div class="field"><span>Where was the camera?</span>${choice('view', SW_VIEWS, 'auto')}
+      <small>Side = facing your chest from straight out from the plate. Front = from the pitcher. Back = from behind the catcher.</small></div>
+    <div class="field"><span>You bat</span>${choice('bats', [['R', 'Right'], ['L', 'Left']], S.settings.bats === 'L' ? 'L' : 'R')}</div>
+    <details class="table-toggle"><summary>More options</summary>
+      <div class="field"><span>Video speed</span>${choice('speed', SW_SPEEDS, 'auto')}
+        <small>Auto works for most videos. Pick 4× or 8× if it's a slow-motion video that plays slowed down.</small></div>
+      <label class="field"><span>Your height (inches)</span><input name="height" inputmode="numeric" autocomplete="off" placeholder="${h || 70}" value="${h || ''}">
+        <small>Used to judge stride length. Saved from the goal calculator if you've used it.</small></label>
+    </details>
+    <button type="submit" class="btn btn-primary btn-block">${icon('play', 'sm')} Analyze</button>
+    <p class="hint">Takes about a minute. The first time, Dugout downloads its body-tracking model (about 21 MB) — after that it works offline.</p>
+  </form>`);
+};
+submits.swingGo = f => {
+  const d = formData(f), input = $('input[type=file]', f), file = input && input.files && input.files[0];
+  if (!file) { toast('Choose a video of your swing first'); return; }
+  if (file.type && !/^video\//.test(file.type)) { toast('That file isn\'t a video'); return; }
+  const h = num(d.height);
+  if (d.height && !(h >= 48 && h <= 90)) { toast('Enter your height in inches (48–90)'); return; }
+  const opts = { view: SW_VIEWS.some(([v]) => v === d.view) ? d.view : 'auto', bats: d.bats === 'L' ? 'L' : 'R',
+    speed: ['1', '4', '8'].includes(d.speed) ? Number(d.speed) : 0, heightIn: h || profileHeightIn() || 70 };
+  if (S.settings.bats !== opts.bats) { S.settings.bats = opts.bats; saveSettings(); }
+  runSwing(file, opts);
+};
+
+// ----- Running the analysis -----
+let swingJob = null;      // the analysis in progress: { ac, stage, pct }
+let lastTrack = null;     // the most recent tracked swing, kept in memory so it can be re-measured with other settings
+const SW_STAGE = { model: 'Getting the swing analyzer ready', find: 'Finding your swing in the video', track: 'Tracking your body, frame by frame',
+  measure: 'Measuring your swing', pictures: 'Saving pictures of your positions' };
+function showSwingProgress() {
+  openSheet('Analyzing your swing', `<div class="stack-sm" aria-live="polite">
+    <div class="sw-live" id="sw-live"><canvas id="sw-live-cv" aria-hidden="true"></canvas></div>
+    <div class="small bold" id="sw-stage">${esc(SW_STAGE[swingJob ? swingJob.stage : 'model'])}</div>
+    <div class="meter pc"><span id="sw-bar" style="width:${swingJob ? Math.round(swingJob.pct * 100) : 0}%"></span></div>
+    <p class="hint" id="sw-sub">Keep Dugout open until it's done. Your video stays on your phone.</p>
+    <button class="btn btn-ghost btn-block" data-action="swingCancel">Cancel</button>
+  </div>`, { onClose: () => { if (swingJob) swingJob.ac.abort(); } });
+}
+function updateSwingProgress() {
+  if (!swingJob) return;
+  const st = $('#sw-stage'), bar = $('#sw-bar'), sub = $('#sw-sub');
+  if (!st) return;
+  st.textContent = SW_STAGE[swingJob.stage] || '';
+  bar.style.width = `${Math.round(clamp(swingJob.pct, 0, 1) * 100)}%`;
+  if (swingJob.stage === 'model' && swingJob.pct < 1) sub.textContent = `Downloading the body-tracking model (one time only): ${Math.round(swingJob.pct * 21)} of 21 MB`;
+  else sub.textContent = 'Keep Dugout open until it\'s done. Your video stays on your phone.';
+}
+actions.swingCancel = () => { if (swingJob) swingJob.ac.abort(); closeSheet(); };
+// Your tracked skeleton drawn over the video while it's analyzed.
+function swLiveDraw(lm, bats) {
+  const box = $('#sw-live'), cv = $('#sw-live-cv'), v = box && $('video', box);
+  if (!cv || !v || !v.videoWidth) return;
+  const cw = v.clientWidth, ch = v.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cw, ch);
+  if (!lm) return;
+  const sc = Math.min(cw / v.videoWidth, ch / v.videoHeight), ox = (cw - v.videoWidth * sc) / 2, oy = (ch - v.videoHeight * sc) / 2;
+  const P = j => [ox + lm[j][0] * v.videoWidth * sc, oy + lm[j][1] * v.videoHeight * sc], lead = bats === 'L' ? 0 : 1;
+  ctx.lineCap = 'round'; ctx.lineWidth = 3;
+  for (const [a, b] of SWING.BONES) {
+    ctx.strokeStyle = a % 2 === lead && b % 2 === lead ? 'rgba(255,149,0,0.95)' : 'rgba(90,200,250,0.95)';
+    const pa = P(a), pb = P(b);
+    ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+  }
+}
+
+const SW_PROBLEM = {
+  old: ['This browser can\'t run the swing analyzer', 'It needs iOS 16.4 or newer on iPhone, or a current Chrome on Android. Update your phone, then try again.'],
+  offline: ['Connect to the internet once', 'The first time, Dugout downloads its body-tracking model (about 21 MB). Connect to Wi-Fi or data and try again — after that it works offline.'],
+  model: ['The swing analyzer couldn\'t start', 'Close other apps to free up memory and try again. Restarting your phone can help.'],
+  video: ['This video couldn\'t be opened', 'Try a video recorded with your phone\'s camera app. On iPhone, Settings → Camera → Formats → "Most Compatible" makes videos that open everywhere.'],
+  nobody: ['Couldn\'t find you in the video', 'Make sure your whole body — head to feet — is in the frame, in good light, with the phone held still. If other people are in view, you should be the biggest.'],
+  noswing: ['Couldn\'t find a full swing', 'Make sure the video shows your stance all the way through your finish, filmed steady (no zooming or following the ball). One swing per video works best.'],
+  nohands: ['That doesn\'t look like a swing', 'When your hands moved fastest they weren\'t together on a bat. Make sure the video is of a swing (not a throw or a bunt) and your hands stay in the picture.']
+};
+function swingProblem(code) {
+  const [title, text] = SW_PROBLEM[code] || ['Something went wrong', 'Try again. If it keeps happening, try a different video.'];
+  openSheet(title, `<p class="text-2">${esc(text)}</p>
+    <div class="sheet-actions"><button class="btn btn-ghost" data-action="closeSheet">Close</button><button class="btn btn-primary" data-action="swingNew">Try another video</button></div>`);
+}
+
+async function runSwing(file, opts) {
+  if (SWING.supported()) { swingProblem('old'); return; }
+  swingJob = { ac: new AbortController(), stage: 'model', pct: 0 };
+  const job = swingJob;
+  showSwingProgress();
+  keepAwake(true);
+  let tr = null;
+  try {
+    tr = await SWING.track(file, { signal: job.ac.signal, host: () => $('#sw-live'), onPose: lm => swLiveDraw(lm, opts.bats),
+      onProgress: (stage, pct) => { job.stage = stage; job.pct = pct; updateSwingProgress(); } });
+    job.stage = 'measure'; job.pct = 1; updateSwingProgress(); swLiveDraw(null);
+    await new Promise(r => setTimeout(r, 40));               // let the screen show it
+    const rep = SWING.analyze(tr.frames, { ...opts, aspect: tr.aspect });
+    if (rep.error) throw Object.assign(new Error(rep.error), { code: rep.reason === 'hands' ? 'nohands' : rep.error });
+    if (job.ac.signal.aborted) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+    job.stage = 'pictures'; job.pct = 0.5; updateSwingProgress();
+    const pics = await SWING.keyframes(tr, rep, SW_KEYS);
+    tr.video.close(); tr.video = null;
+    if (job.ac.signal.aborted || S.locked) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+    const rec = saveSwing(rep, pics, { name: file.name });
+    lastTrack = { id: rec.id, file, frames: tr.frames, aspect: tr.aspect, opts };
+    swingJob = null;
+    closeSheet();
+    Object.assign(S, { tab: 'baseball', ballView: 'swing', swingOpen: rec.id });
+    render({ keepScroll: false });
+    toast(rec.faults.length ? `Analyzed — top priority: ${swFaultName(rec.faults[0].id).toLowerCase()}` : 'Analyzed — no big problems found');
+  } catch (e) {
+    if (tr && tr.video) tr.video.close();
+    if (swingJob === job) swingJob = null;
+    if (S.locked) return;
+    const code = e && e.code;
+    if (code === 'cancelled') { closeSheet(); toast('Analysis cancelled'); } else { if (!SW_PROBLEM[code] || code === 'model') console.error(e); swingProblem(code); }
+  } finally {
+    keepAwake(!!S.active);
+  }
+}
+
+// The saved report: everything the screens need, nothing about the video file itself.
+function saveSwing(rep, pics, extra, keep) {
+  const track = rep.track, step = track.t.length > 180 ? 2 : 1;       // replay: at most ~180 frames
+  const rec = {
+    id: keep ? keep.id : uid(), kind: 'swing', date: keep ? keep.date : ymd(), at: keep ? keep.at : Date.now(),
+    v: rep.version, view: rep.view, viewAuto: rep.viewAuto, bats: rep.bats, speed: rep.speed, speedAuto: rep.speedAuto,
+    confidence: rep.confidence, detected: rep.detected, heightIn: rep.heightIn, score: rep.score,
+    cats: Object.fromEntries(Object.entries(rep.cats).map(([k, c]) => [k, c.score])),
+    metrics: rep.metrics.map(m => ({ key: m.key, cat: m.cat, label: m.label, unit: m.unit, value: m.value, status: m.status, rel: m.rel, target: m.target })),
+    faults: rep.faults.map(f => ({ id: f.id, sev: f.sev, evidence: f.evidence })),
+    strengths: rep.strengths, drills: rep.drills, otherViews: rep.otherViews, notes: rep.notes, timing: rep.timing, hasStride: rep.hasStride,
+    series: rep.series,
+    track: { aspect: track.aspect, t: track.t.filter((_, i) => i % step === 0), pts: track.pts.filter((_, i) => i % step === 0) },
+    keyframes: pics, name: String((extra && extra.name) || (keep && keep.name) || '').slice(0, 80)
+  };
+  putLog(rec);
+  // Personalized drills: if your plan is empty or came from a swing analysis, it becomes this swing's drills.
+  const ids = [...new Set(rec.drills.map(d => d.id))].filter(id => DRILL_BY_ID[id]);
+  if (ids.length && (!S.settings.drillPlan.length || S.settings.drillPlanFrom)) {
+    S.settings.drillPlan = ids; S.settings.drillPlanFrom = rec.date; saveSettings();
+  }
+  return rec;
+}
+
+// ----- The report -----
+function swingReport(r) {
+  const earlier = logsOf('swing').filter(x => x.id !== r.id && x.view === r.view && (x.at || 0) < (r.at || 0));
+  const prev = earlier[earlier.length - 1] || null;
+  const pics = r.keyframes || [];
+  const top = r.faults.slice(0, 4);
+  const drillIds = [...new Set(r.drills.map(d => d.id))].filter(id => DRILL_BY_ID[id]);
+  const isPlan = drillIds.length && drillIds.every(id => S.settings.drillPlan.includes(id));
+  const byCat = Object.keys(SWING.CATS).map(c => [c, SWING.CATS[c][0], r.cats[c]]).filter(([, , s]) => s != null);
+  const canRedo = lastTrack && lastTrack.id === r.id;
+  later(() => swingReplay(r));
+  return `<button class="btn-link sw-back" data-action="swingBack">${icon('left', 'sm')} Swing lab</button>
+  <section class="card hero stack-sm">
+    <div class="sw-score">
+      <div class="sw-ring ${swTone(r.score)}">${swRing(r.score)}<b>${Math.round(r.score)}</b></div>
+      <div class="grow"><div class="card-title">${esc(swScoreWord(r.score))} swing</div>
+        <div class="small text-2">${esc(fmtDate(parseYmd(r.date), { weekday: 'short', month: 'short', day: 'numeric' }))} · filmed ${esc(swViewText(r))} · ${r.bats === 'L' ? 'left' : 'right'}-handed</div>
+        <div class="small text-2">${r.timing.fps} frames per second${r.speed > 1 ? ` (${r.speed}× slow motion${r.speedAuto ? ', auto' : ''})` : ''} · ${esc(r.confidence)} confidence</div></div>
+    </div>
+    ${r.faults.length ? `<p class="small">Top priority: <b>${esc(swFaultName(r.faults[0].id))}</b>${r.faults.length > 1 ? ` · then ${esc(r.faults.slice(1, 3).map(f => swFaultName(f.id).toLowerCase()).join(', '))}` : ''}</p>` : '<p class="small">No big problems found from this angle — nice swing.</p>'}
+  </section>
+  ${pics.length ? `<section class="card stack-sm"><div class="card-title">Your positions</div>
+    <div class="sw-frames">${pics.map(p => `<figure><img src="${esc(p.img)}" alt="${esc(p.label)}" loading="lazy"><figcaption>${esc(p.label)}</figcaption></figure>`).join('')}</div>
+    <p class="hint">Orange = your front side, blue = your back side. Swipe for more.</p></section>` : ''}
+  <section class="card stack-sm"><div class="card-title">${r.faults.length ? 'Your priorities' : 'Keep it up'}</div>
+    ${top.length ? top.map((f, i) => swFaultCard(r, f, i)).join('') : '<p class="text-2 small">Nothing stood out as a problem. Film from another angle to check more, and keep grooving it with the drills below.</p>'}
+    ${r.faults.length > 4 ? `<p class="small text-2">Also: ${esc(r.faults.slice(4).map(f => swFaultName(f.id).toLowerCase()).join(', '))}.</p>` : ''}
+  </section>
+  ${r.strengths.length ? `<section class="card stack-sm"><div class="card-title">What you do well</div><ul class="steps">${r.strengths.map(s => `<li>${esc(s)}</li>`).join('')}</ul></section>` : ''}
+  ${drillIds.length ? `<section class="card stack-sm"><div class="spread"><div class="card-title row">${icon('star')} Your drills</div></div>
+    <p class="hint">Picked for your priorities — the first ones are the most targeted. Do them 3 times a week, then film again to see what changed.</p>
+    <div>${drillIds.map(id => drillRow(DRILL_BY_ID[id])).join('')}</div>
+    ${isPlan ? '<p class="small text-2">These are your drill plan on the Drills screen.</p>' : `<button class="btn btn-ghost btn-block" data-action="swingPlan" data-id="${esc(r.id)}">${icon('star', 'sm')} Make these my drill plan</button>`}
+  </section>` : ''}
+  <section class="card stack-sm"><div class="card-title">Breakdown</div>
+    ${byCat.map(([c, name, s]) => `<div class="sw-cat"><span>${esc(name)}</span><div class="meter pc ${swTone(s) === 'good' ? '' : swTone(s) === 'ok' ? 'near' : 'over'}"><span style="width:${clamp(s, 3, 100)}%"></span></div><b>${Math.round(s)}</b></div>`).join('')}
+  </section>
+  ${swTimeline(r)}
+  ${swCharts(r)}
+  ${r.track && r.track.t && r.track.t.length > 5 ? `<section class="card stack-sm"><div class="card-title">Replay</div>
+    <div class="sw-replay"><canvas id="sw-canvas" aria-label="Stick-figure replay of your swing"></canvas></div>
+    <div class="sw-controls"><button class="btn btn-sm btn-primary" data-action="swPlay" id="sw-play">${icon('play', 'sm')} Play</button>
+      <input type="range" id="sw-scrub" min="0" max="${r.track.t.length - 1}" value="0" data-input="swScrub" aria-label="Move through the swing">
+      <button class="btn btn-sm btn-ghost" data-action="swRate" id="sw-rate">¼×</button></div>
+    <div class="small text-2" id="sw-phase">Stance</div></section>` : ''}
+  <section class="card stack-sm"><div class="card-title">Every measurement</div>
+    <p class="hint">Tap one to see what it means. "Other angle" = hard to see from this camera angle, so it isn't graded.</p>
+    ${Object.keys(SWING.CATS).map(c => { const ms = r.metrics.filter(m => m.cat === c); return ms.length ? `<div class="section-title">${esc(SWING.CATS[c][0])}</div>${ms.map(swMetricRow).join('')}` : ''; }).join('')}
+  </section>
+  ${prev ? swCompare(r, prev) : ''}
+  ${r.otherViews.length || r.notes.length ? `<section class="card stack-sm"><div class="card-title">To get even more</div><ul class="steps">${[...r.otherViews, ...r.notes].map(t => `<li>${esc(t)}</li>`).join('')}</ul></section>` : ''}
+  <section class="card stack-sm">
+    ${canRedo ? `<button class="btn btn-ghost btn-block" data-action="swingRedo" data-id="${esc(r.id)}">${icon('refresh', 'sm')} Fix angle, side or speed</button>`
+      : '<p class="hint">Wrong camera angle or batting side? Analyze the video again and pick them yourself.</p>'}
+    <button class="btn btn-ghost btn-block" data-action="swingDelete" data-id="${esc(r.id)}">${icon('trash', 'sm')} Delete this swing</button>
+  </section>`;
+}
+function swRing(score) {
+  const c = 2 * Math.PI * 42, f = clamp(score, 0, 100) / 100;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="bg" cx="50" cy="50" r="42"/><circle class="fg" cx="50" cy="50" r="42" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}"/></svg>`;
+}
+function swFaultCard(r, f, i) {
+  const info = SWING_FAULTS[f.id] || {};
+  const ds = r.drills.filter(d => d.fault === f.id).map(d => DRILL_BY_ID[d.id]).filter(Boolean);
+  return `<div class="sw-fault">
+    <div class="spread"><b>${i + 1}. ${esc(info.name || f.id)}</b>${swChip(f.sev >= 3 ? 'work' : f.sev === 2 ? 'ok' : 'check', SW_SEV[f.sev] || '')}</div>
+    <p class="small">${esc(f.evidence)}</p>
+    ${info.why ? `<p class="small text-2"><b>Why it matters:</b> ${esc(info.why)}</p>` : ''}
+    ${info.cue ? `<p class="small"><b>Feel:</b> ${esc(info.cue)}</p>` : ''}
+    ${ds.length ? `<div>${ds.map(drillRow).join('')}</div>` : ''}
+  </div>`;
+}
+function swMetricRow(m) {
+  const help = SW_HELP[m.key] || '', tgt = swTarget(m);
+  return `<details class="sw-metric"><summary><span class="grow">${esc(m.label)}${tgt ? `<small>${esc(tgt)}</small>` : ''}</span><b>${esc(swVal(m))}</b>${m.status === 'info' ? '' : swChip(m.status)}</summary>
+    <p class="small text-2">${esc(help)}${m.key === 'sequence' && m.value ? ` Shoulders → hands: ${Math.round(m.value.shToHands)} ms.` : ''} From this angle it's ${esc(SW_REL[m.rel] || 'fairly reliable')} to measure.</p></details>`;
+}
+function swTimeline(r) {
+  const t = r.timing, rows = [];
+  if (t.strideMs != null) rows.push(['Stride', `${t.strideMs} ms`, 'Front foot lifts → lands']);
+  rows.push(['Foot down → contact', `${t.fpToContactMs} ms`, 'Your turn, after your front foot lands']);
+  rows.push(['Swing time', `${t.swingMs} ms`, 'Hands start forward → contact (quicker lets you wait longer)']);
+  const hs = r.metrics.find(m => m.key === 'hand_speed');
+  if (hs && Number.isFinite(hs.value) && hs.rel !== 'low') rows.push(['Hand speed', `${fmt(hs.value, 1)} mph`, 'Rough top speed of your hands']);
+  return `<section class="card stack-sm"><div class="card-title">Timing</div>
+    <div class="timeline">${rows.map(([a, b, c]) => `<div class="tl-row"><span class="grow"><b>${esc(a)}</b><small>${esc(c)}</small></span><b>${esc(b)}</b></div>`).join('')}</div></section>`;
+}
+
+// Small charts (SVG) from the report's time series. x = milliseconds from contact.
+function swCharts(r) {
+  const s = r.series;
+  if (!s || !s.t || s.t.length < 4) return '';
+  const t = r.timing, fp = -t.fpToContactMs, ss = -t.swingMs;
+  const W = 340, H = 170, L = 34, R = 10, T = 12, B = 22;
+  const t0 = s.t[0], t1 = s.t[s.t.length - 1];
+  const X = v => L + ((W - L - R) * (v - t0)) / ((t1 - t0) || 1);
+  const frame = (lo, hi, ticks, fmtT) => {
+    const Y = v => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
+    let g = ticks.map(v => `<line class="gridline" x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="tick" x="${L - 5}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${fmtT(v)}</text>`).join('');
+    const mark = (v, label) => (v > t0 && v < t1 ? `<line class="sw-mark" x1="${X(v).toFixed(1)}" x2="${X(v).toFixed(1)}" y1="${T}" y2="${H - B}"/><text class="tick" x="${X(v).toFixed(1)}" y="${H - 6}" text-anchor="middle">${label}</text>` : '');
+    g += (Math.abs(X(fp) - X(0)) > 40 ? mark(fp, 'foot down') : '') + mark(0, 'contact');
+    return { Y, g };
+  };
+  const path = (vals, Y) => vals.map((v, i) => `${i ? 'L' : 'M'}${X(s.t[i]).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+  // 1) Rotation: how open the hips and shoulders are (0 = your stance). The gap between them is separation.
+  const all = [...s.hip, ...s.sh], lo = Math.floor(Math.min(-20, ...all) / 30) * 30, hi = Math.ceil(Math.max(90, ...all) / 30) * 30;
+  const rot = frame(lo, hi, Array.from({ length: Math.round((hi - lo) / 30) + 1 }, (_, i) => lo + i * 30), v => `${v}°`);
+  const sepArea = `${path(s.hip, rot.Y)}${s.sh.map((v, i) => `L${X(s.t[s.t.length - 1 - i]).toFixed(1)},${rot.Y(s.sh[s.sh.length - 1 - i]).toFixed(1)}`).join('')}Z`;
+  const rotSvg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Hip and shoulder turn during the swing">${rot.g}
+    <path class="sw-sep" d="${sepArea}"/><path class="sw-line hip" d="${path(s.hip, rot.Y)}"/><path class="sw-line sh" d="${path(s.sh, rot.Y)}"/></svg>`;
+  // 2) Sequence: turning speed of hips and shoulders, and hand speed, each as % of its own top speed.
+  const norm = a => { const m = Math.max(1e-6, ...a); return a.map(v => Math.max(0, v) / m * 100); };
+  const seq = frame(0, 100, [0, 50, 100], v => `${v}%`);
+  const peakDot = (vals, cls) => { const a = norm(vals); let k = 0; a.forEach((v, i) => { if (v > a[k] && s.t[i] <= 60) k = i; }); return `<circle class="sw-dot ${cls}" cx="${X(s.t[k]).toFixed(1)}" cy="${seq.Y(a[k]).toFixed(1)}" r="4"/>`; };
+  const seqSvg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Order your hips, shoulders and hands reach top speed">${seq.g}
+    <path class="sw-line hip" d="${path(norm(s.hipV), seq.Y)}"/><path class="sw-line sh" d="${path(norm(s.shV), seq.Y)}"/><path class="sw-line hand" d="${path(norm(s.hand), seq.Y)}"/>
+    ${peakDot(s.hipV, 'hip')}${peakDot(s.shV, 'sh')}${peakDot(s.hand, 'hand')}</svg>`;
+  // 3) Head path from your stance to contact (inches); the ring is the ±3 in "quiet head" zone.
+  let headSvg = '';
+  if (s.head && s.head.length) {
+    const upTo = s.head.filter((_, i) => s.t[i] <= 0), after = s.head.filter((_, i) => s.t[i] >= 0);
+    const ext = Math.min(30, Math.max(6, ...[...upTo, ...after].map(p => Math.max(Math.abs(p[0]), Math.abs(p[1]))))) + 1;
+    const Hs = 180, c = Hs / 2, k = (Hs / 2 - 14) / ext, P = p => `${(c + p[0] * k).toFixed(1)},${(c - p[1] * k).toFixed(1)}`;
+    const lbl = r.view === 'side' ? ['← catcher', 'pitcher →'] : ['← away from plate', 'toward plate →'];
+    const end = upTo[upTo.length - 1] || [0, 0];
+    headSvg = `<svg viewBox="0 0 ${Hs} ${Hs}" class="sw-head-svg" role="img" aria-label="Your head's path from stance to contact">
+      <line class="gridline" x1="0" x2="${Hs}" y1="${c}" y2="${c}"/><line class="gridline" x1="${c}" x2="${c}" y1="0" y2="${Hs}"/>
+      <circle class="sw-zone" cx="${c}" cy="${c}" r="${(3 * k).toFixed(1)}"/>
+      ${after.length > 1 ? `<polyline class="sw-line after" points="${after.map(P).join(' ')}"/>` : ''}
+      ${upTo.length > 1 ? `<polyline class="sw-line head" points="${upTo.map(P).join(' ')}"/>` : ''}
+      <circle class="sw-dot start" cx="${c}" cy="${c}" r="3.5"/><circle class="sw-dot hand" cx="${P(end).split(',')[0]}" cy="${P(end).split(',')[1]}" r="4.5"/>
+      <text class="tick" x="4" y="${Hs - 5}">${lbl[0]}</text><text class="tick" x="${Hs - 4}" y="${Hs - 5}" text-anchor="end">${lbl[1]}</text>
+      <text class="tick" x="${c + 4}" y="11">up</text></svg>`;
+  }
+  const seqM = r.metrics.find(m => m.key === 'sequence'), sepM = r.metrics.find(m => m.key === 'sep_max');
+  return `<section class="card stack-sm"><div class="card-title">Hip and shoulder turn</div>
+      <div class="sw-chart">${rotSvg}</div>
+      <div class="sw-legend"><span><i class="hip"></i>Hips</span><span><i class="sh"></i>Shoulders</span><span><i class="sep"></i>Separation${sepM && Number.isFinite(sepM.value) ? ` (most: ${Math.round(sepM.value)}°)` : ''}</span></div>
+      <p class="hint">How far each has turned toward the pitcher (0° = your stance). Good swings keep the shoulders closed until the foot lands while the hips start to open.</p>
+    </section>
+    <section class="card stack-sm"><div class="card-title">Firing order</div>
+      <div class="sw-chart">${seqSvg}</div>
+      <div class="sw-legend"><span><i class="hip"></i>Hips</span><span><i class="sh"></i>Shoulders</span><span><i class="hand"></i>Hands</span></div>
+      <p class="hint">Dots mark top speed. Powerful swings fire hips → shoulders → hands${seqM && seqM.value ? ` — yours: hips to shoulders ${Math.round(seqM.value.hipToSh)} ms, shoulders to hands ${Math.round(seqM.value.shToHands)} ms` : ''}.</p>
+    </section>
+    ${headSvg ? `<section class="card stack-sm"><div class="card-title">Head movement</div>
+      <div class="sw-chart center">${headSvg}</div>
+      <p class="hint">Your head's path from your stance (center) to contact (big dot), seen ${esc(SW_VIEW_TEXT[r.view] || '')}. Staying inside the ring (3 in) keeps your eyes steady.${r.view !== 'side' ? ' Forward/back movement shows best from the side.' : ''}</p>
+    </section>` : ''}`;
+}
+
+function swCompare(r, prev) {
+  const was = Object.fromEntries(prev.metrics.map(m => [m.key, m]));
+  const rank = { work: 0, ok: 1, good: 2 };
+  const better = [], worse = [];
+  for (const m of r.metrics) {
+    const p = was[m.key];
+    if (!p || rank[m.status] == null || rank[p.status] == null || rank[m.status] === rank[p.status]) continue;
+    (rank[m.status] > rank[p.status] ? better : worse).push(`${m.label}: ${swVal(p)} → ${swVal(m)}`);
+  }
+  const d = Math.round(r.score - prev.score);
+  return `<section class="card stack-sm"><div class="card-title">Since your last swing ${esc(SW_VIEW_TEXT[r.view] || '')}</div>
+    <p class="small">Score ${Math.round(prev.score)} → <b>${Math.round(r.score)}</b> (${d > 0 ? '+' : ''}${d}) · ${esc(shortDate(prev.date))}</p>
+    ${better.length ? `<div class="small"><b class="text-good">Better</b><ul class="steps">${better.slice(0, 6).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+    ${worse.length ? `<div class="small"><b class="text-bad">Slipped</b><ul class="steps">${worse.slice(0, 6).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+    ${!better.length && !worse.length ? '<p class="small text-2">No grades changed.</p>' : ''}
+  </section>`;
+}
+
+// ----- Stick-figure replay (drawn from the tracked points) -----
+let swAnim = null;         // { raf, playing, i, rate, last }
+function swingReplay(r) {
+  const cv = $('#sw-canvas');
+  if (!cv || !r.track) return;
+  if (swAnim && swAnim.raf) cancelAnimationFrame(swAnim.raf);
+  const tr = r.track, n = tr.t.length, asp = tr.aspect || 16 / 9;
+  const xs = [], ys = [];
+  tr.pts.forEach(f => f.forEach(([x, y]) => { xs.push(x * asp); ys.push(y); }));
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const w = cv.clientWidth || 300, bw = x1 - x0 || 1, bh = y1 - y0 || 1;
+  const h = clamp(Math.round((w * bh) / bw) + 24, 180, 360), dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = `${h}px`;
+  const ctx = cv.getContext('2d');
+  const k = Math.min((w - 24) / bw, (h - 24) / bh), ox = (w - bw * k) / 2, oy = (h - bh * k) / 2;
+  const J = SWING.TRACK_JOINTS, at = j => J.indexOf(j);
+  const lead = r.bats === 'L' ? 0 : 1;
+  const ev = [[-(r.timing.strideMs || 0) - r.timing.fpToContactMs, 'Stride'], [-r.timing.fpToContactMs, 'Foot down'], [-r.timing.swingMs, 'Swing'], [0, 'Contact'], [60, 'Follow-through'], [260, 'Finish']];
+  const phase = t => { let p = r.timing.strideMs != null ? 'Stance & load' : 'Stance'; ev.forEach(([et, name]) => { if (t >= et) p = name; }); return p; };
+  const css = getComputedStyle(document.body);
+  const colLead = css.getPropertyValue('--gym').trim() || '#ff7a1a', colBack = css.getPropertyValue('--water').trim() || '#38bdf8';
+  const draw = i => {
+    const f = tr.pts[i], P = j => [ox + (f[at(j)][0] * asp - x0) * k, oy + (f[at(j)][1] - y0) * k];
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    // faint trail of the hands so far
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath();
+    for (let q = Math.max(0, i - 40); q <= i; q++) { const g = tr.pts[q], hx = ox + ((g[at(15)][0] + g[at(16)][0]) / 2 * asp - x0) * k, hy = oy + ((g[at(15)][1] + g[at(16)][1]) / 2 - y0) * k; if (q === Math.max(0, i - 40)) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy); }
+    ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineWidth = 4;
+    for (const [a, b] of SWING.BONES) {
+      ctx.strokeStyle = a % 2 === lead && b % 2 === lead ? colLead : colBack;
+      const pa = P(a), pb = P(b);
+      ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+    }
+    const hd = P(0), l = P(11), rs = P(12), neck = [(l[0] + rs[0]) / 2, (l[1] + rs[1]) / 2];
+    ctx.strokeStyle = '#f2f5f9'; ctx.beginPath(); ctx.moveTo(neck[0], neck[1]); ctx.lineTo(hd[0], hd[1]); ctx.stroke();
+    ctx.fillStyle = '#f2f5f9'; ctx.beginPath(); ctx.arc(hd[0], hd[1], 8, 0, Math.PI * 2); ctx.fill();
+    const lbl = $('#sw-phase'), sc = $('#sw-scrub');
+    if (lbl) lbl.textContent = `${phase(tr.t[i])} · ${tr.t[i] > 0 ? '+' : ''}${tr.t[i]} ms`;
+    if (sc && Number(sc.value) !== i) sc.value = i;
+  };
+  swAnim = { raf: 0, playing: false, i: 0, rate: 0.25, last: 0, draw, n, t: tr.t, cv };
+  draw(0);
+}
+function swTick(now) {
+  const a = swAnim;
+  if (!a || !a.playing || !document.contains(a.cv)) { if (a) a.playing = false; return; }
+  const dt = a.last ? now - a.last : 0;
+  a.last = now;
+  a.clock = (a.clock ?? a.t[a.i]) + dt * a.rate;
+  while (a.i < a.n - 1 && a.t[a.i + 1] <= a.clock) a.i++;
+  a.draw(a.i);
+  if (a.i >= a.n - 1) { a.playing = false; const b = $('#sw-play'); if (b) b.innerHTML = `${icon('play', 'sm')} Play`; return; }
+  a.raf = requestAnimationFrame(swTick);
+}
+actions.swPlay = el => {
+  const a = swAnim;
+  if (!a) return;
+  a.playing = !a.playing;
+  if (a.playing) { if (a.i >= a.n - 1) a.i = 0; a.clock = a.t[a.i]; a.last = 0; a.raf = requestAnimationFrame(swTick); }
+  el.innerHTML = a.playing ? `${icon('x', 'sm')} Pause` : `${icon('play', 'sm')} Play`;
+};
+actions.swRate = el => {
+  if (!swAnim) return;
+  const rates = [0.1, 0.25, 1], next = rates[(rates.indexOf(swAnim.rate) + 1) % rates.length];
+  swAnim.rate = next;
+  el.textContent = next === 1 ? '1×' : next === 0.25 ? '¼×' : '⅒×';
+};
+inputs.swScrub = el => { const a = swAnim; if (!a) return; a.playing = false; a.i = clamp(parseInt(el.value, 10) || 0, 0, a.n - 1); a.draw(a.i); const b = $('#sw-play'); if (b) b.innerHTML = `${icon('play', 'sm')} Play`; };
+
+// ----- Report actions -----
+actions.swingPlan = el => {
+  const r = swingById(el.dataset.id);
+  if (!r) return;
+  S.settings.drillPlan = [...new Set(r.drills.map(d => d.id))].filter(id => DRILL_BY_ID[id]);
+  S.settings.drillPlanFrom = r.date;
+  saveSettings(); render(); toast('Your drill plan is set — it\'s on the Drills screen');
+};
+actions.swingDelete = async el => {
+  const r = swingById(el.dataset.id);
+  if (!r || !(await confirmBox('Delete this swing?', 'Its report and pictures will be removed from this phone.', { ok: 'Delete', danger: true }))) return;
+  removeLog(r.id);
+  if (lastTrack && lastTrack.id === r.id) lastTrack = null;
+  S.swingOpen = null; render({ keepScroll: false }); toast('Swing deleted');
+};
+actions.swingRedo = el => {
+  const r = swingById(el.dataset.id);
+  if (!r || !lastTrack || lastTrack.id !== r.id) return;
+  openSheet('Re-measure this swing', `<form class="form" novalidate data-submit="swingRedo" data-id="${esc(r.id)}">
+    <p class="text-2 small">Uses the body tracking from this video again — only the measuring is redone.</p>
+    <div class="field"><span>Where was the camera?</span>${choice('view', SW_VIEWS.slice(1), r.view)}</div>
+    <div class="field"><span>You bat</span>${choice('bats', [['R', 'Right'], ['L', 'Left']], r.bats)}</div>
+    <div class="field"><span>Video speed</span>${choice('speed', SW_SPEEDS.slice(1), String(r.speed))}</div>
+    <button type="submit" class="btn btn-primary btn-block">Re-measure</button>
+  </form>`);
+};
+submits.swingRedo = async f => {
+  const r = swingById(f.dataset.id), d = formData(f);
+  if (!r || !lastTrack || lastTrack.id !== r.id) { closeSheet(); return; }
+  const opts = { ...lastTrack.opts, view: ['side', 'front', 'back'].includes(d.view) ? d.view : r.view, bats: d.bats === 'L' ? 'L' : 'R', speed: ['1', '4', '8'].includes(d.speed) ? Number(d.speed) : r.speed };
+  const rep = SWING.analyze(lastTrack.frames, { ...opts, aspect: lastTrack.aspect });
+  if (rep.error) { swingProblem(rep.reason === 'hands' ? 'nohands' : rep.error); return; }
+  let pics = r.keyframes;
+  let vid = null;
+  try { vid = await SWING.openVideo(lastTrack.file); pics = await SWING.keyframes({ video: vid, frames: lastTrack.frames }, rep, SW_KEYS); } catch (e) { /* keep the old pictures */ } finally { if (vid) vid.close(); }
+  if (S.locked) return;
+  const rec = saveSwing(rep, pics, null, r);
+  lastTrack.opts = opts;
+  closeSheet(); S.swingOpen = rec.id; render({ keepScroll: false }); toast('Re-measured');
+};
 
 /* ============================== 10. SETTINGS + BACKUP ============================== */
 
@@ -3931,6 +4646,7 @@ const CSV = {
       else if (l.kind === 'throw') rows.push([l.date, 'Throwing', THROW_LABEL[l.type] || l.type, l.count, PITCHING.includes(l.type) ? 'pitches' : 'throws', [l.dist ? `${l.dist} ft` : '', l.feel ? `arm ${FEEL[l.feel].toLowerCase()}` : '', l.note || ''].filter(Boolean).join('; ')]);
       else if (l.kind === 'game') rows.push([l.date, 'Game', [l.opp && `vs ${l.opp}`, l.result, l.score].filter(Boolean).join(' '), '', '',
         [`${l.bat.h}-for-${l.bat.ab}`, ...BAT.slice(2).filter(([k]) => l.bat[k]).map(([k, n]) => `${l.bat[k]} ${n}`), l.pitch ? `pitching ${ipText(l.pitch.outs)} IP ${PITCH.map(([k, n]) => `${l.pitch[k]} ${n}`).join(' ')}` : '', l.note].filter(Boolean).join('; ')]);
+      else if (l.kind === 'swing') rows.push([l.date, 'Swing analysis', `Filmed ${(SW_VIEW_TEXT[l.view] || '').trim()}`, l.score, '/100', l.faults.map(f => swFaultName(f.id)).join('; ') || 'no big problems']);
       else if (l.kind === 'skill') rows.push([l.date, 'Practice', (SKILL[l.type] || {}).l || l.type, l.reps ?? '', l.reps ? 'reps' : '', [l.min ? `${l.min} min` : '', l.note || ''].filter(Boolean).join('; ')]);
       else if (l.kind === 'checkin') rows.push([l.date, 'Check-in', 'Readiness', readiness(l), '/100', `sleep ${l.sleep} h; energy ${l.energy}/5; soreness ${l.sore}/5`]);
     }
@@ -4022,7 +4738,7 @@ actions.checkUpdate = async () => {
     if (S.active) await saveActive();
     const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
     if (reg) await reg.update();
-    if (self.caches) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
+    if (self.caches) { const keys = await caches.keys(); await Promise.all(keys.filter(k => !k.startsWith('dugout-models')).map(k => caches.delete(k))); }   // keep the big swing model
   } catch (e) { /* ignore — reload anyway */ }
   setTimeout(() => location.reload(), 400);
 };
@@ -4031,7 +4747,8 @@ actions.checkUpdate = async () => {
 const HELP = [
   ['Your day in Dugout', ['Open the Today tab: it shows today\'s workout, a quick check-in, your nutrition, water and what to eat next.',
     'Tap Start to begin a workout. Check off each set — the rest timer starts on its own, and your weights from last time are filled in.',
-    'Tap ▶ on any exercise for a form video, step-by-step how-to, common mistakes and easier or harder versions.']],
+    'Tap ▶ on any exercise for a form video, step-by-step how-to, common mistakes and easier or harder versions.',
+    'Need to stop early? Tap End at the top of the workout: save the sets you did, or cancel the whole workout (you can undo it).']],
   ['Light, Moderate or Heavy', ['Every day you pick how hard to go, right above your workout on the Today screen. It starts on Heavy (the full workout) each morning.',
     'Moderate keeps the same exercises with about ⅔ of the sets, and fills in weights at about 90% of last time.',
     'Light swaps in your Light workout: mobility, arm care and core, with a form video for every exercise. Good the day after a game, sprinting or a hard practice.',
@@ -4041,10 +4758,18 @@ const HELP = [
     'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
   ['Setting your goals', ['Settings → Calculate my goals turns your age, size, training and goal into calories, protein, carbs, fat and water.',
     'Weigh in once or twice a week (Progress → Body) and recalculate every month or so. If you\'re trying to gain and your weight stalls for 2–3 weeks, add about 250 calories.']],
-  ['Games and stats', ['Log each game in Progress → Baseball: your batting line and, if you pitched, innings (5.2 = 5⅔), hits, runs, walks and strikeouts.',
+  ['Drills for every position', ['Baseball tab → Drills: drills for hitting, pitching, catching, every infield spot, outfield, throwing and base running.',
+    'Pick Alone for drills you can do by yourself (tee, net, wall, fence) or With a partner for drills with a coach, parent or teammate.',
+    'Tap a drill for the steps, coaching points and mistakes to avoid, plus a demo video. Star drills to build your plan, and tap Log it to add it to your practice log.']],
+  ['Swing lab (swing analysis)', ['Baseball tab → Swing lab → Analyze a swing, then pick a video. It runs on your phone — your video is never uploaded or saved.',
+    'Film one swing with your whole body in the frame and the phone held still. Side view (facing your chest) sees the most; front (from the pitcher) and back (from behind the catcher) see stride direction, head and posture better.',
+    'You get a score, your top priorities with the numbers behind them, pictures of your stance, load, foot plant, contact and finish, charts of your hip and shoulder turn and firing order, a replay, and every measurement with its target.',
+    'Drills are picked for your priorities and become your drill plan (unless you built your own plan). Do them for 2–3 weeks, then film again from the same angle to see what changed.',
+    'The first time, Dugout downloads its body-tracking model (about 21 MB). After that the Swing lab works offline.']],
+  ['Games and stats', ['Log each game in the Baseball tab → Games & arm: your batting line and, if you pitched, innings (5.2 = 5⅔), hits, runs, walks and strikeouts.',
     'Your season AVG, OBP, SLG, OPS, ERA and WHIP update automatically, and pitches can go straight into the arm-care log.']],
   ['Testing the right way', ['Warm up fully first. Take 2–3 tries and log your best.', 'Test the same way each time — same surface, same timer, same time of day — so the numbers are fair.',
-    'Re-test every 4–6 weeks. The stopwatch (Progress → Baseball) lets a partner time your sprints.']],
+    'Re-test every 4–6 weeks. The stopwatch (Baseball tab → Games & arm) lets a partner time your sprints.']],
   ['Arm care and pitch counts', ['Log every throwing session with how your arm feels. Big week-to-week jumps in throwing are a common cause of arm trouble.',
     'During games use the pitch counter: it shows your Pitch Smart limit for your age and the rest days you\'ll need. Your league\'s rules come first.',
     'Soreness that fades in a day is normal. Pain, numbness or pain that lingers is not — stop throwing and tell a coach, athletic trainer or doctor.']],
@@ -4115,6 +4840,9 @@ function cleanSettings(st) {
   out.proteinGoal = clamp(Math.round(out.proteinGoal) || DEFAULT_SETTINGS.proteinGoal, 10, 500);
   out.waterGoal = clamp(Math.round(out.waterGoal) || DEFAULT_SETTINGS.waterGoal, 16, 400);
   for (const k of ['profile', 'mealPlan', 'intensity']) if (!isObj(out[k])) out[k] = null;
+  out.drillPlan = Array.isArray(out.drillPlan) ? out.drillPlan.filter(id => typeof id === 'string') : [];
+  if (!isObj(out.drillVideos)) out.drillVideos = {};
+  if (!['R', 'L'].includes(out.bats)) out.bats = 'R';
   if (!Array.isArray(out.badges)) out.badges = null;
   return out;
 }
@@ -4178,6 +4906,13 @@ function cleanLog(l) {
     case 'throw': return Number(l.count) > 0 ? { ...l, count: Number(l.count), feel: clamp(parseInt(l.feel, 10) || 4, 1, 5), dist: optNum(l.dist) } : null;
     case 'checkin': return { ...l, sleep: clamp(n0(l.sleep) || 8, 5, 9), energy: clamp(n0(l.energy) || 3, 1, 5), sore: clamp(n0(l.sore) || 2, 1, 5) };
     case 'skill': return { ...l, reps: optNum(l.reps), min: optNum(l.min) };
+    case 'swing': {                         // a Swing lab report (pictures must be JPEG data, nothing else)
+      if (!Array.isArray(l.metrics) || !Number.isFinite(Number(l.score)) || !isObj(l.timing)) return null;
+      const arr = a => (Array.isArray(a) ? a : []);
+      return { ...l, score: Number(l.score), faults: arr(l.faults).filter(f => isObj(f) && typeof f.id === 'string'), drills: arr(l.drills).filter(isObj),
+        strengths: arr(l.strengths).map(String), otherViews: arr(l.otherViews).map(String), notes: arr(l.notes).map(String), cats: isObj(l.cats) ? l.cats : {},
+        keyframes: arr(l.keyframes).filter(k => isObj(k) && typeof k.img === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(k.img)) };
+    }
     case 'game': {
       const bat = Object.fromEntries(BAT.map(([k]) => [k, Math.max(0, n0(isObj(l.bat) ? l.bat[k] : 0))]));
       const pitch = isObj(l.pitch) && n0(l.pitch.outs) > 0 ? { outs: n0(l.pitch.outs), ...Object.fromEntries(PITCH.map(([k]) => [k, Math.max(0, n0(l.pitch[k]))])) } : null;
@@ -4365,21 +5100,26 @@ async function openApp(newUsername) {
 }
 
 // ----- What's new (shown once after an update to people who already use the app) -----
-const WHATS_NEW = '2.1';
+const WHATS_NEW = '2.2';
 function whatsNew() {
   const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
-  openSheet("What's new in Dugout 2.1", `
+  openSheet("What's new in Dugout 2.2", `
+    ${item('video', 'Swing lab', 'Baseball tab → Swing lab: film a swing from the side, front or back and get a full breakdown — stride, hip-shoulder separation, firing order, head movement, hands and finish — plus drills picked for what it finds. It all runs on your phone.')}
+    ${item('baseball', '66 drills for every position', 'Baseball tab → Drills: hitting, pitching, catching, every infield spot, outfield, throwing and base running — split into drills you can do alone and drills with a partner.')}
+    ${item('x', 'End a workout early', 'Tap End at the top of a workout to save what you did or cancel it.')}
+    <details class="table-toggle"><summary>New in 2.1</summary><div class="stack-sm">
     ${item('flame', 'Light, Moderate or Heavy', 'Pick how hard to go each day, right on the Today screen. Moderate trims the sets and weights. Light swaps in an easy recovery workout with a form video for every exercise.')}
     ${item('dumbbell', '10 more exercises', 'Goblet squats, Bulgarian split squats, band pull-aparts and more in the exercise library.')}
     ${item('refresh', 'Always the newest version', 'Dugout now loads the latest version every time you open it with internet.')}
     ${item('shield', 'Fixes', 'Switching lb and kg converts what you logged, and pitch counts add up across a whole day for Pitch Smart rest days.')}
+    </div></details>
     <details class="table-toggle"><summary>Everything new in 2.0</summary><div class="stack-sm">
     ${item('diet', 'Easier food logging', 'Search 169 foods, pick servings, and track carbs and fat. Recent foods and "copy yesterday" save taps.')}
     ${item('flame', 'Goals made for you', 'Calculate calories, protein and water from your size and training. Track water and body weight.')}
     ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 45 recipes, a game-day timeline, the week ahead and a shopping list.')}
     ${item('dumbbell', 'Smarter workouts', 'How-tos for every exercise, a library, swaps, next-weight tips, warm-up sets, a plate calculator and effort notes.')}
     ${item('plan', 'In-season program', 'Plan tab → Programs: off-season, pre-season and in-season plans, including two short lifts a week to stay strong during the season.')}
-    ${item('timer', 'Baseball tests, stats and arm care', 'Progress → Baseball: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
+    ${item('timer', 'Baseball tests, stats and arm care', 'Baseball tab: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
     ${item('trophy', 'Stay on track', 'Daily readiness check-in, a weekly review, a training calendar, badges and spreadsheet export.')}
     ${item('settings', 'Light mode', 'Settings → Appearance: a bright theme that is easier to read outside at the field.')}
     </div></details>
@@ -4454,7 +5194,9 @@ async function lockApp(message) {
   toastAct = null;
   DB.lock();
   badgeSig = ''; calcResult = null; pendingBackup = null;
-  Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null });
+  if (swingJob) swingJob.ac.abort();                 // stop a swing analysis and forget the last video
+  swingJob = null; lastTrack = null;
+  Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null, swingOpen: null });
   render();
   if (message) toast(message);
   if (updateReady) reloadForUpdate(updateReady);        // a new version was waiting: switch to it now

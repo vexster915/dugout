@@ -10,7 +10,7 @@
    When you change the app: set VERSION below to the same number as APP_VERSION in
    app.js. If you add a new file, add its name to FILES too. */
 
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 const CACHE = 'dugout-' + VERSION;
 const FILES = [
   './',
@@ -20,6 +20,8 @@ const FILES = [
   './meals.js',
   './foods.js',
   './exercises.js',
+  './drills.js',
+  './swing.js',
   './db.js',
   './app.js',
   './manifest.json',
@@ -28,6 +30,9 @@ const FILES = [
   './icon-512.png'
 ];
 const INDEX = './index.html';
+// The swing-analysis body model (vendor/…, about 21 MB) is downloaded the first time you use the Swing lab and kept
+// in its own cache across app updates. Its folder name carries its version, so new files mean a new folder.
+const MODELS = 'dugout-models-1';
 const SLOW = 3500;     // ms to wait for the internet before using the saved copy
 
 // Install: download and save every file (fresh from the server, not the browser's cache).
@@ -41,7 +46,7 @@ self.addEventListener('install', event => {
 
 // A new version took over: delete old saved copies and tell open windows which version this is.
 const tellVersion = client => client.postMessage({ type: 'dugout-version', version: VERSION });
-const dropOldCopies = () => caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))));
+const dropOldCopies = () => caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== MODELS).map(k => caches.delete(k))));
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     // Versions before 2.1 (saved as "dugout-v1" … "dugout-v6") can't switch over by themselves,
@@ -70,6 +75,17 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // YouTube etc. go straight to the internet
+
+  if (url.pathname.includes('/vendor/')) {      // the body model: from the phone if it's saved, otherwise download and keep it
+    event.respondWith(caches.open(MODELS).then(async cache => {
+      const saved = await cache.match(req);
+      if (saved) return saved;
+      const res = await fetch(req);
+      if (res.ok) event.waitUntil(cache.put(req, res.clone()));
+      return res;
+    }));
+    return;
+  }
 
   const isPage = req.mode === 'navigate';
   const key = isPage ? INDEX : req;
