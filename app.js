@@ -4170,7 +4170,7 @@ actions.checkUpdate = async () => {
     if (S.active) await saveActive();
     const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
     if (reg) await reg.update();
-    if (self.caches) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
+    if (self.caches) { const keys = await caches.keys(); await Promise.all(keys.filter(k => !k.startsWith('dugout-models')).map(k => caches.delete(k))); }   // keep the big swing model
   } catch (e) { /* ignore — reload anyway */ }
   setTimeout(() => location.reload(), 400);
 };
