@@ -14,3 +14,7 @@ https://storage.googleapis.com/mediapipe-assets/Model%20Card%20BlazePose%20GHUM%
 
 The folder name carries the version: to upgrade, add a new folder and point `swing.js` at it (the service worker
 keeps these big files in their own long-lived cache, so a new folder name is what makes phones download new ones).
+
+**Privacy:** this version of MediaPipe tries to send anonymous usage statistics (which task ran, timings) to
+`odml.pa.googleapis.com`. Dugout's Content-Security-Policy (`connect-src 'self'` in `index.html`) blocks that request,
+so nothing about you or your videos leaves the phone. (The blocked attempt shows up as an error in the browser console.)

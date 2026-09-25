@@ -10,7 +10,7 @@
    When you change the app: set VERSION below to the same number as APP_VERSION in
    app.js. If you add a new file, add its name to FILES too. */
 
-const VERSION = '2.1.1';
+const VERSION = '2.2.0';
 const CACHE = 'dugout-' + VERSION;
 const FILES = [
   './',
@@ -21,6 +21,7 @@ const FILES = [
   './foods.js',
   './exercises.js',
   './drills.js',
+  './swing.js',
   './db.js',
   './app.js',
   './manifest.json',

@@ -1,7 +1,7 @@
 /* swing.js — the Swing lab's analysis engine.
 
-   1. Tracking (in the browser): MediaPipe Pose Landmarker (vendor/…) finds 33 body points in every sampled frame of
-      your video, on the phone. Nothing is uploaded.
+   1. Tracking (in the browser, section 4): MediaPipe Pose Landmarker (vendor/…) finds 33 body points in every frame
+      of your video, on the phone. Nothing is uploaded.
    2. Analysis (plain math, no browser needed — tested with made-up swings):
       - builds a "hitter frame" — toward the pitcher (P), toward the plate (F) and up (U) — so the same measurements
         work from the side, front or back. Directions the camera sees flat come from the video; depth comes from the
@@ -41,6 +41,15 @@ const SWING = (() => {
   const conv = (a, k) => { const h = (k.length - 1) / 2; return a.map((_, i) => k.reduce((s, w, j) => s + w * a[clampN(i + j - h, 0, a.length - 1)], 0)); };
   const smooth = a => (a.length >= SGW + 2 ? conv(a, SGK[0]) : a.slice());
   const deriv = (a, dt) => (a.length >= SGW + 2 ? conv(a, SGK[1]).map(v => v / dt) : a.map((v, i) => (i ? (v - a[i - 1]) / dt : 0)));
+  // Running median: removes one-frame glitches but leaves smooth motion untouched.
+  const medFilt = (a, w) => { const h = (w - 1) >> 1; return a.map((_, i) => { const b = []; for (let j = i - h; j <= i + h; j++) b.push(a[clampN(j, 0, a.length - 1)]); b.sort((x, y) => x - y); return b[h]; }); };
+  // Outlier-only filter (Hampel): a sample far from its neighbors' median is replaced by that median; everything else
+  // is left exactly as it was.
+  const despike = (a, floor) => a.map((v, i) => {
+    const b = []; for (let j = i - 2; j <= i + 2; j++) b.push(a[clampN(j, 0, a.length - 1)]);
+    const m = med(b), mad = med(b.map(x => Math.abs(x - m)));
+    return Math.abs(v - m) > Math.max(floor, 4.4 * mad) ? m : v;
+  });
   const unwrap = a => { const o = a.slice(); for (let i = 1; i < o.length; i++) { while (o[i] - o[i - 1] > 180) o[i] -= 360; while (o[i] - o[i - 1] < -180) o[i] += 360; } return o; };
   // Index of the largest value in [from, to], refined between frames with a parabola (returns a fractional index).
   function peakAt(a, from = 0, to = a.length - 1) {
@@ -57,8 +66,35 @@ const SWING = (() => {
 
   /* ======================= 1. Clean up the tracked frames ======================= */
   // frames: [{ t: seconds in the video, lm: 33 × [x, y, visibility] (0–1 image coords), w: 33 × [x, y, z] meters } | null]
+
+  // Seen from the side, the body model sometimes swaps your left and right arm or leg for a few frames. Put them back:
+  // if trading a pair (elbow, wrist… or knee, ankle, foot) matches the frame before far better, trade it.
+  const SWAP_GROUPS = [[[13, 14], [15, 16], [17, 18], [19, 20], [21, 22]], [[25, 26], [27, 28], [29, 30], [31, 32]]];
+  function fixSwaps(frames) {
+    let prev = null;
+    return frames.map(f => {
+      if (!f) return f;
+      let g = f;
+      if (prev) {
+        for (const group of SWAP_GROUPS) {
+          let same = 0, swap = 0;
+          for (const [a, b] of group) {
+            const d = (x, y) => Math.hypot(g.lm[x][0] - prev.lm[y][0], g.lm[x][1] - prev.lm[y][1]);
+            same += d(a, a) + d(b, b); swap += d(a, b) + d(b, a);
+          }
+          if (swap < 0.5 * same && same > 0.04 * group.length) {
+            g = { t: g.t, lm: g.lm.slice(), w: g.w.slice() };
+            for (const [a, b] of group) { [g.lm[a], g.lm[b]] = [g.lm[b], g.lm[a]]; [g.w[a], g.w[b]] = [g.w[b], g.w[a]]; }
+          }
+        }
+      }
+      prev = g;
+      return g;
+    });
+  }
   // speed: how many times slower than real life the video plays (slow motion) — smoothing depends on real time.
   function prepare(frames, speed = 1) {
+    frames = fixSwaps(frames);
     const n = frames.length, ok = frames.filter(Boolean).length;
     if (n < 12 || ok / n < 0.6) return { error: 'nobody' };
     const ts = frames.filter(Boolean).map(f => f.t), dtv = ts.length > 1 ? (ts[ts.length - 1] - ts[0]) / (ts.length - 1) : 1 / 30;
@@ -82,10 +118,10 @@ const SWING = (() => {
         V[i][j] = frames[i] ? frames[i].lm[j][2] : 0;
       }
     }
-    // Smooth every coordinate over time.
+    // Smooth every coordinate over time (one-frame glitches are removed first).
     for (let j = 0; j < 33; j++) {
-      for (let c = 0; c < 2; c++) { const s = smooth(P.map(p => p[j][c])); s.forEach((v, i) => { P[i][j][c] = v; }); }
-      for (let c = 0; c < 3; c++) { const s = smooth(W.map(w => w[j][c])); s.forEach((v, i) => { W[i][j][c] = v; }); }
+      for (let c = 0; c < 2; c++) { const s = smooth(despike(P.map(p => p[j][c]), 0.02)); s.forEach((v, i) => { P[i][j][c] = v; }); }
+      for (let c = 0; c < 3; c++) { const s = smooth(despike(W.map(w => w[j][c]), 0.06)); s.forEach((v, i) => { W[i][j][c] = v; }); }
     }
     const times = frames.map((f, i) => (f ? f.t : NaN));
     // Uniform sampling is assumed (the tracker samples at a fixed step); fill any missing times.
@@ -97,12 +133,13 @@ const SWING = (() => {
 
   /* ======================= 2. The hitter frame ======================= */
   // Which way is the pitcher, which way is the plate, and which camera angle is this?
-  function orient(D, opts) {
+  // stance: frame numbers of your stance before the swing (the first part of the clip if unknown).
+  function orient(D, opts, stance) {
     const { P, W, V, n } = D, bats = opts.bats === 'L' ? 'L' : 'R';
     const S = bats === 'R' ? { sh: [LM.lSh, LM.rSh], el: [LM.lEl, LM.rEl], wr: [LM.lWr, LM.rWr], hip: [LM.lHip, LM.rHip], kn: [LM.lKn, LM.rKn], an: [LM.lAn, LM.rAn], heel: [LM.lHeel, LM.rHeel], toe: [LM.lToe, LM.rToe] }
       : { sh: [LM.rSh, LM.lSh], el: [LM.rEl, LM.lEl], wr: [LM.rWr, LM.lWr], hip: [LM.rHip, LM.lHip], kn: [LM.rKn, LM.lKn], an: [LM.rAn, LM.lAn], heel: [LM.rHeel, LM.lHeel], toe: [LM.rToe, LM.lToe] };
-    // [lead, back] index pairs. Look at the first ~quarter of the clip (the stance) to decide.
-    const early = Array.from({ length: Math.max(3, Math.floor(n * 0.25)) }, (_, i) => i);
+    // [lead, back] index pairs. Look at the stance to decide.
+    const early = stance && stance.length >= 3 ? stance : Array.from({ length: Math.max(3, Math.floor(n * 0.25)) }, (_, i) => i).filter(i => i < n);
     const aspect = opts.aspect || 16 / 9;
     const p2 = (i, j) => [P[i][j][0] * aspect, P[i][j][1], 0];
     const torso2 = med(early.map(i => len(sub(mid(p2(i, LM.lSh), p2(i, LM.rSh)), mid(p2(i, LM.lHip), p2(i, LM.rHip))))));
@@ -134,9 +171,9 @@ const SWING = (() => {
   // Hitter-frame coordinates (meters, relative to the hip center, scaled to your height):
   // a = toward the pitcher, b = toward the plate, c = up. Flat-to-camera directions come from the video (sharper),
   // depth comes from the model's 3D points.
-  function hitterCoords(D, O, heightM) {
+  function hitterCoords(D, O, heightM, stance) {
     const { P, W, n } = D, { Ph, Fh, aspect, view } = O;
-    const setup = Array.from({ length: Math.max(3, Math.floor(n * 0.2)) }, (_, i) => i);
+    const setup = stance && stance.length >= 3 ? stance : Array.from({ length: Math.max(3, Math.floor(n * 0.2)) }, (_, i) => i).filter(i => i < n);
     const hm2 = i => { const l = P[i][LM.lHip], r = P[i][LM.rHip]; return [((l[0] + r[0]) / 2) * aspect, (l[1] + r[1]) / 2]; };
     const sm2 = i => { const l = P[i][LM.lSh], r = P[i][LM.rSh]; return [((l[0] + r[0]) / 2) * aspect, (l[1] + r[1]) / 2]; };
     const torsoW = med(setup.map(i => len(sub(mid(W[i][LM.lSh], W[i][LM.rSh]), mid(W[i][LM.lHip], W[i][LM.rHip])))));
@@ -202,10 +239,11 @@ const SWING = (() => {
   const CATS = { setup: ['Setup', 0.06], stride: ['Load & stride', 0.16], rotation: ['Rotation & sequence', 0.24], head: ['Head & posture', 0.18],
     legs: ['Lower half', 0.12], hands: ['Hands & bat path', 0.16], finish: ['Finish', 0.08] };
 
-  // Slow motion? A swing's hand-speed peak is about 0.15 s wide (at half height) in real time. Uses only the 2D
-  // wrists; later passes smooth over a window matched to the peak itself, so jitter can't fool it at any frame rate.
-  // Returns 1 (normal), 4 or 8.
-  function estimateSpeed(D, aspect) {
+  // Where is the swing, and is it slow motion? Finds the hands' fastest moment on video (2D wrists only; later passes
+  // smooth over a window matched to the peak itself, so jitter can't fool it at any frame rate) and how wide that
+  // peak is. A swing's peak is about 0.15 s wide (at half height) in real time, so the width tells the playback speed.
+  function handPeak(D, aspect) {
+    let at = 0;
     const width = win => {
       const k = sgKernels(win), sm = a => conv(conv(a, k[0]), k[0]);
       const hx = sm(D.P.map(p => ((p[LM.lWr][0] + p[LM.rWr][0]) / 2) * aspect)), hy = sm(D.P.map(p => (p[LM.lWr][1] + p[LM.rWr][1]) / 2));
@@ -214,6 +252,7 @@ const SWING = (() => {
       let a0 = pk.i, a1 = pk.i;
       while (a0 > 0 && v[a0 - 1] > pk.v / 2) a0--;
       while (a1 < v.length - 1 && v[a1 + 1] > pk.v / 2) a1++;
+      at = pk.i;
       return a1 - a0 + 1;                                                      // in frames
     };
     let win = clampN(2 * Math.round(D.n / 60) + 1, 5, 41), w = 0;
@@ -223,9 +262,9 @@ const SWING = (() => {
       if (next === win) break;
       win = next;
     }
-    w *= D.dt;
-    return w < 0.33 ? 1 : w < 0.76 ? 4 : 8;
+    return { i: at, w: w * D.dt };
   }
+  const speedFromWidth = w => (w < 0.33 ? 1 : w < 0.76 ? 4 : 8);        // normal, 4× or 8× slow motion
   // Very high frame rates (slow motion) are averaged down to about 120 frames per real second.
   function bin(frames, k) {
     const out = [];
@@ -241,15 +280,20 @@ const SWING = (() => {
   function analyze(frames, opts = {}) {
     let D = prepare(frames);
     if (D.error) return D;
-    let speed = Number(opts.speed) || 0;
+    const hp0 = handPeak(D, opts.aspect || 16 / 9);
+    let speed = Number(opts.speed) || 0, swingAt = hp0.i;
     const speedAuto = !speed;
-    if (!speed) speed = estimateSpeed(D, opts.aspect || 16 / 9);
+    if (!speed) speed = speedFromWidth(hp0.w);
     const k = Math.floor((speed / D.dt) / 120 + 0.05);        // e.g. 240 real fps → average every 2 frames
-    if (k >= 2 || speed > 1) { D = prepare(k >= 2 ? bin(frames, k) : frames, speed); if (D.error) return D; }
-    const O = orient(D, opts);
+    if (k >= 2 || speed > 1) { D = prepare(k >= 2 ? bin(frames, k) : frames, speed); if (D.error) return D; if (k >= 2) swingAt = Math.floor(swingAt / k); }
+    const n = D.n, dtR = D.dt / speed, fr = s => Math.max(1, Math.round(s / dtR));        // real seconds → frames
+    // Your stance: roughly 1.6 to 0.6 s before the hands' fastest moment (anything earlier — walking in, a practice
+    // swing — is ignored).
+    const stance = Array.from({ length: n }, (_, i) => i).filter(i => i >= swingAt - fr(1.6) && i <= swingAt - fr(0.6));
+    const O = orient(D, opts, stance);
     const heightM = ((opts.heightIn || 69) * 2.54) / 100;
-    const H = hitterCoords(D, O, heightM);
-    const { C } = H, n = D.n, S = O.S;
+    const H = hitterCoords(D, O, heightM, stance);
+    const { C } = H, S = O.S;
     const J = (i, j) => C[i][j];
     const head = i => { const f = [LM.nose, LM.lEar, LM.rEar].map(j => [J(i, j), Math.max(0.05, D.V[i][j] || 0.05)]); const tw = f.reduce((s, [, w]) => s + w, 0); return f.reduce((acc, [p, w]) => add(acc, mul(p, w / tw)), [0, 0, 0]); };
     const L = { sh: i => J(i, S.sh[0]), bsh: i => J(i, S.sh[1]), el: i => J(i, S.el[0]), bel: i => J(i, S.el[1]), wr: i => J(i, S.wr[0]), bwr: i => J(i, S.wr[1]),
@@ -271,14 +315,12 @@ const SWING = (() => {
     const margin = Math.min(3, Math.floor(n / 10));
     const top = peakAt(hv, margin, n - 1 - margin);
     let pk = top;
-    for (let i = margin + 1; i < top.i; i++) if (hv[i] >= 0.7 * top.v && hv[i] >= hv[i - 1] && hv[i] >= hv[i + 1]) { pk = peakAt(hv, i - 1, i + 1); break; }
+    for (let i = Math.max(margin + 1, top.i - fr(0.45)); i < top.i; i++) if (hv[i] >= 0.7 * top.v && hv[i] >= hv[i - 1] && hv[i] >= hv[i + 1]) { pk = peakAt(hv, i - 1, i + 1); break; }
     const iC = pk.i;
     // A real swing stands out from the jitter and moves the hands a long way (about half a meter or more).
     let travel = 0;
-    for (let i = Math.max(0, iC - Math.round(n / 3)); i < iC; i++) travel = Math.max(travel, len(sub(hRel[iC], hRel[i])));
+    for (let i = Math.max(0, iC - fr(0.6)); i < iC; i++) travel = Math.max(travel, len(sub(hRel[iC], hRel[i])));
     if (iC < 4 || pk.v < 2 * med(hv) || travel < 0.28) return { error: 'noswing' };
-
-    const dtR = D.dt / speed, fr = s => Math.max(1, Math.round(s / dtR));        // real seconds → frames
 
     // Stride: lead ankle relative to the back ankle.
     const aRel = rng.map(i => sub(L.an(i), L.ban(i)));
@@ -289,16 +331,21 @@ const SWING = (() => {
     if (hasStride) {
       iSS = sp.i; while (iSS > 0 && av[iSS - 1] > 0.15 * sp.v) iSS--;
       // Foot plant from the foot's position (no smoothing lag): ~all the way to its landing spot and back on the ground.
-      const base = Array.from({ length: Math.max(3, iSS - fr(0.08)) }, (_, i) => i).filter(i => i < n);
+      let base = rng.filter(i => i <= iSS - fr(0.08) && i >= iSS - fr(0.7));
+      if (base.length < 3) base = [0, 1, 2].filter(i => i < n);
       const aS = [0, 1, 2].map(c => { const sm = c === depthAxis ? smooth(smooth(aRel.map(v => v[c]))) : aRel.map(v => v[c]); return sm; });
       const b0 = [0, 1, 2].map(c => med(base.map(i => aS[c][i])));
-      const dsp = i => Math.hypot(aS[0][i] - b0[0], aS[1][i] - b0[1]), total = dsp(iC) || 1e-6;
+      // Progress along the stride's direction (so depth jitter across it doesn't count) and height off the ground.
+      const u0 = [aS[0][iC] - b0[0], aS[1][iC] - b0[1]], total = Math.hypot(u0[0], u0[1]) || 1e-6;
+      const prog = i => ((aS[0][i] - b0[0]) * u0[0] + (aS[1][i] - b0[1]) * u0[1]) / (total * total);
       const lift = i => aS[2][i] - b0[2], maxLift = Math.max(0, ...rng.slice(iSS, iC + 1).map(lift));
-      // From the front or back, forward progress is depth (the model's smoothed guess, which lags), so the foot touching
-      // back down (sharp on video) leads and progress only needs to be most of the way.
-      const need = depthAxis === 0 ? 0.85 : 0.9;
+      // With a real leg lift, the foot coming back down (sharp on video) marks the plant — the planted foot can still
+      // drift a little afterwards. With a slide step or toe tap, it's when the foot has (nearly) reached its spot.
+      // From the front or back, forward progress is depth (the model's smoothed guess, which lags), so it needs less.
+      const lifted = maxLift > 0.03;
+      const need = lifted ? 0.7 : depthAxis === 0 ? 0.85 : 0.9, down = Math.max(0.01, 0.12 * maxLift);
       iFP = sp.i;
-      while (iFP < iC && !(dsp(iFP) >= need * total && lift(iFP) <= Math.max(0.008, 0.15 * maxLift))) iFP++;
+      while (iFP < iC && !(prog(iFP) >= need && lift(iFP) <= down)) iFP++;
     } else { let s0 = iC; while (s0 > 0 && hv[s0 - 1] > 0.25 * pk.v) s0--; iFP = Math.max(0, s0 - 1); iSS = Math.max(0, iFP - fr(0.3)); }
     // Load: hands farthest back (toward the catcher) around the stride. Swing start: hand speed passes 25% of its peak.
     const hA = smooth(hRel.map(v => v[0]));
@@ -306,7 +353,7 @@ const SWING = (() => {
     for (let i = iL; i <= Math.min(iC - 1, iFP + fr(0.08)); i++) if (hA[i] < hA[iL]) iL = i;
     let iS = iC; while (iS > iL && hv[iS - 1] > 0.25 * pk.v) iS--;
     const iSetEnd = Math.max(2, Math.min(iSS, iL) - fr(0.1));
-    const setup = rng.filter(i => i <= iSetEnd);
+    const setup = rng.filter(i => i <= iSetEnd && i >= iSetEnd - fr(1.0));
     const shortSetup = setup.length < 3;
     const setupIdx = shortSetup ? [0, 1, 2].filter(i => i < n) : setup;
     const iF = Math.min(n - 1, iC + fr(0.35));
@@ -328,7 +375,7 @@ const SWING = (() => {
         return deg(Math.atan2(-x[1], x[0]));
       });
     };
-    const hipRaw = unwrap(openAng(S.hip[0], S.hip[1])), shRaw = unwrap(openAng(S.sh[0], S.sh[1]));
+    const hipRaw = medFilt(unwrap(openAng(S.hip[0], S.hip[1])), SGW >= 13 ? 5 : 3), shRaw = medFilt(unwrap(openAng(S.sh[0], S.sh[1])), SGW >= 13 ? 5 : 3);
     const h0 = atSetup(i => hipRaw[i]), s0 = atSetup(i => shRaw[i]);
     const angSmooth = a => (SGW >= 7 ? smooth(a) : a);
     const hipO = angSmooth(hipRaw.map(v => v - h0)), shO = angSmooth(shRaw.map(v => v - s0));
@@ -514,7 +561,8 @@ const SWING = (() => {
     const series = { t: keep.map(tr), hip: keep.map(i => r1(hipO[i])), sh: keep.map(i => r1(shO[i])), hipV: keep.map(i => Math.round(hipV[i])), shV: keep.map(i => Math.round(shV[i])),
       hand: keep.map(i => r1(hvR[i] * 2.23694)), head: headPath };
     const q = v => Math.round(v * 1000) / 1000;
-    const track = { t: rng.map(tr), aspect: O.aspect, pts: rng.map(i => TRACK_JOINTS.map(j => [q(D.P[i][j][0]), q(D.P[i][j][1])])) };
+    const shown = rng.filter(i => i >= Math.max(0, iSetEnd - fr(0.5)) && i <= iF);
+    const track = { t: shown.map(tr), aspect: O.aspect, pts: shown.map(i => TRACK_JOINTS.map(j => [q(D.P[i][j][0]), q(D.P[i][j][1])])) };
     const ev = { setup: setupIdx[setupIdx.length - 1], load: iL, strideStart: iSS, footPlant: iFP, swingStart: iS, contact: iC, finish: iF };
     const evT = Object.fromEntries(Object.entries(ev).map(([k, i]) => [k, D.t[i]]));
     const timing = { loadMs: Math.round((iL - Math.min(iL, iSS)) * dtR * 1000), strideMs: hasStride ? Math.round((iFP - iSS) * dtR * 1000) : null,
@@ -535,5 +583,309 @@ const SWING = (() => {
     return out.slice(0, 5);
   }
 
-  return { analyze, prepare, orient, DEF, CATS, LM, TRACK_JOINTS, VERSION, _math: { smooth, deriv, peakAt, jointAngle, unwrap } };
+  /* ======================= 4. Tracking your video (browser only) ======================= */
+  // The body model runs on the phone: the video is played (muted, off screen) and every frame is handed to MediaPipe.
+  const MP = 'vendor/mediapipe-1.0.1/';
+  const MP_FILES = [['vision_bundle.mjs', 155393], ['vision_wasm_internal.js', 323377], ['vision_wasm_internal.wasm', 11756954], ['pose_landmarker_full.task', 9398198]];
+  const MAX_FRAMES = 720;                 // frames measured per swing (e.g. 12 s of 60 fps)
+  const oops = (code, detail) => Object.assign(new Error(code), { code, detail });
+  let model = null, modelMs = 40, loadingModel = null, checked = false;
+  let ts = 0;                              // the model needs ever-increasing timestamps (ms), across every video
+
+  // Can this browser run it? (WebAssembly with SIMD — iOS 16.4+, Chrome/Android from 2021 on.)
+  function supported() {
+    if (typeof WebAssembly !== 'object' || typeof HTMLVideoElement === 'undefined') return 'old';
+    try { if (!WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]))) return 'old'; } catch (e) { return 'old'; }
+    return '';
+  }
+
+  async function makeModel(delegate) {
+    const vision = await import('./' + MP + 'vision_bundle.mjs');
+    const m = await vision.PoseLandmarker.createFromOptions({ wasmLoaderPath: MP + 'vision_wasm_internal.js', wasmBinaryPath: MP + 'vision_wasm_internal.wasm' }, {
+      baseOptions: { modelAssetPath: MP + 'pose_landmarker_full.task', delegate }, runningMode: 'VIDEO', numPoses: 2,
+      minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5
+    });
+    m.delegate = delegate;
+    return m;
+  }
+  // Milliseconds per frame (the first run also warms the model up).
+  function timeModel(ctx, cv, v) {
+    const times = [];
+    for (let i = 0; i < 3; i++) { const a = performance.now(); detectFrame(ctx, cv, v, ++ts, null); times.push(performance.now() - a); }
+    return Math.max(8, Math.min(times[1], times[2]));
+  }
+
+  // Downloads the model files the first time (about 21 MB; the service worker keeps them), then starts the model.
+  function loadModel(onProgress = () => {}, delegate = 'GPU') {
+    if (model) return Promise.resolve(model);
+    if (loadingModel) return loadingModel;
+    loadingModel = (async () => {
+      const total = MP_FILES.reduce((t, [, b]) => t + b, 0);
+      let got = 0;
+      for (const [f] of MP_FILES) {
+        let res;
+        try { res = await fetch(MP + f); } catch (e) { throw oops('offline'); }
+        if (!res.ok) throw oops('offline');
+        if (res.body && res.body.getReader) {
+          const rd = res.body.getReader();
+          for (;;) { const { done, value } = await rd.read(); if (done) break; got += value.length; onProgress(Math.min(1, got / total)); }
+        } else { got += (await res.arrayBuffer()).byteLength; onProgress(Math.min(1, got / total)); }
+      }
+      if (delegate === 'GPU') { try { model = await makeModel('GPU'); } catch (e) { model = null; } }
+      if (!model) model = await makeModel('CPU');
+      return model;
+    })().catch(e => { loadingModel = null; throw e.code ? e : oops('model', e && e.message); });
+    return loadingModel;
+  }
+
+  const waitFor = (el, ev, ms, bad) => new Promise((resolve, reject) => {
+    const t = setTimeout(() => { el.removeEventListener(ev, ok); resolve(false); }, ms);
+    const ok = () => { clearTimeout(t); el.removeEventListener('error', fail); resolve(true); };
+    const fail = () => { clearTimeout(t); el.removeEventListener(ev, ok); reject(bad); };
+    el.addEventListener(ev, ok, { once: true });
+    if (bad) el.addEventListener('error', fail, { once: true });
+  });
+  // Jump to time t and wait until that frame can be drawn.
+  const seek = async (v, t) => {
+    if (Math.abs(v.currentTime - t) < 1e-4 && v.readyState >= 2) return;
+    const shown = 'requestVideoFrameCallback' in v ? new Promise(r => { v.requestVideoFrameCallback(() => r()); setTimeout(r, 400); }) : null;
+    const p = waitFor(v, 'seeked', 4000);
+    v.currentTime = t;
+    await p;
+    if (shown) await shown;
+  };
+
+  // Opens the video file in a hidden player (it has to be on the page for iPhones to decode it).
+  async function openVideo(file) {
+    const v = document.createElement('video'), url = URL.createObjectURL(file);
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+    v.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1';
+    document.body.appendChild(v);
+    const close = () => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { /* already gone */ } v.remove(); URL.revokeObjectURL(url); };
+    try {
+      const loaded = waitFor(v, 'loadeddata', 20000, oops('video'));
+      v.src = url;
+      if (!(await loaded) || !v.videoWidth) throw oops('video');
+    } catch (e) { close(); throw e.code ? e : oops('video'); }
+    return { v, close, w: v.videoWidth, h: v.videoHeight, duration: Number.isFinite(v.duration) ? v.duration : null };
+  }
+
+  // One frame → the hitter's 33 body points (or null). With two people in view (a coach, a catcher), it keeps
+  // following whoever it followed before; at the start it picks the biggest person.
+  function detectFrame(ctx, cv, v, ts, prev) {
+    ctx.drawImage(v, 0, 0, cv.width, cv.height);
+    const r = model.detectForVideo(cv, ts), L = r.landmarks || [], Wl = r.worldLandmarks || [];
+    if (!L.length || !Wl.length) return null;
+    const hipOf = p => [(p[23].x + p[24].x) / 2, (p[23].y + p[24].y) / 2];
+    const size = p => { const ys = p.map(q => q.y); return Math.max(...ys) - Math.min(...ys); };
+    let best = 0;
+    for (let i = 1; i < Math.min(L.length, Wl.length); i++) {
+      const a = L[i], b = L[best];
+      const better = prev ? Math.hypot(hipOf(a)[0] - prev[0], hipOf(a)[1] - prev[1]) < Math.hypot(hipOf(b)[0] - prev[0], hipOf(b)[1] - prev[1]) : size(a) > size(b);
+      if (better) best = i;
+    }
+    const p = L[best], w = Wl[best];
+    return { lm: p.map(q => [q.x, q.y, q.visibility == null ? 1 : q.visibility]), w: w.map(q => [q.x, q.y, q.z]), hip: hipOf(p) };
+  }
+
+  // Plays [t0, t1] at `rate`, calling onFrame(mediaTime, presentedFrames) for each frame the browser shows.
+  // (Falls back to stepping through with seeks where frame callbacks don't exist.)
+  function playRange(vid, t0, t1, rate, onFrame, signal, step) {
+    const v = vid.v;
+    if (!('requestVideoFrameCallback' in v)) {
+      return (async () => {
+        for (let t = t0; t <= t1 + 1e-6; t += step) {
+          if (signal && signal.aborted) throw oops('cancelled');
+          await seek(v, t);
+          onFrame(t, 0);
+          await new Promise(r => setTimeout(r, 0));
+        }
+      })();
+    }
+    return new Promise((resolve, reject) => {
+      let over = false, lastT = -1, lastSeen = Date.now();
+      const stop = err => {
+        if (over) return;
+        over = true; clearInterval(dog); v.pause(); v.removeEventListener('ended', onEnd);
+        if (err) reject(err); else resolve();
+      };
+      const onEnd = () => stop();
+      const tick = (now, meta) => {
+        if (over) return;
+        if (signal && signal.aborted) { stop(oops('cancelled')); return; }
+        const t = meta.mediaTime;
+        if (t > lastT + 1e-6) {
+          lastT = t; lastSeen = Date.now();
+          try { onFrame(t, meta.presentedFrames); } catch (e) { stop(e); return; }
+        }
+        if (t >= t1 - 1e-6) { stop(); return; }
+        v.requestVideoFrameCallback(tick);
+      };
+      // If the phone paused the video (app in the background), start it again; if nothing moves for 12 s, give up.
+      const dog = setInterval(() => {
+        if (over) return;
+        if (signal && signal.aborted) { stop(oops('cancelled')); return; }
+        if (typeof document !== 'undefined' && document.hidden) { lastSeen = Date.now(); return; }
+        if (v.paused && !v.ended) v.play().catch(() => {});
+        if (Date.now() - lastSeen > 12000) stop(lastT >= 0 ? null : oops('video'));
+      }, 1000);
+      v.addEventListener('ended', onEnd);
+      seek(v, t0).then(() => {
+        try { v.playbackRate = rate; } catch (e) { v.playbackRate = rate < 0.5 ? 0.5 : 1; }
+        v.requestVideoFrameCallback(tick);
+        return v.play();
+      }).catch(e => stop(e && e.code ? e : oops('video')));
+    });
+  }
+
+  // Tracks the body through the swing. Returns frames on an even time grid (null where nobody was found) for analyze().
+  async function track(file, { onProgress = () => {}, signal, delegate } = {}) {
+    if (supported()) throw oops('old');
+    await loadModel(f => onProgress('model', f), delegate);
+    if (signal && signal.aborted) throw oops('cancelled');
+    const vid = await openVideo(file);
+    try {
+      const { v } = vid, dur = vid.duration || 60;
+      const sc = Math.min(1, 640 / Math.max(vid.w, vid.h));
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(2, Math.round(vid.w * sc)); cv.height = Math.max(2, Math.round(vid.h * sc));
+      const ctx = cv.getContext('2d');
+      let tsBase = ts + 1000;
+      const stamp = t => (ts = Math.max(ts + 1, Math.round(t * 1000) + tsBase));
+
+      // How long the model takes per frame. Some phones' graphics path is slower than their processor: the first
+      // time, try both and keep the faster one.
+      await seek(v, Math.min(0.05, dur / 2));
+      modelMs = timeModel(ctx, cv, v);
+      if (!checked && model.delegate === 'GPU' && modelMs > 120) {
+        try {
+          const cpu = await makeModel('CPU'), gpu = model;
+          model = cpu;
+          const cpuMs = timeModel(ctx, cv, v);
+          if (cpuMs < modelMs) { gpu.close(); modelMs = cpuMs; } else { cpu.close(); model = gpu; }
+        } catch (e) { /* keep the GPU one */ }
+      }
+      checked = true;
+      tsBase = ts + 1000;
+
+      // The video's frame rate: play a moment without doing any work and look at the frame times.
+      const probe = [];
+      await playRange(vid, 0, Math.min(dur, 0.6), 1, (t, pf) => probe.push([t, pf]), signal, 1 / 30).catch(e => { if (e.code === 'cancelled') throw e; });
+      const gaps = [];
+      for (let i = 1; i < probe.length; i++) { const dpf = probe[i][1] - probe[i - 1][1], dt = probe[i][0] - probe[i - 1][0]; if (dt > 0) gaps.push(dpf > 0 ? dt / dpf : dt); }
+      let frameDt = med(gaps);
+      if (!Number.isFinite(frameDt) || frameDt <= 0.002 || frameDt > 0.2) frameDt = 1 / 30;
+      const common = [24, 25, 30, 48, 50, 60, 90, 100, 120, 240].find(r => Math.abs(1 / frameDt / r - 1) < 0.04);
+      if (common) frameDt = 1 / common;                       // 59.9 → 60 (frame times are rounded)
+
+      // 1) Long clip: a quick pass over everything to find the swing (the fastest hands).
+      let t0 = 0, t1 = dur;
+      if (dur > 6) {
+        const pts = [];
+        let prev = null;
+        await playRange(vid, 0, dur, clampN(0.1 / (1.2 * modelMs / 1000), 0.0625, 1), t => {
+          const f = detectFrame(ctx, cv, v, stamp(t), prev);
+          if (f) { prev = f.hip; pts.push([t, (f.lm[15][0] + f.lm[16][0]) / 2 * cv.width / cv.height, (f.lm[15][1] + f.lm[16][1]) / 2, (f.lm[27][0] + f.lm[28][0]) / 2 * cv.width / cv.height, (f.lm[27][1] + f.lm[28][1]) / 2, Math.abs(f.lm[0][1] - (f.lm[27][1] + f.lm[28][1]) / 2)]); }
+          onProgress('find', Math.min(1, t / dur));
+        }, signal, 0.1);
+        tsBase = ts + 1000;
+        // Hand speed relative to the feet, in body heights per second.
+        const body = Math.max(0.1, med(pts.map(p => p[5])));
+        const spd = i => { const [ta, ax, ay, fx, fy] = pts[i - 1], [tb, bx, by, gx, gy] = pts[i], dt = tb - ta;
+          return dt > 0 && dt <= 0.4 ? Math.hypot((bx - gx) - (ax - fx), (by - gy) - (ay - fy)) / body / dt : 0; };
+        let bestV = 0, iT = -1;
+        for (let i = 1; i < pts.length; i++) { const x = spd(i); if (x > bestV) { bestV = x; iT = i; } }
+        if (iT < 0) throw oops('nobody');
+        const T = (pts[iT - 1][0] + pts[iT][0]) / 2;
+        // Slow motion stretches the swing out: take a longer window.
+        let a = iT, b = iT;
+        while (a > 1 && spd(a - 1) > bestV / 2) a--;
+        while (b < pts.length - 1 && spd(b + 1) > bestV / 2) b++;
+        const slowish = pts[b][0] - pts[a - 1][0] > 0.45;
+        t0 = Math.max(0, T - (slowish ? 14 : 5)); t1 = Math.min(dur, T + (slowish ? 6 : 2));
+      }
+
+      // 2) The swing window, frame by frame (every k-th frame if there are too many), played slowly enough for the
+      // model to keep up.
+      const k = Math.max(1, Math.ceil((t1 - t0) / frameDt / MAX_FRAMES)), step = frameDt * k;
+      const n = Math.max(1, Math.floor((t1 - t0) / step + 1e-6) + 1);
+      const rate = clampN(step / (1.35 * modelMs / 1000), 0.0625, 1);
+      const frames = new Array(n).fill(null), tried = new Array(n).fill(false), offs = [];
+      let prev = null, done = 0;
+      await playRange(vid, t0, t1, rate, t => {
+        const idx = Math.round((t - t0) / step);
+        if (idx < 0 || idx >= n || tried[idx] || Math.abs(t - (t0 + idx * step)) > frameDt * 0.51) return;
+        tried[idx] = true; offs.push(t - (t0 + idx * step));
+        const f = detectFrame(ctx, cv, v, stamp(t), prev);
+        if (f) { prev = f.hip; frames[idx] = { t, lm: f.lm, w: f.w }; }
+        onProgress('track', ++done / n);
+      }, signal, step);
+      // Frames the video moved past while the model was still busy (slower phones): go back for each one.
+      const off = offs.length ? med(offs) : 0;
+      tsBase = ts + 1000;
+      for (let idx = 0; idx < n; idx++) {
+        if (tried[idx]) continue;
+        if (signal && signal.aborted) throw oops('cancelled');
+        const t = t0 + idx * step + off;
+        await seek(v, clampN(t + frameDt * 0.1, 0, dur));
+        const f = detectFrame(ctx, cv, v, stamp(t), prev);
+        if (f) { prev = f.hip; frames[idx] = { t, lm: f.lm, w: f.w }; }
+        tried[idx] = true;
+        onProgress('track', ++done / n);
+      }
+      const got = frames.filter(Boolean).length;
+      if (!got) throw oops('nobody');
+      // Missing frames are simply gaps (the analysis fills them in); trim empty ends.
+      let a = 0, b = n - 1;
+      while (a < b && !frames[a]) a++;
+      while (b > a && !frames[b]) b--;
+      return { frames: frames.slice(a, b + 1).map((f, i) => f || null), aspect: cv.width / cv.height, fps: Math.round(1 / step), frameDt, step, window: [t0, t1],
+        video: vid, delegate: model.delegate, modelMs: Math.round(modelMs) };
+    } catch (e) { vid.close(); throw e; }
+  }
+
+  // Still pictures of the key moments (stance, load, foot plant, contact, finish) with your tracked skeleton drawn on,
+  // cropped to you. Small JPEGs saved with the report.
+  const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [27, 29], [29, 31], [27, 31], [28, 30], [30, 32], [28, 32]];
+  async function keyframes(tr, report, labels) {
+    const { v } = tr.video, frames = tr.frames.filter(Boolean);
+    if (!frames.length || !report || !report.eventTimes) return [];
+    const xs = [], ys = [];
+    frames.forEach(f => TRACK_JOINTS.forEach(j => { if (f.lm[j][2] > 0.3) { xs.push(f.lm[j][0]); ys.push(f.lm[j][1]); } }));
+    const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.floor(p * (b.length - 1))]; };
+    let x0 = q(xs, 0.01), x1 = q(xs, 0.99), y0 = q(ys, 0.01), y1 = q(ys, 0.99);
+    const padY = (y1 - y0) * 0.16, padX = padY * v.videoHeight / v.videoWidth;
+    x0 = Math.max(0, x0 - padX); x1 = Math.min(1, x1 + padX); y0 = Math.max(0, y0 - padY); y1 = Math.min(1, y1 + padY * 0.6);
+    const sw = (x1 - x0) * v.videoWidth, sh = (y1 - y0) * v.videoHeight;
+    if (sw < 8 || sh < 8) return [];
+    const H = 320, W = Math.round(clampN((H * sw) / sh, 160, 420));
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const out = [];
+    for (const [key, label] of labels) {
+      const t = report.eventTimes[key];
+      if (!Number.isFinite(t)) continue;
+      await seek(v, clampN(t, 0, (tr.video.duration || t) - 0.001));
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(v, x0 * v.videoWidth, y0 * v.videoHeight, sw, sh, 0, 0, W, H);
+      const f = frames.reduce((b, x) => (Math.abs(x.t - t) < Math.abs(b.t - t) ? x : b), frames[0]);
+      const P = j => [((f.lm[j][0] - x0) / (x1 - x0)) * W, ((f.lm[j][1] - y0) / (y1 - y0)) * H];
+      const leadSide = report.bats === 'L' ? 0 : 1;             // right-handed hitters lead with their left side (odd points)
+      ctx.lineCap = 'round'; ctx.lineWidth = 3;
+      for (const [a, b] of BONES) {
+        const lead = a % 2 === leadSide && b % 2 === leadSide;
+        ctx.strokeStyle = lead ? 'rgba(255,149,0,0.95)' : 'rgba(90,200,250,0.95)';
+        const pa = P(a), pb = P(b);
+        ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+      }
+      const hd = P(0); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(hd[0], hd[1], 7, 0, Math.PI * 2); ctx.stroke();
+      let img = '';
+      try { img = cv.toDataURL('image/jpeg', 0.72); } catch (e) { img = ''; }
+      if (img) out.push({ key, label, img });
+    }
+    return out;
+  }
+
+  return { analyze, prepare, orient, supported, loadModel, track, openVideo, keyframes, DEF, CATS, LM, TRACK_JOINTS, VERSION, _math: { smooth, deriv, peakAt, jointAngle, unwrap } };
 })();
