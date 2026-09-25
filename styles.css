@@ -762,6 +762,10 @@ i.t-rest { background: var(--muted); }
 }
 
 /* ---------- Light theme (Settings → Appearance) — easier to read outdoors in the sun ---------- */
+.wo-head-btns { gap: 6px; flex-shrink: 0; }
+.wo-meta { gap: 4px 10px; flex-wrap: wrap; }
+.wo-meta .wo-clock { white-space: nowrap; }
+
 /* ---------- Light / Moderate / Heavy ---------- */
 .level-seg button { flex-direction: column; gap: 1px; min-height: 50px; font-weight: 900; font-size: 15px; line-height: 1.1; }
 .level-seg button small { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }

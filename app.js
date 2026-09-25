@@ -19,7 +19,7 @@
 
 'use strict';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
@@ -844,14 +844,17 @@ function renderWorkout() {
     <div class="wo-head">
       <div class="spread">
         <div class="grow">
-          <div class="row" style="gap:10px">
+          <div class="row wo-meta">
             <span class="badge solid">${icon(m.icon)} ${m.label}</span>
             <span class="wo-clock" id="wo-clock">${clock((Date.now() - a.startedAt) / 1000)}</span>
             <span class="wo-clock" id="wo-count">${done}/${total} sets</span>
           </div>
           <div class="wo-title" style="margin-top:6px">${esc(a.title)}${levelTag(a)}</div>
         </div>
-        <button class="btn btn-icon btn-ghost" data-action="workoutMenu" aria-label="Workout options">${icon('more')}</button>
+        <div class="row wo-head-btns">
+          <button class="btn btn-sm btn-ghost" data-action="exitWorkout">${icon('x', 'sm')} End</button>
+          <button class="btn btn-icon btn-ghost" data-action="workoutMenu" aria-label="Workout options">${icon('more')}</button>
+        </div>
       </div>
       <div class="wo-bar"><span id="wo-bar" style="width:${total ? (done / total) * 100 : 0}%"></span></div>
     </div>
@@ -863,6 +866,7 @@ function renderWorkout() {
       ${a.exercises.map((e, i) => woExercise(e, i, i === open)).join('')}
       <button class="btn btn-ghost btn-block" data-action="addWorkoutExercise">${icon('plus')} Add exercise</button>
       <button class="btn btn-primary btn-xl" data-action="finishWorkout">${icon('check')} Finish workout</button>
+      <button class="btn-link center" data-action="exitWorkout">End early or cancel</button>
     </div>`;
 }
 
@@ -1145,7 +1149,7 @@ actions.workoutMenu = () => openSheet('Workout options', `<div class="stack">
   <div class="field"><span>Quick timer</span>
     <div class="chips">${[30, 45, 60, 90, 120, 180].map(s => `<button class="chip" data-action="customTimer" data-s="${s}">${restLabel(s)}</button>`).join('')}</div>
   </div>
-  <button class="btn btn-danger btn-block" data-action="discardWorkout">${icon('trash', 'sm')} Discard workout</button>
+  <button class="btn btn-ghost btn-block" data-action="exitWorkout">${icon('x', 'sm')} End early or cancel</button>
 </div>`);
 actions.customTimer = el => { closeSheet(); unlockAudio(); startTimer(+el.dataset.s, 'Timer'); };
 
@@ -1174,22 +1178,40 @@ const lowerIsBetter = e => e.track === 'time' && repSeconds(e.reps) == null;   /
 const volumeOf = w => sum(w.exercises.filter(e => e.track === 'weight'), e => sum(e.sets.filter(s => s.done), s => (s.w || 0) * (s.r || 0)));
 const setsDone = w => sum(w.exercises, e => e.sets.filter(s => s.done).length);
 
-actions.finishWorkout = async () => {
+actions.finishWorkout = () => {
   if (!S.active) return;
   const { total, done } = workoutProgress();
-  if (done === 0) {
-    if (await confirmBox('Nothing checked off', "You haven't checked off any sets. Discard this workout?", { ok: 'Discard', danger: true })) endWorkout(false);
-    return;
-  }
-  if (done < total) {
-    const left = total - done;
-    if (!(await confirmBox('Finish workout?', `${left} set${left === 1 ? ' is' : 's are'} not checked off. They'll be saved as skipped.`, { ok: 'Finish' }))) return;
-  } else closeSheet();
+  if (done < total) { actions.exitWorkout(); return; }       // sets left: same choices as the End button
+  closeSheet();
   endWorkout(true);
 };
-actions.discardWorkout = async () => {
-  if (await confirmBox('Discard workout?', 'Everything logged in this workout will be deleted.', { ok: 'Discard', danger: true })) endWorkout(false);
+// ----- Stop early: keep what you did, or cancel the whole workout (with Undo) -----
+actions.exitWorkout = () => {
+  if (!S.active) return;
+  const { total, done } = workoutProgress(), left = total - done, took = fmtDur(Date.now() - S.active.startedAt);
+  const s = n => (n === 1 ? '' : 's');
+  openSheet(!done ? 'Cancel this workout?' : left ? 'End workout early?' : 'Finish workout?', `<div class="stack">
+    <p class="text-2">${done ? `You've done <b>${done} of ${total} set${s(total)}</b> in ${took}.` : `You haven't checked off any sets yet (${took}).`}</p>
+    ${done ? `<div class="stack-sm">
+      <button class="btn btn-primary btn-block" data-action="endEarly">${icon('check', 'sm')} ${left ? 'Save and end now' : 'Finish and save'}</button>
+      <p class="hint">${left ? `Keeps the ${done} set${s(done)} you checked off, and the other ${left} ${left === 1 ? 'is' : 'are'} marked as skipped.` : 'Every set is done.'} It goes into your history and progress charts.</p>
+    </div>` : ''}
+    <div class="stack-sm">
+      <button class="btn btn-danger btn-block" data-action="cancelWorkout">${icon('trash', 'sm')} Cancel workout</button>
+      <p class="hint">Nothing from this workout is saved. You can undo it right after.</p>
+    </div>
+    <button class="btn btn-ghost btn-block" data-action="closeSheet">Keep going</button>
+  </div>`);
 };
+actions.endEarly = () => { if (!S.active) return; closeSheet(); endWorkout(true); };
+actions.cancelWorkout = () => { if (!S.active) return; closeSheet(); endWorkout(false); };
+// Undo a cancel: the workout comes back exactly as it was.
+function resumeWorkout(a) {
+  if (S.active) { toast('Another workout is already going'); return; }
+  S.active = a; S.openEx = null; S.tab = 'today';
+  saveActive(); render({ keepScroll: false }); keepAwake(true);
+  toast('Workout back — keep going');
+}
 
 async function endWorkout(keep) {
   const a = S.active;
@@ -1201,6 +1223,7 @@ async function endWorkout(keep) {
   let prs = [];
   if (keep) {
     a.finishedAt = Date.now();
+    a.early = a.exercises.some(e => e.sets.some(st => !st.done));   // stopped before every set was done
     // Forgot to tap Finish? End the workout a minute after your last checked set instead of now.
     if (a.lastAt && a.finishedAt - a.lastAt > 3 * 3600000) a.finishedAt = a.lastAt + 60000;
     prs = findPRs(a);
@@ -1209,7 +1232,8 @@ async function endWorkout(keep) {
   }
   await saveActive();
   render({ keepScroll: false });
-  if (keep) showSummary(a, prs); else toast('Workout discarded');
+  if (keep) showSummary(a, prs);
+  else toast('Workout canceled — nothing saved', { action: () => resumeWorkout(a), label: 'Undo' });
 }
 
 // New bests compared with every earlier workout in the same mode.
@@ -1240,8 +1264,9 @@ function findPRs(w) {
 }
 
 function showSummary(w, prs) {
-  const vol = volumeOf(w);
-  openSheet('Workout complete', `
+  const vol = volumeOf(w), total = sum(w.exercises, e => e.sets.length);
+  openSheet(w.early ? 'Workout saved' : 'Workout complete', `
+    ${w.early ? `<p class="text-2 small">Ended early: ${setsDone(w)} of ${total} sets done. Good call if your body needed it.</p>` : ''}
     <div class="tiles">
       <div class="tile"><div class="tile-label">Time</div><div class="tile-value">${fmtDur(w.finishedAt - w.startedAt)}</div></div>
       <div class="tile"><div class="tile-label">Sets done</div><div class="tile-value">${setsDone(w)}</div></div>
@@ -3202,7 +3227,7 @@ function historyList(ws) {
   return `<div class="stack">${shown.map(w => {
     const vol = volumeOf(w);
     return `<button class="hist" data-action="showWorkout" data-id="${w.id}">
-      <div><div class="hist-title">${esc(w.title)}${levelTag(w)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.rpe ? ` · effort ${w.rpe}/10` : ''}${w.notes ? ' · notes' : ''}</div></div>
+      <div><div class="hist-title">${esc(w.title)}${levelTag(w)}</div><div class="hist-sub">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.early ? ' · ended early' : ''}${w.rpe ? ` · effort ${w.rpe}/10` : ''}${w.notes ? ' · notes' : ''}</div></div>
       <div class="hist-right">${setsDone(w)} sets<small>${vol ? `${fmtK(vol)} ${S.settings.unit}` : ''}</small></div>
     </button>`;
   }).join('')}</div>
@@ -3220,6 +3245,7 @@ actions.showWorkout = el => {
       <span class="badge">${fmtDate(parseYmd(w.date), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
       <span class="badge">${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}</span>
       ${isEasy(w) ? `<span class="badge">${LEVELS[w.intensity].label} day</span>` : ''}
+      ${w.early ? '<span class="badge">Ended early</span>' : ''}
       ${vol ? `<span class="badge">${fmtK(vol)} ${S.settings.unit}</span>` : ''}
     </div>
     <div>${w.exercises.map(e => `<div class="detail-ex">
@@ -4031,7 +4057,8 @@ actions.checkUpdate = async () => {
 const HELP = [
   ['Your day in Dugout', ['Open the Today tab: it shows today\'s workout, a quick check-in, your nutrition, water and what to eat next.',
     'Tap Start to begin a workout. Check off each set — the rest timer starts on its own, and your weights from last time are filled in.',
-    'Tap ▶ on any exercise for a form video, step-by-step how-to, common mistakes and easier or harder versions.']],
+    'Tap ▶ on any exercise for a form video, step-by-step how-to, common mistakes and easier or harder versions.',
+    'Need to stop early? Tap End at the top of the workout: save the sets you did, or cancel the whole workout (you can undo it).']],
   ['Light, Moderate or Heavy', ['Every day you pick how hard to go, right above your workout on the Today screen. It starts on Heavy (the full workout) each morning.',
     'Moderate keeps the same exercises with about ⅔ of the sets, and fills in weights at about 90% of last time.',
     'Light swaps in your Light workout: mobility, arm care and core, with a form video for every exercise. Good the day after a game, sprinting or a hard practice.',
