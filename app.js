@@ -3990,6 +3990,7 @@ const SW_STAGE = { model: 'Getting the swing analyzer ready', find: 'Finding you
   measure: 'Measuring your swing', pictures: 'Saving pictures of your positions' };
 function showSwingProgress() {
   openSheet('Analyzing your swing', `<div class="stack-sm" aria-live="polite">
+    <div class="sw-live" id="sw-live"><canvas id="sw-live-cv" aria-hidden="true"></canvas></div>
     <div class="small bold" id="sw-stage">${esc(SW_STAGE[swingJob ? swingJob.stage : 'model'])}</div>
     <div class="meter pc"><span id="sw-bar" style="width:${swingJob ? Math.round(swingJob.pct * 100) : 0}%"></span></div>
     <p class="hint" id="sw-sub">Keep Dugout open until it's done. Your video stays on your phone.</p>
@@ -4006,6 +4007,25 @@ function updateSwingProgress() {
   else sub.textContent = 'Keep Dugout open until it\'s done. Your video stays on your phone.';
 }
 actions.swingCancel = () => { if (swingJob) swingJob.ac.abort(); closeSheet(); };
+// Your tracked skeleton drawn over the video while it's analyzed.
+function swLiveDraw(lm, bats) {
+  const box = $('#sw-live'), cv = $('#sw-live-cv'), v = box && $('video', box);
+  if (!cv || !v || !v.videoWidth) return;
+  const cw = v.clientWidth, ch = v.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cw, ch);
+  if (!lm) return;
+  const sc = Math.min(cw / v.videoWidth, ch / v.videoHeight), ox = (cw - v.videoWidth * sc) / 2, oy = (ch - v.videoHeight * sc) / 2;
+  const P = j => [ox + lm[j][0] * v.videoWidth * sc, oy + lm[j][1] * v.videoHeight * sc], lead = bats === 'L' ? 0 : 1;
+  ctx.lineCap = 'round'; ctx.lineWidth = 3;
+  for (const [a, b] of SWING.BONES) {
+    ctx.strokeStyle = a % 2 === lead && b % 2 === lead ? 'rgba(255,149,0,0.95)' : 'rgba(90,200,250,0.95)';
+    const pa = P(a), pb = P(b);
+    ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+  }
+}
 
 const SW_PROBLEM = {
   old: ['This browser can\'t run the swing analyzer', 'It needs iOS 16.4 or newer on iPhone, or a current Chrome on Android. Update your phone, then try again.'],
@@ -4013,7 +4033,8 @@ const SW_PROBLEM = {
   model: ['The swing analyzer couldn\'t start', 'Close other apps to free up memory and try again. Restarting your phone can help.'],
   video: ['This video couldn\'t be opened', 'Try a video recorded with your phone\'s camera app. On iPhone, Settings → Camera → Formats → "Most Compatible" makes videos that open everywhere.'],
   nobody: ['Couldn\'t find you in the video', 'Make sure your whole body — head to feet — is in the frame, in good light, with the phone held still. If other people are in view, you should be the biggest.'],
-  noswing: ['Couldn\'t find a full swing', 'Make sure the video shows your stance all the way through your finish, filmed steady (no zooming or following the ball). One swing per video works best.']
+  noswing: ['Couldn\'t find a full swing', 'Make sure the video shows your stance all the way through your finish, filmed steady (no zooming or following the ball). One swing per video works best.'],
+  nohands: ['That doesn\'t look like a swing', 'When your hands moved fastest they weren\'t together on a bat. Make sure the video is of a swing (not a throw or a bunt) and your hands stay in the picture.']
 };
 function swingProblem(code) {
   const [title, text] = SW_PROBLEM[code] || ['Something went wrong', 'Try again. If it keeps happening, try a different video.'];
@@ -4029,11 +4050,12 @@ async function runSwing(file, opts) {
   keepAwake(true);
   let tr = null;
   try {
-    tr = await SWING.track(file, { signal: job.ac.signal, onProgress: (stage, pct) => { job.stage = stage; job.pct = pct; updateSwingProgress(); } });
-    job.stage = 'measure'; job.pct = 1; updateSwingProgress();
+    tr = await SWING.track(file, { signal: job.ac.signal, host: () => $('#sw-live'), onPose: lm => swLiveDraw(lm, opts.bats),
+      onProgress: (stage, pct) => { job.stage = stage; job.pct = pct; updateSwingProgress(); } });
+    job.stage = 'measure'; job.pct = 1; updateSwingProgress(); swLiveDraw(null);
     await new Promise(r => setTimeout(r, 40));               // let the screen show it
     const rep = SWING.analyze(tr.frames, { ...opts, aspect: tr.aspect });
-    if (rep.error) throw Object.assign(new Error(rep.error), { code: rep.error });
+    if (rep.error) throw Object.assign(new Error(rep.error), { code: rep.reason === 'hands' ? 'nohands' : rep.error });
     if (job.ac.signal.aborted) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
     job.stage = 'pictures'; job.pct = 0.5; updateSwingProgress();
     const pics = await SWING.keyframes(tr, rep, SW_KEYS);
@@ -4051,7 +4073,7 @@ async function runSwing(file, opts) {
     if (swingJob === job) swingJob = null;
     if (S.locked) return;
     const code = e && e.code;
-    if (code === 'cancelled') { closeSheet(); toast('Analysis cancelled'); } else { console.error(e); swingProblem(code); }
+    if (code === 'cancelled') { closeSheet(); toast('Analysis cancelled'); } else { if (!SW_PROBLEM[code] || code === 'model') console.error(e); swingProblem(code); }
   } finally {
     keepAwake(!!S.active);
   }
@@ -4267,7 +4289,6 @@ function swingReplay(r) {
   const k = Math.min((w - 24) / bw, (h - 24) / bh), ox = (w - bw * k) / 2, oy = (h - bh * k) / 2;
   const J = SWING.TRACK_JOINTS, at = j => J.indexOf(j);
   const lead = r.bats === 'L' ? 0 : 1;
-  const bones = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [27, 29], [29, 31], [27, 31], [28, 30], [30, 32], [28, 32]];
   const ev = [[-(r.timing.strideMs || 0) - r.timing.fpToContactMs, 'Stride'], [-r.timing.fpToContactMs, 'Foot down'], [-r.timing.swingMs, 'Swing'], [0, 'Contact'], [60, 'Follow-through'], [260, 'Finish']];
   const phase = t => { let p = r.timing.strideMs != null ? 'Stance & load' : 'Stance'; ev.forEach(([et, name]) => { if (t >= et) p = name; }); return p; };
   const css = getComputedStyle(document.body);
@@ -4281,12 +4302,14 @@ function swingReplay(r) {
     for (let q = Math.max(0, i - 40); q <= i; q++) { const g = tr.pts[q], hx = ox + ((g[at(15)][0] + g[at(16)][0]) / 2 * asp - x0) * k, hy = oy + ((g[at(15)][1] + g[at(16)][1]) / 2 - y0) * k; if (q === Math.max(0, i - 40)) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy); }
     ctx.stroke();
     ctx.lineCap = 'round'; ctx.lineWidth = 4;
-    for (const [a, b] of bones) {
+    for (const [a, b] of SWING.BONES) {
       ctx.strokeStyle = a % 2 === lead && b % 2 === lead ? colLead : colBack;
       const pa = P(a), pb = P(b);
       ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
     }
-    const hd = P(0); ctx.fillStyle = '#f2f5f9'; ctx.beginPath(); ctx.arc(hd[0], hd[1], 7, 0, Math.PI * 2); ctx.fill();
+    const hd = P(0), l = P(11), rs = P(12), neck = [(l[0] + rs[0]) / 2, (l[1] + rs[1]) / 2];
+    ctx.strokeStyle = '#f2f5f9'; ctx.beginPath(); ctx.moveTo(neck[0], neck[1]); ctx.lineTo(hd[0], hd[1]); ctx.stroke();
+    ctx.fillStyle = '#f2f5f9'; ctx.beginPath(); ctx.arc(hd[0], hd[1], 8, 0, Math.PI * 2); ctx.fill();
     const lbl = $('#sw-phase'), sc = $('#sw-scrub');
     if (lbl) lbl.textContent = `${phase(tr.t[i])} · ${tr.t[i] > 0 ? '+' : ''}${tr.t[i]} ms`;
     if (sc && Number(sc.value) !== i) sc.value = i;
@@ -4351,7 +4374,7 @@ submits.swingRedo = async f => {
   if (!r || !lastTrack || lastTrack.id !== r.id) { closeSheet(); return; }
   const opts = { ...lastTrack.opts, view: ['side', 'front', 'back'].includes(d.view) ? d.view : r.view, bats: d.bats === 'L' ? 'L' : 'R', speed: ['1', '4', '8'].includes(d.speed) ? Number(d.speed) : r.speed };
   const rep = SWING.analyze(lastTrack.frames, { ...opts, aspect: lastTrack.aspect });
-  if (rep.error) { swingProblem(rep.error); return; }
+  if (rep.error) { swingProblem(rep.reason === 'hands' ? 'nohands' : rep.error); return; }
   let pics = r.keyframes;
   let vid = null;
   try { vid = await SWING.openVideo(lastTrack.file); pics = await SWING.keyframes({ video: vid, frames: lastTrack.frames }, rep, SW_KEYS); } catch (e) { /* keep the old pictures */ } finally { if (vid) vid.close(); }

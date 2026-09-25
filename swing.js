@@ -321,6 +321,10 @@ const SWING = (() => {
     let travel = 0;
     for (let i = Math.max(0, iC - fr(0.6)); i < iC; i++) travel = Math.max(travel, len(sub(hRel[iC], hRel[i])));
     if (iC < 4 || pk.v < 2 * med(hv) || travel < 0.28) return { error: 'noswing' };
+    // Both hands on the bat: through contact your wrists stay close together (walking, jumping, waving or throwing
+    // don't look like that).
+    const apart = med(rng.slice(Math.max(0, iC - fr(0.08)), iC + 1).map(i => len(sub(L.wr(i), L.bwr(i))) / (len(mid(L.sh(i), L.bsh(i))) || 0.3)));
+    if (apart > 0.6) return { error: 'noswing', reason: 'hands' };
 
     // Stride: lead ankle relative to the back ankle.
     const aRel = rng.map(i => sub(L.an(i), L.ban(i)));
@@ -611,7 +615,7 @@ const SWING = (() => {
   // Milliseconds per frame (the first run also warms the model up).
   function timeModel(ctx, cv, v) {
     const times = [];
-    for (let i = 0; i < 3; i++) { const a = performance.now(); detectFrame(ctx, cv, v, ++ts, null); times.push(performance.now() - a); }
+    for (let i = 0; i < 3; i++) { const a = performance.now(); detectFrame(ctx, cv, v, ++ts, 0, null); times.push(performance.now() - a); }
     return Math.max(8, Math.min(times[1], times[2]));
   }
 
@@ -655,36 +659,49 @@ const SWING = (() => {
     if (shown) await shown;
   };
 
-  // Opens the video file in a hidden player (it has to be on the page for iPhones to decode it).
-  async function openVideo(file) {
+  // Opens the video file in a player on the page (iPhones only decode, and keep playing, videos that are on screen).
+  // host() gives the element to show it in (the progress screen); without one it's a tiny dot in the corner.
+  async function openVideo(file, host) {
     const v = document.createElement('video'), url = URL.createObjectURL(file);
     v.muted = true; v.playsInline = true; v.preload = 'auto';
     v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-    v.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1';
-    document.body.appendChild(v);
+    const place = () => {
+      const h = host && host();
+      if (h && h.isConnected) {
+        if (v.parentNode !== h) { h.prepend(v); v.style.cssText = ''; v.className = 'sw-video'; }
+      } else if (v.parentNode !== document.body) {
+        document.body.appendChild(v);
+        v.className = ''; v.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1';
+      }
+    };
+    place();
     const close = () => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { /* already gone */ } v.remove(); URL.revokeObjectURL(url); };
     try {
       const loaded = waitFor(v, 'loadeddata', 20000, oops('video'));
       v.src = url;
       if (!(await loaded) || !v.videoWidth) throw oops('video');
     } catch (e) { close(); throw e.code ? e : oops('video'); }
-    return { v, close, w: v.videoWidth, h: v.videoHeight, duration: Number.isFinite(v.duration) ? v.duration : null };
+    return { v, close, place, w: v.videoWidth, h: v.videoHeight, duration: Number.isFinite(v.duration) ? v.duration : null };
   }
 
-  // One frame → the hitter's 33 body points (or null). With two people in view (a coach, a catcher), it keeps
-  // following whoever it followed before; at the start it picks the biggest person.
-  function detectFrame(ctx, cv, v, ts, prev) {
+  // One frame → the hitter's 33 body points (or null). Shaky "people" the model half-sees (in trees, shadows) are
+  // skipped. With two people in view (a coach, a catcher) it keeps following whoever it followed before — a sudden jump
+  // across the picture is a different person, not the hitter — and at the start it picks the biggest, clearest one.
+  // prev: { hip, t } of the last frame it kept.
+  const BODY = [11, 12, 23, 24, 25, 26, 27, 28];
+  function detectFrame(ctx, cv, v, ts, t, prev) {
     ctx.drawImage(v, 0, 0, cv.width, cv.height);
     const r = model.detectForVideo(cv, ts), L = r.landmarks || [], Wl = r.worldLandmarks || [];
-    if (!L.length || !Wl.length) return null;
     const hipOf = p => [(p[23].x + p[24].x) / 2, (p[23].y + p[24].y) / 2];
     const size = p => { const ys = p.map(q => q.y); return Math.max(...ys) - Math.min(...ys); };
-    let best = 0;
-    for (let i = 1; i < Math.min(L.length, Wl.length); i++) {
-      const a = L[i], b = L[best];
-      const better = prev ? Math.hypot(hipOf(a)[0] - prev[0], hipOf(a)[1] - prev[1]) < Math.hypot(hipOf(b)[0] - prev[0], hipOf(b)[1] - prev[1]) : size(a) > size(b);
-      if (better) best = i;
-    }
+    const quality = p => BODY.reduce((acc, j) => acc + (p[j].visibility == null ? 1 : p[j].visibility), 0) / BODY.length;
+    const people = [];
+    for (let i = 0; i < Math.min(L.length, Wl.length); i++) if (quality(L[i]) >= 0.35) people.push(i);
+    if (!people.length) return null;
+    const recent = prev && t - prev.t < 0.6;
+    const dist = i => Math.hypot(hipOf(L[i])[0] - prev.hip[0], hipOf(L[i])[1] - prev.hip[1]);
+    const best = people.reduce((b, i) => (recent ? dist(i) < dist(b) : size(L[i]) * quality(L[i]) > size(L[b]) * quality(L[b])) ? i : b, people[0]);
+    if (recent && dist(best) > 0.12 + Math.max(0, t - prev.t)) return null;
     const p = L[best], w = Wl[best];
     return { lm: p.map(q => [q.x, q.y, q.visibility == null ? 1 : q.visibility]), w: w.map(q => [q.x, q.y, q.z]), hip: hipOf(p) };
   }
@@ -727,6 +744,7 @@ const SWING = (() => {
         if (over) return;
         if (signal && signal.aborted) { stop(oops('cancelled')); return; }
         if (typeof document !== 'undefined' && document.hidden) { lastSeen = Date.now(); return; }
+        vid.place();                                      // the progress screen was redrawn: move the player back in
         if (v.paused && !v.ended) v.play().catch(() => {});
         if (Date.now() - lastSeen > 12000) stop(lastT >= 0 ? null : oops('video'));
       }, 1000);
@@ -740,11 +758,12 @@ const SWING = (() => {
   }
 
   // Tracks the body through the swing. Returns frames on an even time grid (null where nobody was found) for analyze().
-  async function track(file, { onProgress = () => {}, signal, delegate } = {}) {
+  // onPose(points) gets each frame's body points (or null) as they're found, to draw them live.
+  async function track(file, { onProgress = () => {}, onPose = () => {}, signal, delegate, host } = {}) {
     if (supported()) throw oops('old');
     await loadModel(f => onProgress('model', f), delegate);
     if (signal && signal.aborted) throw oops('cancelled');
-    const vid = await openVideo(file);
+    const vid = await openVideo(file, host);
     try {
       const { v } = vid, dur = vid.duration || 60;
       const sc = Math.min(1, 640 / Math.max(vid.w, vid.h));
@@ -785,8 +804,15 @@ const SWING = (() => {
         const pts = [];
         let prev = null;
         await playRange(vid, 0, dur, clampN(0.1 / (1.2 * modelMs / 1000), 0.0625, 1), t => {
-          const f = detectFrame(ctx, cv, v, stamp(t), prev);
-          if (f) { prev = f.hip; pts.push([t, (f.lm[15][0] + f.lm[16][0]) / 2 * cv.width / cv.height, (f.lm[15][1] + f.lm[16][1]) / 2, (f.lm[27][0] + f.lm[28][0]) / 2 * cv.width / cv.height, (f.lm[27][1] + f.lm[28][1]) / 2, Math.abs(f.lm[0][1] - (f.lm[27][1] + f.lm[28][1]) / 2)]); }
+          const f = detectFrame(ctx, cv, v, stamp(t), t, prev);
+          onPose(f ? f.lm : null);
+          if (f) {
+            prev = { hip: f.hip, t };
+            const A = cv.width / cv.height, lm = f.lm, xy = j => [lm[j][0] * A, lm[j][1]];
+            const torso = Math.hypot((xy(11)[0] + xy(12)[0] - xy(23)[0] - xy(24)[0]) / 2, (xy(11)[1] + xy(12)[1] - xy(23)[1] - xy(24)[1]) / 2);
+            const apart = Math.hypot(xy(15)[0] - xy(16)[0], xy(15)[1] - xy(16)[1]) / Math.max(1e-3, torso);   // both hands on the bat → small
+            pts.push([t, (xy(15)[0] + xy(16)[0]) / 2, (xy(15)[1] + xy(16)[1]) / 2, (xy(27)[0] + xy(28)[0]) / 2, (xy(27)[1] + xy(28)[1]) / 2, Math.abs(lm[0][1] - (lm[27][1] + lm[28][1]) / 2), apart]);
+          }
           onProgress('find', Math.min(1, t / dur));
         }, signal, 0.1);
         tsBase = ts + 1000;
@@ -794,8 +820,13 @@ const SWING = (() => {
         const body = Math.max(0.1, med(pts.map(p => p[5])));
         const spd = i => { const [ta, ax, ay, fx, fy] = pts[i - 1], [tb, bx, by, gx, gy] = pts[i], dt = tb - ta;
           return dt > 0 && dt <= 0.4 ? Math.hypot((bx - gx) - (ax - fx), (by - gy) - (ay - fy)) / body / dt : 0; };
+        // A swing is fast hands that are together (on the bat) — waving, walking or throwing don't count.
+        const together = i => pts[i][6] < 0.7 && pts[i - 1][6] < 0.7;
         let bestV = 0, iT = -1;
-        for (let i = 1; i < pts.length; i++) { const x = spd(i); if (x > bestV) { bestV = x; iT = i; } }
+        for (const strict of [true, false]) {
+          for (let i = 1; i < pts.length; i++) { const x = spd(i); if (x > bestV && (!strict || together(i))) { bestV = x; iT = i; } }
+          if (iT >= 0) break;
+        }
         if (iT < 0) throw oops('nobody');
         const T = (pts[iT - 1][0] + pts[iT][0]) / 2;
         // Slow motion stretches the swing out: take a longer window.
@@ -817,8 +848,9 @@ const SWING = (() => {
         const idx = Math.round((t - t0) / step);
         if (idx < 0 || idx >= n || tried[idx] || Math.abs(t - (t0 + idx * step)) > frameDt * 0.51) return;
         tried[idx] = true; offs.push(t - (t0 + idx * step));
-        const f = detectFrame(ctx, cv, v, stamp(t), prev);
-        if (f) { prev = f.hip; frames[idx] = { t, lm: f.lm, w: f.w }; }
+        const f = detectFrame(ctx, cv, v, stamp(t), t, prev);
+        if (f) { prev = { hip: f.hip, t }; frames[idx] = { t, lm: f.lm, w: f.w }; }
+        onPose(f ? f.lm : null);
         onProgress('track', ++done / n);
       }, signal, step);
       // Frames the video moved past while the model was still busy (slower phones): go back for each one.
@@ -829,8 +861,11 @@ const SWING = (() => {
         if (signal && signal.aborted) throw oops('cancelled');
         const t = t0 + idx * step + off;
         await seek(v, clampN(t + frameDt * 0.1, 0, dur));
-        const f = detectFrame(ctx, cv, v, stamp(t), prev);
-        if (f) { prev = f.hip; frames[idx] = { t, lm: f.lm, w: f.w }; }
+        const near = frames.slice(Math.max(0, idx - 3), idx + 4).filter(Boolean);        // the hitter just before/after
+        const guide = near.length ? { hip: [(near[0].lm[23][0] + near[0].lm[24][0]) / 2, (near[0].lm[23][1] + near[0].lm[24][1]) / 2], t: near[0].t } : prev;
+        const f = detectFrame(ctx, cv, v, stamp(t), t, guide ? { hip: guide.hip, t: Math.min(t, guide.t) } : null);
+        if (f) { prev = { hip: f.hip, t }; frames[idx] = { t, lm: f.lm, w: f.w }; }
+        onPose(f ? f.lm : null);
         tried[idx] = true;
         onProgress('track', ++done / n);
       }
@@ -887,5 +922,5 @@ const SWING = (() => {
     return out;
   }
 
-  return { analyze, prepare, orient, supported, loadModel, track, openVideo, keyframes, DEF, CATS, LM, TRACK_JOINTS, VERSION, _math: { smooth, deriv, peakAt, jointAngle, unwrap } };
+  return { analyze, prepare, orient, supported, loadModel, track, openVideo, keyframes, DEF, CATS, LM, TRACK_JOINTS, BONES, VERSION, _math: { smooth, deriv, peakAt, jointAngle, unwrap } };
 })();
