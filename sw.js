@@ -20,6 +20,7 @@ const FILES = [
   './meals.js',
   './foods.js',
   './exercises.js',
+  './drills.js',
   './db.js',
   './app.js',
   './manifest.json',

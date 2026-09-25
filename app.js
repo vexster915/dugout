@@ -26,6 +26,7 @@ if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY
 if (typeof FOODS === 'undefined') self.FOODS = [];
 if (typeof EXERCISE_INFO === 'undefined') Object.assign(self, { EXERCISE_INFO: {}, EXERCISE_GROUPS: [] });
 if (typeof LIGHT_WORKOUT === 'undefined') self.LIGHT_WORKOUT = { gym: REST_DAY, home: REST_DAY };   // older plan.js
+if (typeof DRILLS === 'undefined') Object.assign(self, { DRILLS: [], DRILL_BY_ID: {}, DRILL_POSITIONS: [], SWING_FAULTS: {} });
 
 /* ============================== 1. HELPERS ============================== */
 
@@ -193,7 +194,8 @@ const ICONS = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   drop: '<path d="M12 3.5c3 3.6 6 7 6 10.3a6 6 0 0 1-12 0C6 10.5 9 7.1 12 3.5z"/>',
-  scale: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0l-2.2 2.2"/>'
+  scale: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0l-2.2 2.2"/>',
+  baseball: '<circle cx="12" cy="12" r="9"/><path d="M6.3 5.2c1.9 1.8 3 4.2 3 6.8s-1.1 5-3 6.8M17.7 5.2c-1.9 1.8-3 4.2-3 6.8s1.1 5 3 6.8"/>'
 };
 const FILLED = new Set(['play', 'more']);
 const icon = (name, cls = '') => `<svg class="i ${FILLED.has(name) ? 'fill' : ''} ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -231,7 +233,11 @@ const DEFAULT_SETTINGS = {
   badges: null,           // badge ids already celebrated
   reviewSeen: '',         // week (Monday "YYYY-MM-DD") whose review card you closed
   seenVersion: '',        // last "What's new" shown
-  intensity: null         // today's Light / Moderate / Heavy pick: { date, level }
+  intensity: null,        // today's Light / Moderate / Heavy pick: { date, level }
+  drillPlan: [],          // drill ids you starred (or the Swing lab picked for you)
+  drillPlanFrom: '',      // date of the swing analysis that built the plan, if it did
+  drillVideos: {},        // drill id → a YouTube link you saved for it
+  bats: 'R'               // which side you hit from (Swing lab)
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -259,6 +265,10 @@ const S = {
   progView: 'lifts',   // Progress tab: lifts, body or baseball
   editCheckin: false,  // Today: daily check-in form open
   calMonth: null,      // Progress calendar month ("YYYY-MM"), null = this month
+  ballView: 'drills',  // Baseball tab: drills, swing (Swing lab) or stats
+  drillWho: 'solo',    // Drills: alone or with a partner
+  drillPos: 'all',     // Drills: position filter
+  drillQ: '',          // Drills: search text
   histLimit: 15,
   openEx: null         // which exercise card is open during a workout (null = automatic)
 };
@@ -345,7 +355,7 @@ const actions = {}, inputs = {}, changes = {}, submits = {};
 let postRender = [];
 const later = fn => postRender.push(fn);
 
-const TABS = [['today', 'Today'], ['plan', 'Plan'], ['diet', 'Diet'], ['progress', 'Progress'], ['settings', 'Settings']];
+const TABS = [['today', 'Today'], ['plan', 'Plan'], ['baseball', 'Baseball'], ['diet', 'Diet'], ['progress', 'Progress'], ['settings', 'Settings']];
 
 function renderTabbar() {
   $('#tabbar').innerHTML = TABS.map(([id, label]) => `
@@ -366,7 +376,7 @@ function render({ keepScroll = true } = {}) {
   $('#tabbar').hidden = false;
   document.body.dataset.mode = S.active ? S.active.mode : S.settings.mode;
   const top = view.scrollTop;
-  const views = { today: renderToday, plan: renderPlan, diet: renderDiet, progress: renderProgress, settings: renderSettings };
+  const views = { today: renderToday, plan: renderPlan, baseball: renderBaseball, diet: renderDiet, progress: renderProgress, settings: renderSettings };
   view.innerHTML = views[S.tab]();
   view.scrollTop = keepScroll ? top : 0;
   renderTabbar();
@@ -2926,7 +2936,7 @@ function weekStreak(ws) {
   return n;
 }
 
-const PROG_VIEWS = [['lifts', 'Lifts'], ['body', 'Body'], ['baseball', 'Baseball']];
+const PROG_VIEWS = [['lifts', 'Lifts'], ['body', 'Body']];
 actions.progView = el => { S.progView = el.dataset.v; render({ keepScroll: false }); };
 function recoveryCard() {
   const list = logsOf('checkin'), today = checkinOf(ymd());
@@ -2956,7 +2966,6 @@ function renderProgress() {
   const head = `<div class="page-head"><div><div class="eyebrow">Your gains</div><h1 class="page-title">Progress</h1></div></div>
     <div class="seg" role="group" aria-label="What to show">${PROG_VIEWS.map(([k, l]) => `<button class="${S.progView === k ? 'on' : ''}" data-action="progView" data-v="${k}" aria-pressed="${S.progView === k}">${l}</button>`).join('')}</div>`;
   if (S.progView === 'body') return `<div class="page">${head}${bodyCard()}${recoveryCard()}${goalsCard()}</div>`;
-  if (S.progView === 'baseball') return `<div class="page">${head}${toolsCard()}${gamesCard()}${skillsCard()}${testsCard()}${armCard()}${throwCard()}</div>`;
   const mode = S.settings.mode, m = MODES[mode];
   const ws = S.workouts.filter(w => w.mode === mode);
   const weekKey = ymd(weekStart()), monthKey = ymd().slice(0, 7);
@@ -3546,7 +3555,8 @@ actions.deleteGame = async el => {
 
 // ----- Skills practice: hitting and fielding reps -----
 const SKILLS = [['tee', 'Tee work', 'swings'], ['toss', 'Front / soft toss', 'swings'], ['cage', 'Cage or machine', 'swings'], ['bp', 'Live BP', 'swings'],
-  ['ground', 'Ground balls', 'fielding'], ['fly', 'Fly balls', 'fielding'], ['bunt', 'Bunting', 'swings'], ['bases', 'Base running', 'running'], ['catcher', 'Catching / blocking', 'fielding']];
+  ['ground', 'Ground balls', 'fielding'], ['fly', 'Fly balls', 'fielding'], ['bunt', 'Bunting', 'swings'], ['bases', 'Base running', 'running'], ['catcher', 'Catching / blocking', 'fielding'],
+  ['pdrill', 'Pitching drills', 'throwing'], ['tdrill', 'Throwing drills', 'throwing']];
 const SKILL = Object.fromEntries(SKILLS.map(([k, l, g]) => [k, { l, g }]));
 const skillText = l => `${(SKILL[l.type] || { l: 'Practice' }).l}${l.reps ? ` · ${fmt(l.reps)} ${SKILL[l.type] && SKILL[l.type].g === 'swings' ? 'swings' : 'reps'}` : ''}${l.min ? ` · ${fmt(l.min)} min` : ''}`;
 function skillsCard() {
@@ -3565,18 +3575,18 @@ function skillsCard() {
       : '<p class="hint">Log tee work, cage sessions, ground balls and more. Quality reps with a purpose beat mindless volume — pick one thing to work on each session.</p>'}
   </section>`;
 }
-actions.logSkill = () => openSheet('Log practice', `<form class="form" novalidate data-submit="saveSkill">
-  <label class="field"><span>What did you work on?</span><select name="type">${SKILLS.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></label>
+actions.logSkill = el => { const pre = (el && el.dataset) || {}; openSheet('Log practice', `<form class="form" novalidate data-submit="saveSkill">
+  <label class="field"><span>What did you work on?</span><select name="type">${SKILLS.map(([k, l]) => `<option value="${k}" ${k === pre.type ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
   <div class="form-grid">
     <label class="field"><span>Swings / reps</span><input name="reps" inputmode="numeric" autocomplete="off" placeholder="e.g. 75"></label>
     <label class="field"><span>Minutes</span><input name="min" inputmode="numeric" autocomplete="off" placeholder="optional"></label>
   </div>
   <div class="form-grid">
     <label class="field"><span>Date</span><input name="date" type="date" value="${ymd()}" max="${ymd()}"></label>
-    <label class="field"><span>Focus / notes</span><input name="note" maxlength="120" autocomplete="off" placeholder="e.g. stay through the ball"></label>
+    <label class="field"><span>Focus / notes</span><input name="note" maxlength="120" autocomplete="off" placeholder="e.g. stay through the ball" value="${esc(pre.note || '')}"></label>
   </div>
   <button class="btn btn-primary btn-block" type="submit">Save</button>
-</form>`);
+</form>`); };
 submits.saveSkill = f => {
   const d = formData(f), reps = Math.round(num(d.reps) || 0), min = Math.round(num(d.min) || 0);
   if (!reps && !min) { toast('Enter your swings/reps or minutes'); return; }
@@ -3694,6 +3704,118 @@ function toolsCard() {
     </div>
   </section>`;
 }
+
+/* ============================== 9c. BASEBALL TAB + DRILLS ============================== */
+
+const BALL_VIEWS = [['drills', 'Drills'], ['stats', 'Games & arm']];
+function renderBaseball() {
+  const v = BALL_VIEWS.some(([k]) => k === S.ballView) ? S.ballView : 'drills';
+  const body = v === 'swing' ? swingView() : v === 'stats' ? toolsCard() + gamesCard() + skillsCard() + testsCard() + armCard() + throwCard() : drillsView();
+  return `<div class="page">
+    <div class="page-head"><div><div class="eyebrow">Skills, drills and games</div><h1 class="page-title">Baseball</h1></div></div>
+    <div class="seg" role="group" aria-label="Baseball sections">${BALL_VIEWS.map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-action="ballView" data-v="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div>
+    ${body}
+  </div>`;
+}
+actions.ballView = el => { S.ballView = el.dataset.v; render({ keepScroll: false }); };
+
+// ----- Drills: alone or with a partner, for every position (drills.js) -----
+const POS_LABEL = Object.fromEntries(DRILL_POSITIONS);
+const drillPosText = d => (d.pos.length > 2 ? 'Every infielder' : d.pos.map(p => POS_LABEL[p] || p).join(', '));
+const drillGroup = d => (d.pos.length > 1 ? 'infield' : d.pos[0]);
+const DRILL_GROUPS = [['hitting', 'Hitting'], ['pitching', 'Pitching'], ['catcher', 'Catcher'], ['infield', 'Infield (every position)'], ['first', 'First base'],
+  ['middle', 'Second base / shortstop'], ['third', 'Third base'], ['outfield', 'Outfield'], ['throwing', 'Throwing (everyone)'], ['running', 'Base running']];
+const inDrillPlan = id => S.settings.drillPlan.includes(id);
+function drillMatches(d, q) {
+  if (!q) return true;
+  const hay = normName([d.n, d.why, d.gear, drillPosText(d), ...d.steps, ...d.cues, ...d.fixes.map(f => (SWING_FAULTS[f] || {}).name || '')].join(' '));
+  return q.split(' ').every(w => hay.includes(w));
+}
+const drillRow = d => `<button class="lib-row" data-action="openDrill" data-id="${d.id}">
+  <span class="grow"><b>${esc(d.n)}</b><small>${esc(drillPosText(d))} · ${esc(d.dose)}</small></span>
+  ${inDrillPlan(d.id) ? `<span class="plan-star" title="In your plan">${icon('star', 'sm')}</span>` : ''}${icon('right', 'sm')}</button>`;
+function drillList() {
+  const who = S.drillWho === 'partner' ? 'partner' : 'solo', pos = S.drillPos || 'all', q = normName(S.drillQ);
+  const list = DRILLS.filter(d => d.who === who && (pos === 'all' || d.pos.includes(pos)) && drillMatches(d, q));
+  if (!list.length) return `<div class="empty">No ${who === 'solo' ? 'solo' : 'partner'} drills match. Try the other tab or clear the search.</div>`;
+  if (pos !== 'all' || q) return list.map(drillRow).join('');
+  return DRILL_GROUPS.map(([g, label]) => { const l = list.filter(d => drillGroup(d) === g); return l.length ? `<div class="section-title">${esc(label)}</div>${l.map(drillRow).join('')}` : ''; }).join('');
+}
+function drillsView() {
+  const who = S.drillWho === 'partner' ? 'partner' : 'solo', pos = S.drillPos || 'all';
+  const count = w => DRILLS.filter(d => d.who === w && (pos === 'all' || d.pos.includes(pos))).length;
+  const plan = S.settings.drillPlan.map(id => DRILL_BY_ID[id]).filter(Boolean);
+  const chip = (k, label) => `<button class="chip ${pos === k ? 'on' : ''}" data-action="drillPos" data-k="${k}" aria-pressed="${pos === k}">${esc(label)}</button>`;
+  return `${plan.length ? `<section class="card stack-sm">
+      <div class="spread"><div class="card-title row">${icon('star')} My drill plan</div><button class="btn-link" data-action="clearDrillPlan">Clear</button></div>
+      ${S.settings.drillPlanFrom ? `<p class="hint">Picked for you by your swing analysis on ${shortDate(S.settings.drillPlanFrom)}. Do them 3 times a week.</p>` : '<p class="hint">Drills you starred. Tap one to see how to do it.</p>'}
+      <div>${plan.map(drillRow).join('')}</div>
+    </section>` : ''}
+    <div class="seg" role="group" aria-label="Drills alone or with a partner">
+      <button class="${who === 'solo' ? 'on' : ''}" data-action="drillWho" data-k="solo" aria-pressed="${who === 'solo'}">Alone <small class="seg-count">${count('solo')}</small></button>
+      <button class="${who === 'partner' ? 'on' : ''}" data-action="drillWho" data-k="partner" aria-pressed="${who === 'partner'}">With a partner <small class="seg-count">${count('partner')}</small></button>
+    </div>
+    <div class="chip-row">${chip('all', 'All positions')}${DRILL_POSITIONS.map(([k, l]) => chip(k, l)).join('')}</div>
+    <label class="field"><span>Search drills</span><input data-input="drillSearch" value="${esc(S.drillQ)}" placeholder="e.g. casting, backhand, bunt" autocomplete="off" autocorrect="off"></label>
+    <p class="hint">${who === 'solo' ? 'Drills you can do by yourself with a tee, a net, a wall or a fence.' : 'Drills with a coach, parent or teammate tossing, throwing or hitting to you.'}</p>
+    <div id="drill-list">${drillList()}</div>`;
+}
+actions.drillWho = el => { S.drillWho = el.dataset.k === 'partner' ? 'partner' : 'solo'; render(); };
+actions.drillPos = el => { S.drillPos = el.dataset.k; render(); };
+inputs.drillSearch = el => { S.drillQ = el.value; const box = $('#drill-list'); if (box) box.innerHTML = drillList(); };
+actions.clearDrillPlan = () => { S.settings.drillPlan = []; S.settings.drillPlanFrom = ''; saveSettings(); render(); toast('Drill plan cleared'); };
+
+actions.openDrill = el => openDrill(DRILL_BY_ID[el.dataset.id]);
+function openDrill(d) {
+  if (!d) return;
+  const saved = S.settings.drillVideos[d.id], info = saved ? ytInfo(saved) : null, list = (tag, items) => `<${tag} class="steps">${items.map(x => `<li>${esc(x)}</li>`).join('')}</${tag}>`;
+  openSheet(d.n, `
+    <div class="row wrap" style="gap:6px"><span class="badge accent">${d.who === 'solo' ? 'Alone' : 'With a partner'}</span><span class="badge">${esc(drillPosText(d))}</span></div>
+    ${info ? videoEmbed(info, d.n) : ''}
+    <p class="text-2">${esc(d.why)}</p>
+    <div class="grid2">
+      <div class="tile"><div class="tile-label">You need</div><div class="small">${esc(d.gear)}</div></div>
+      <div class="tile"><div class="tile-label">How much</div><div class="small">${esc(d.dose)}</div></div>
+    </div>
+    <div class="section-title">How to do it</div>${list('ol', d.steps)}
+    <div class="section-title">Coaching points</div>${list('ul', d.cues)}
+    <div class="section-title">Watch out for</div>${list('ul', d.avoid)}
+    <div class="tile"><div class="tile-label">Make it harder</div><div class="small">${esc(d.harder)}</div></div>
+    ${d.fixes.length ? `<p class="small text-2"><b>Helps fix:</b> ${esc(d.fixes.map(f => ((SWING_FAULTS[f] || {}).name || f).toLowerCase()).join(', '))}</p>` : ''}
+    <div class="grid2">
+      <button class="btn btn-primary" data-action="logDrill" data-id="${d.id}">${icon('check', 'sm')} Log it</button>
+      <button class="btn btn-ghost" data-action="toggleDrillPlan" data-id="${d.id}" aria-pressed="${inDrillPlan(d.id)}">${icon('star', 'sm')} ${inDrillPlan(d.id) ? 'In my plan' : 'Add to plan'}</button>
+    </div>
+    <a class="btn btn-ghost btn-block" href="${esc(ytSearch(d.yt))}" target="_blank" rel="noopener" data-external>${icon('video', 'sm')} ${info ? 'Find a different demo video' : 'Find a demo video on YouTube'}</a>
+    <details class="table-toggle"><summary>${info ? 'Change the saved video' : 'Save a video link to this drill'}</summary>
+      <form class="form" novalidate data-submit="saveDrillVideo" data-id="${d.id}">
+        <label class="field"><span>YouTube link</span><input name="video" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://youtu.be/…" value="${esc(saved || '')}"></label>
+        <div class="sheet-actions">
+          <button type="button" class="btn btn-ghost" data-action="pasteLink">${icon('copy', 'sm')} Paste</button>
+          <button type="submit" class="btn btn-primary">${saved ? 'Save' : 'Save link'}</button>
+        </div>
+        <p class="hint">Find a demo you like, tap Share → Copy link, then paste it here. It plays right here next time. Leave it empty and save to remove it.</p>
+      </form>
+    </details>`);
+}
+actions.toggleDrillPlan = el => {
+  const id = el.dataset.id, on = inDrillPlan(id);
+  S.settings.drillPlan = on ? S.settings.drillPlan.filter(x => x !== id) : [...S.settings.drillPlan, id];
+  saveSettings(); render(); openDrill(DRILL_BY_ID[id]);
+  toast(on ? 'Removed from your plan' : 'Added to your drill plan');
+};
+submits.saveDrillVideo = f => {
+  const id = f.dataset.id, url = normUrl(formData(f).video);
+  if (url && !safeUrl(url)) { toast('Paste a full link that starts with https://'); return; }
+  if (url) S.settings.drillVideos[id] = url; else delete S.settings.drillVideos[id];
+  saveSettings(); openDrill(DRILL_BY_ID[id]);
+  toast(url ? (ytInfo(url) ? 'Video saved — it plays right here' : 'Link saved') : 'Video removed');
+};
+// "Log it" adds the drill to your practice log.
+const drillLogType = d => d.pos.includes('hitting') ? ({ bunting: 'bunt', 'live-timing': 'bp' }[d.id] || (d.who === 'solo' ? 'tee' : 'toss'))
+  : d.pos.includes('catcher') ? 'catcher' : d.pos.includes('outfield') ? 'fly' : d.pos.includes('running') ? 'bases'
+  : d.pos.includes('pitching') ? 'pdrill' : d.pos.includes('throwing') ? 'tdrill' : 'ground';
+actions.logDrill = el => { const d = DRILL_BY_ID[el.dataset.id]; if (d) actions.logSkill({ dataset: { type: drillLogType(d), note: d.n } }); };
 
 /* ============================== 10. SETTINGS + BACKUP ============================== */
 
@@ -4068,10 +4190,13 @@ const HELP = [
     'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
   ['Setting your goals', ['Settings → Calculate my goals turns your age, size, training and goal into calories, protein, carbs, fat and water.',
     'Weigh in once or twice a week (Progress → Body) and recalculate every month or so. If you\'re trying to gain and your weight stalls for 2–3 weeks, add about 250 calories.']],
-  ['Games and stats', ['Log each game in Progress → Baseball: your batting line and, if you pitched, innings (5.2 = 5⅔), hits, runs, walks and strikeouts.',
+  ['Drills for every position', ['Baseball tab → Drills: drills for hitting, pitching, catching, every infield spot, outfield, throwing and base running.',
+    'Pick Alone for drills you can do by yourself (tee, net, wall, fence) or With a partner for drills with a coach, parent or teammate.',
+    'Tap a drill for the steps, coaching points and mistakes to avoid, plus a demo video. Star drills to build your plan, and tap Log it to add it to your practice log.']],
+  ['Games and stats', ['Log each game in the Baseball tab → Games & arm: your batting line and, if you pitched, innings (5.2 = 5⅔), hits, runs, walks and strikeouts.',
     'Your season AVG, OBP, SLG, OPS, ERA and WHIP update automatically, and pitches can go straight into the arm-care log.']],
   ['Testing the right way', ['Warm up fully first. Take 2–3 tries and log your best.', 'Test the same way each time — same surface, same timer, same time of day — so the numbers are fair.',
-    'Re-test every 4–6 weeks. The stopwatch (Progress → Baseball) lets a partner time your sprints.']],
+    'Re-test every 4–6 weeks. The stopwatch (Baseball tab → Games & arm) lets a partner time your sprints.']],
   ['Arm care and pitch counts', ['Log every throwing session with how your arm feels. Big week-to-week jumps in throwing are a common cause of arm trouble.',
     'During games use the pitch counter: it shows your Pitch Smart limit for your age and the rest days you\'ll need. Your league\'s rules come first.',
     'Soreness that fades in a day is normal. Pain, numbness or pain that lingers is not — stop throwing and tell a coach, athletic trainer or doctor.']],
@@ -4142,6 +4267,9 @@ function cleanSettings(st) {
   out.proteinGoal = clamp(Math.round(out.proteinGoal) || DEFAULT_SETTINGS.proteinGoal, 10, 500);
   out.waterGoal = clamp(Math.round(out.waterGoal) || DEFAULT_SETTINGS.waterGoal, 16, 400);
   for (const k of ['profile', 'mealPlan', 'intensity']) if (!isObj(out[k])) out[k] = null;
+  out.drillPlan = Array.isArray(out.drillPlan) ? out.drillPlan.filter(id => typeof id === 'string') : [];
+  if (!isObj(out.drillVideos)) out.drillVideos = {};
+  if (!['R', 'L'].includes(out.bats)) out.bats = 'R';
   if (!Array.isArray(out.badges)) out.badges = null;
   return out;
 }
@@ -4406,7 +4534,7 @@ function whatsNew() {
     ${item('check', 'Meal plans and recipes', 'A daily plan sized to your goals, 45 recipes, a game-day timeline, the week ahead and a shopping list.')}
     ${item('dumbbell', 'Smarter workouts', 'How-tos for every exercise, a library, swaps, next-weight tips, warm-up sets, a plate calculator and effort notes.')}
     ${item('plan', 'In-season program', 'Plan tab → Programs: off-season, pre-season and in-season plans, including two short lifts a week to stay strong during the season.')}
-    ${item('timer', 'Baseball tests, stats and arm care', 'Progress → Baseball: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
+    ${item('timer', 'Baseball tests, stats and arm care', 'Baseball tab: a game log with AVG/OBP/SLG and ERA, 60-yard and exit velo tests, a throwing log, a live pitch counter with Pitch Smart rest days, and a stopwatch.')}
     ${item('trophy', 'Stay on track', 'Daily readiness check-in, a weekly review, a training calendar, badges and spreadsheet export.')}
     ${item('settings', 'Light mode', 'Settings → Appearance: a bright theme that is easier to read outside at the field.')}
     </div></details>

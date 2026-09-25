@@ -87,7 +87,7 @@ h1, h2, h3, h4, p { margin: 0; }
 #tabbar {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background: rgba(11, 14, 20, 0.97);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -95,8 +95,9 @@ h1, h2, h3, h4, p { margin: 0; }
 .tab {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   height: 58px; background: none; border: 0; color: var(--muted);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.02em; position: relative;
+  font-size: 11px; font-weight: 700; letter-spacing: 0; position: relative; min-width: 0;
 }
+@media (max-width: 360px) { .tab { font-size: 10px; } .tab .i { width: 24px; height: 24px; } }
 #tabbar[hidden] { display: none; }
 .tab .i { width: 26px; height: 26px; }
 .tab.on { color: var(--accent); }
@@ -765,6 +766,12 @@ i.t-rest { background: var(--muted); }
 .wo-head-btns { gap: 6px; flex-shrink: 0; }
 .wo-meta { gap: 4px 10px; flex-wrap: wrap; }
 .wo-meta .wo-clock { white-space: nowrap; }
+
+/* ---------- Baseball tab: drills ---------- */
+.seg-count { font-size: 11px; font-weight: 800; color: var(--muted); margin-left: 2px; }
+.seg button.on .seg-count { color: inherit; opacity: 0.7; }
+.plan-star { color: var(--warn); display: inline-flex; }
+.plan-star .i { color: var(--warn); }
 
 /* ---------- Light / Moderate / Heavy ---------- */
 .level-seg button { flex-direction: column; gap: 1px; min-height: 50px; font-weight: 900; font-size: 15px; line-height: 1.1; }

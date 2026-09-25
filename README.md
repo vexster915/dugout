@@ -20,12 +20,17 @@ Everything is stored only on your phone, encrypted with your login, and it works
 - Daily meal plan sized to your goals (training, rest and game days) and 45 athlete recipes
 - Water tracker and "eating for baseball" tips
 
+**Baseball** (its own tab)
+- 66 drills for every position — hitting, pitching, catcher, first base, second base / shortstop, third base,
+  outfield, throwing and base running — split into drills you can do **alone** and drills **with a partner**,
+  each with steps, coaching points, mistakes to avoid and a demo video. Star drills to build your plan.
+- Game log with season AVG / OBP / SLG / OPS and ERA / WHIP / K/9
+- Baseball tests: 60-yard dash, exit velocity, throwing velocity, pop time and more
+- Arm care: throwing log, live pitch counter and Pitch Smart rest days by age, sprint stopwatch, practice log
+
 **Track**
 - Lift charts, personal records, training calendar and badges
 - Body weight trend and recovery trends
-- Game log with season AVG / OBP / SLG / OPS and ERA / WHIP / K/9
-- Baseball tests: 60-yard dash, exit velocity, throwing velocity, pop time and more
-- Arm care: throwing log, live pitch counter and Pitch Smart rest days by age, sprint stopwatch
 - Encrypted backups, plus CSV spreadsheets for your coach
 - Dark or light theme (light is easier to read outdoors)
 
@@ -39,6 +44,7 @@ Everything is stored only on your phone, encrypted with your login, and it works
 | `exercises.js` | How-to details for every exercise |
 | `meals.js` | Recipes and eating tips |
 | `foods.js` | Built-in food list |
+| `drills.js` | Baseball drills for every position and the swing problems they fix |
 | `db.js` | Encrypted on-phone storage |
 | `sw.js` | Offline support and updates: loads the newest version whenever there's internet |
 | `styles.css` | The look of the app |
