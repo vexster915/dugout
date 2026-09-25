@@ -497,7 +497,7 @@ const SWING = (() => {
       addF('head', Math.abs(M.head_drift) > 10 || Math.abs(M.head_drop) > 8 ? 3 : 2, `Your head moved ${parts.join(' and ')} between your stance and contact. Good hitters keep it within about 3–4 inches.`, 'head_drift');
     }
     if (m.weight_fp.status === 'work' && M.weight_fp > 70) addF('lunge', M.weight_fp > 85 ? 3 : 2, `${Math.round(M.weight_fp)}% of the way to your front foot when it landed — your weight got out in front before the swing started. Aim for about 40–60%.`, 'weight_fp');
-    else if (m.head_drift.status === 'work' && M.head_drift > 7.5 && m.weight_fp.status !== 'check') addF('lunge', 2, `Your head drifted ${f1(M.head_drift)} in forward — a sign your weight is lunging toward the pitcher.`, 'head_drift');
+    else if (m.head_drift.status === 'work' && M.head_drift > 7.5 && m.weight_fp.status !== 'check' && M.weight_fp > 60) addF('lunge', 2, `Your head drifted ${f1(M.head_drift)} in forward and your weight was ${Math.round(M.weight_fp)}% of the way to your front foot when it landed — you're lunging toward the pitcher.`, 'head_drift');
     if (m.early_open.status === 'work') addF('early_open', M.early_open > 30 ? 3 : 2, `Your shoulders had already turned ${Math.round(M.early_open)}° open when your front foot landed. They should still be closed — about where they were in your stance.`, 'early_open');
     // Separation at the exact moment of foot plant is touchy, so it only counts when the peak separation is also low.
     if (m.sep_max.status === 'work' || (m.sep_fp.status === 'work' && m.sep_max.status === 'ok')) addF('no_sep', m.sep_max.status === 'work' ? 2 : 1, `Only ${Math.round(M.sep_max)}° of separation between your hips and shoulders at most (${Math.round(M.sep_fp)}° when your front foot landed). Strong hitters get about 20–45°.`, 'sep_max');
@@ -615,7 +615,7 @@ const SWING = (() => {
   // Milliseconds per frame (the first run also warms the model up).
   function timeModel(ctx, cv, v) {
     const times = [];
-    for (let i = 0; i < 3; i++) { const a = performance.now(); detectFrame(ctx, cv, v, ++ts, 0, null); times.push(performance.now() - a); }
+    for (let i = 0; i < 3; i++) { const a = performance.now(); detectAll(ctx, cv, v, ++ts); times.push(performance.now() - a); }
     return Math.max(8, Math.min(times[1], times[2]));
   }
 
@@ -684,27 +684,68 @@ const SWING = (() => {
     return { v, close, place, w: v.videoWidth, h: v.videoHeight, duration: Number.isFinite(v.duration) ? v.duration : null };
   }
 
-  // One frame → the hitter's 33 body points (or null). Shaky "people" the model half-sees (in trees, shadows) are
-  // skipped. With two people in view (a coach, a catcher) it keeps following whoever it followed before — a sudden jump
-  // across the picture is a different person, not the hitter — and at the start it picks the biggest, clearest one.
-  // prev: { hip, t } of the last frame it kept.
+  // One frame → everyone the model sees clearly: [{ lm: 33 × [x, y, visibility], w: 33 × [x, y, z], hip, size }].
+  // Shaky "people" it half-sees (in trees, shadows) are skipped.
   const BODY = [11, 12, 23, 24, 25, 26, 27, 28];
-  function detectFrame(ctx, cv, v, ts, t, prev) {
+  function detectAll(ctx, cv, v, ts) {
     ctx.drawImage(v, 0, 0, cv.width, cv.height);
-    const r = model.detectForVideo(cv, ts), L = r.landmarks || [], Wl = r.worldLandmarks || [];
-    const hipOf = p => [(p[23].x + p[24].x) / 2, (p[23].y + p[24].y) / 2];
-    const size = p => { const ys = p.map(q => q.y); return Math.max(...ys) - Math.min(...ys); };
-    const quality = p => BODY.reduce((acc, j) => acc + (p[j].visibility == null ? 1 : p[j].visibility), 0) / BODY.length;
-    const people = [];
-    for (let i = 0; i < Math.min(L.length, Wl.length); i++) if (quality(L[i]) >= 0.35) people.push(i);
-    if (!people.length) return null;
-    const recent = prev && t - prev.t < 0.6;
-    const dist = i => Math.hypot(hipOf(L[i])[0] - prev.hip[0], hipOf(L[i])[1] - prev.hip[1]);
-    const best = people.reduce((b, i) => (recent ? dist(i) < dist(b) : size(L[i]) * quality(L[i]) > size(L[b]) * quality(L[b])) ? i : b, people[0]);
-    if (recent && dist(best) > 0.12 + Math.max(0, t - prev.t)) return null;
-    const p = L[best], w = Wl[best];
-    return { lm: p.map(q => [q.x, q.y, q.visibility == null ? 1 : q.visibility]), w: w.map(q => [q.x, q.y, q.z]), hip: hipOf(p) };
+    const r = model.detectForVideo(cv, ts), L = r.landmarks || [], Wl = r.worldLandmarks || [], out = [];
+    for (let i = 0; i < Math.min(L.length, Wl.length); i++) {
+      const p = L[i], vis = q => (q.visibility == null ? 1 : q.visibility);
+      const quality = BODY.reduce((acc, j) => acc + vis(p[j]), 0) / BODY.length;
+      if (quality < 0.35) continue;
+      const ys = p.map(q => q.y);
+      out.push({ lm: p.map(q => [q.x, q.y, vis(q)]), w: Wl[i].map(q => [q.x, q.y, q.z]), hip: [(p[23].x + p[24].x) / 2, (p[23].y + p[24].y) / 2], size: (Math.max(...ys) - Math.min(...ys)) * quality });
+    }
+    return out;
   }
+
+  // Joins each frame's people into tracks (the same person from frame to frame: a hip can't jump across the picture),
+  // then picks the hitter: the track with the fastest hands that are together on a bat. A coach, catcher or someone
+  // walking past can't take over. times[i], cands[i] = detectAll() result (or null). Returns the chosen track's
+  // person per frame (null where it wasn't seen), plus where its swing is.
+  function pickHitter(times, cands, aspect) {
+    const tracks = [];
+    for (let i = 0; i < cands.length; i++) {
+      const cs = cands[i] || [], used = new Set();
+      const live = tracks.filter(tk => times[i] - times[tk.last] < 0.6).sort((a, b) => b.n - a.n);
+      for (const tk of live) {
+        let best = -1, bd = Infinity;
+        cs.forEach((c, j) => { if (!used.has(j)) { const d = Math.hypot(c.hip[0] - tk.hip[0], c.hip[1] - tk.hip[1]); if (d < bd) { bd = d; best = j; } } });
+        if (best >= 0 && bd <= 0.12 + (times[i] - times[tk.last])) { used.add(best); tk.at[i] = cs[best]; tk.hip = cs[best].hip; tk.last = i; tk.n++; tk.size += cs[best].size; }
+      }
+      cs.forEach((c, j) => { if (!used.has(j)) tracks.push({ at: { [i]: c }, hip: c.hip, last: i, n: 1, size: c.size }); });
+    }
+    const xy = (c, j) => [c.lm[j][0] * aspect, c.lm[j][1]];
+    const swing = (tk, strict) => {
+      const idx = Object.keys(tk.at).map(Number).sort((a, b) => a - b);
+      const body = Math.max(0.1, med(idx.map(i => Math.abs(tk.at[i].lm[0][1] - (tk.at[i].lm[27][1] + tk.at[i].lm[28][1]) / 2))));
+      const apart = c => { const sh = mid([...xy(c, 11), 0], [...xy(c, 12), 0]), hp = mid([...xy(c, 23), 0], [...xy(c, 24), 0]); return Math.hypot(xy(c, 15)[0] - xy(c, 16)[0], xy(c, 15)[1] - xy(c, 16)[1]) / Math.max(1e-3, Math.hypot(sh[0] - hp[0], sh[1] - hp[1])); };
+      const rel = c => { const h = mid([...xy(c, 15), 0], [...xy(c, 16), 0]), f = mid([...xy(c, 27), 0], [...xy(c, 28), 0]); return [h[0] - f[0], h[1] - f[1]]; };
+      let best = { v: 0, t: null };
+      for (let k = 1; k < idx.length; k++) {
+        const a = tk.at[idx[k - 1]], b = tk.at[idx[k]], dt = times[idx[k]] - times[idx[k - 1]];
+        if (dt <= 0 || dt > 0.4 || (strict && (apart(a) > 0.7 || apart(b) > 0.7))) continue;
+        const ra = rel(a), rb = rel(b), v = Math.hypot(rb[0] - ra[0], rb[1] - ra[1]) / body / dt;
+        if (v > best.v) best = { v, t: (times[idx[k]] + times[idx[k - 1]]) / 2, k };
+      }
+      return best;
+    };
+    const total = cands.filter(c => c && c.length).length;
+    const keep = tracks.filter(tk => tk.n >= Math.max(3, 0.2 * total));
+    let scored = keep.map(tk => ({ tk, sw: swing(tk, true) }));
+    if (!scored.some(x => x.sw.v > 0)) scored = keep.map(tk => ({ tk, sw: swing(tk, false) }));      // wrists too blurry to tell
+    if (!scored.length) return null;
+    // The swing decides; if nobody swings, the biggest, most-seen person.
+    scored.sort((a, b) => b.sw.v - a.sw.v || b.tk.size - a.tk.size);
+    const top = scored[0], alt = scored.slice().sort((a, b) => b.tk.size - a.tk.size)[0];
+    const pick = top.sw.v > 0 ? top : alt;
+    return { at: pick.tk.at, swingAt: pick.sw.t, speed: pick.sw.v, idx: Object.keys(pick.tk.at).map(Number).sort((a, b) => a - b) };
+  }
+
+  // For the live picture: the person closest to the one shown last (or the biggest); null if nobody's there.
+  const nearest = (cs, last) => (cs && cs.length ? cs.reduce((b, c) => (last ? Math.hypot(c.hip[0] - last.hip[0], c.hip[1] - last.hip[1]) < Math.hypot(b.hip[0] - last.hip[0], b.hip[1] - last.hip[1]) : c.size > b.size) ? c : b, cs[0]) : null);
+  const showLive = (cs, st, onPose) => { const c = nearest(cs, st.last); if (c) st.last = c; onPose(c ? c.lm : null); };
 
   // Plays [t0, t1] at `rate`, calling onFrame(mediaTime, presentedFrames) for each frame the browser shows.
   // (Falls back to stepping through with seeks where frame callbacks don't exist.)
@@ -801,39 +842,31 @@ const SWING = (() => {
       // 1) Long clip: a quick pass over everything to find the swing (the fastest hands).
       let t0 = 0, t1 = dur;
       if (dur > 6) {
-        const pts = [];
-        let prev = null;
+        const times = [], cands = [], live = { last: null };
         await playRange(vid, 0, dur, clampN(0.1 / (1.2 * modelMs / 1000), 0.0625, 1), t => {
-          const f = detectFrame(ctx, cv, v, stamp(t), t, prev);
-          onPose(f ? f.lm : null);
-          if (f) {
-            prev = { hip: f.hip, t };
-            const A = cv.width / cv.height, lm = f.lm, xy = j => [lm[j][0] * A, lm[j][1]];
-            const torso = Math.hypot((xy(11)[0] + xy(12)[0] - xy(23)[0] - xy(24)[0]) / 2, (xy(11)[1] + xy(12)[1] - xy(23)[1] - xy(24)[1]) / 2);
-            const apart = Math.hypot(xy(15)[0] - xy(16)[0], xy(15)[1] - xy(16)[1]) / Math.max(1e-3, torso);   // both hands on the bat → small
-            pts.push([t, (xy(15)[0] + xy(16)[0]) / 2, (xy(15)[1] + xy(16)[1]) / 2, (xy(27)[0] + xy(28)[0]) / 2, (xy(27)[1] + xy(28)[1]) / 2, Math.abs(lm[0][1] - (lm[27][1] + lm[28][1]) / 2), apart]);
-          }
+          const cs = detectAll(ctx, cv, v, stamp(t));
+          times.push(t); cands.push(cs);
+          showLive(cs, live, onPose);
           onProgress('find', Math.min(1, t / dur));
         }, signal, 0.1);
         tsBase = ts + 1000;
-        // Hand speed relative to the feet, in body heights per second.
-        const body = Math.max(0.1, med(pts.map(p => p[5])));
-        const spd = i => { const [ta, ax, ay, fx, fy] = pts[i - 1], [tb, bx, by, gx, gy] = pts[i], dt = tb - ta;
-          return dt > 0 && dt <= 0.4 ? Math.hypot((bx - gx) - (ax - fx), (by - gy) - (ay - fy)) / body / dt : 0; };
-        // A swing is fast hands that are together (on the bat) — waving, walking or throwing don't count.
-        const together = i => pts[i][6] < 0.7 && pts[i - 1][6] < 0.7;
-        let bestV = 0, iT = -1;
-        for (const strict of [true, false]) {
-          for (let i = 1; i < pts.length; i++) { const x = spd(i); if (x > bestV && (!strict || together(i))) { bestV = x; iT = i; } }
-          if (iT >= 0) break;
-        }
-        if (iT < 0) throw oops('nobody');
-        const T = (pts[iT - 1][0] + pts[iT][0]) / 2;
-        // Slow motion stretches the swing out: take a longer window.
-        let a = iT, b = iT;
-        while (a > 1 && spd(a - 1) > bestV / 2) a--;
-        while (b < pts.length - 1 && spd(b + 1) > bestV / 2) b++;
-        const slowish = pts[b][0] - pts[a - 1][0] > 0.45;
+        const hit = pickHitter(times, cands, cv.width / cv.height);
+        if (!hit) throw oops('nobody');
+        const T = hit.swingAt != null ? hit.swingAt : times[hit.idx[Math.floor(hit.idx.length / 2)]];
+        // Slow motion stretches the swing out: take a longer window. (How long the hands stay fast, on video.)
+        const fastFor = (() => {
+          if (hit.swingAt == null) return 0;
+          const idx = hit.idx, sp = [];
+          for (let k = 1; k < idx.length; k++) {
+            const a = hit.at[idx[k - 1]], b = hit.at[idx[k]], dt = times[idx[k]] - times[idx[k - 1]], A = cv.width / cv.height;
+            const h = c => [((c.lm[15][0] + c.lm[16][0]) / 2 - (c.lm[27][0] + c.lm[28][0]) / 2) * A, (c.lm[15][1] + c.lm[16][1]) / 2 - (c.lm[27][1] + c.lm[28][1]) / 2];
+            sp.push([(times[idx[k]] + times[idx[k - 1]]) / 2, dt > 0 && dt <= 0.4 ? Math.hypot(h(b)[0] - h(a)[0], h(b)[1] - h(a)[1]) / dt : 0]);
+          }
+          const pk = sp.reduce((m, x) => (x[1] > m[1] ? x : m), [0, 0]);
+          const fast = sp.filter(x => x[1] > pk[1] / 2 && Math.abs(x[0] - pk[0]) < 3);
+          return fast.length ? Math.max(...fast.map(x => x[0])) - Math.min(...fast.map(x => x[0])) + 0.1 : 0;
+        })();
+        const slowish = fastFor > 0.45;
         t0 = Math.max(0, T - (slowish ? 14 : 5)); t1 = Math.min(dur, T + (slowish ? 6 : 2));
       }
 
@@ -842,33 +875,33 @@ const SWING = (() => {
       const k = Math.max(1, Math.ceil((t1 - t0) / frameDt / MAX_FRAMES)), step = frameDt * k;
       const n = Math.max(1, Math.floor((t1 - t0) / step + 1e-6) + 1);
       const rate = clampN(step / (1.35 * modelMs / 1000), 0.0625, 1);
-      const frames = new Array(n).fill(null), tried = new Array(n).fill(false), offs = [];
-      let prev = null, done = 0;
+      const cands = new Array(n).fill(null), times = Array.from({ length: n }, (_, i) => t0 + i * step), offs = [];
+      const live = { last: null };
+      let done = 0;
       await playRange(vid, t0, t1, rate, t => {
         const idx = Math.round((t - t0) / step);
-        if (idx < 0 || idx >= n || tried[idx] || Math.abs(t - (t0 + idx * step)) > frameDt * 0.51) return;
-        tried[idx] = true; offs.push(t - (t0 + idx * step));
-        const f = detectFrame(ctx, cv, v, stamp(t), t, prev);
-        if (f) { prev = { hip: f.hip, t }; frames[idx] = { t, lm: f.lm, w: f.w }; }
-        onPose(f ? f.lm : null);
+        if (idx < 0 || idx >= n || cands[idx] || Math.abs(t - (t0 + idx * step)) > frameDt * 0.51) return;
+        offs.push(t - (t0 + idx * step)); times[idx] = t;
+        cands[idx] = detectAll(ctx, cv, v, stamp(t));
+        showLive(cands[idx], live, onPose);
         onProgress('track', ++done / n);
       }, signal, step);
       // Frames the video moved past while the model was still busy (slower phones): go back for each one.
       const off = offs.length ? med(offs) : 0;
       tsBase = ts + 1000;
       for (let idx = 0; idx < n; idx++) {
-        if (tried[idx]) continue;
+        if (cands[idx]) continue;
         if (signal && signal.aborted) throw oops('cancelled');
         const t = t0 + idx * step + off;
         await seek(v, clampN(t + frameDt * 0.1, 0, dur));
-        const near = frames.slice(Math.max(0, idx - 3), idx + 4).filter(Boolean);        // the hitter just before/after
-        const guide = near.length ? { hip: [(near[0].lm[23][0] + near[0].lm[24][0]) / 2, (near[0].lm[23][1] + near[0].lm[24][1]) / 2], t: near[0].t } : prev;
-        const f = detectFrame(ctx, cv, v, stamp(t), t, guide ? { hip: guide.hip, t: Math.min(t, guide.t) } : null);
-        if (f) { prev = { hip: f.hip, t }; frames[idx] = { t, lm: f.lm, w: f.w }; }
-        onPose(f ? f.lm : null);
-        tried[idx] = true;
+        times[idx] = t;
+        cands[idx] = detectAll(ctx, cv, v, stamp(t));
+        showLive(cands[idx], live, onPose);
         onProgress('track', ++done / n);
       }
+      const hit = pickHitter(times, cands, cv.width / cv.height);
+      if (!hit) throw oops('nobody');
+      const frames = times.map((t, i) => (hit.at[i] ? { t, lm: hit.at[i].lm, w: hit.at[i].w } : null));
       const got = frames.filter(Boolean).length;
       if (!got) throw oops('nobody');
       // Missing frames are simply gaps (the analysis fills them in); trim empty ends.
@@ -892,9 +925,14 @@ const SWING = (() => {
     let x0 = q(xs, 0.01), x1 = q(xs, 0.99), y0 = q(ys, 0.01), y1 = q(ys, 0.99);
     const padY = (y1 - y0) * 0.16, padX = padY * v.videoHeight / v.videoWidth;
     x0 = Math.max(0, x0 - padX); x1 = Math.min(1, x1 + padX); y0 = Math.max(0, y0 - padY); y1 = Math.min(1, y1 + padY * 0.6);
+    // Keep the picture between tall (1:2) and wide (4:3) by taking in more of the video around you — never stretched.
+    const fit = (lo, hi, want) => { const c = (lo + hi) / 2, h = Math.min(0.5, want / 2); let a = c - h, b = c + h; if (a < 0) { b -= a; a = 0; } if (b > 1) { a -= b - 1; b = 1; } return [Math.max(0, a), Math.min(1, b)]; };
+    let asp = ((x1 - x0) * v.videoWidth) / ((y1 - y0) * v.videoHeight);
+    if (asp < 0.5) [x0, x1] = fit(x0, x1, (0.5 * (y1 - y0) * v.videoHeight) / v.videoWidth);
+    else if (asp > 4 / 3) [y0, y1] = fit(y0, y1, ((x1 - x0) * v.videoWidth) / (4 / 3) / v.videoHeight);
     const sw = (x1 - x0) * v.videoWidth, sh = (y1 - y0) * v.videoHeight;
     if (sw < 8 || sh < 8) return [];
-    const H = 320, W = Math.round(clampN((H * sw) / sh, 160, 420));
+    const H = 320, W = Math.round((H * sw) / sh);
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
     const out = [];
