@@ -1,7 +1,8 @@
 # Dugout
 
 A baseball training app for your phone (a PWA — install it from Safari with **Share → Add to Home Screen**).
-Everything is stored only on your phone, encrypted with your login, and it works offline.
+Everything is stored only on your phone, encrypted with your login, and it works offline. Nothing leaves the phone
+unless you turn on the optional Claude features with your own Anthropic API key (Settings → Claude AI).
 
 ## What's inside
 
@@ -18,6 +19,15 @@ Everything is stored only on your phone, encrypted with your login, and it works
 - Food log with a built-in list of 169 common foods, favorites, servings, calories, protein, carbs and fat
 - Goal calculator for calories, protein, carbs, fat and water
 - Daily meal plan sized to your goals (training, rest and game days) and 45 athlete recipes
+- **Pantry — what can I make?** Take photos of your pantry, fridge and freezer (or tap in what you have) and see the
+  recipes you can make right now, quick plates (a protein + a carb + a fruit or veggie you have, with calories and
+  protein), what you're one ingredient away from, and a shopping list. Photos are read on the phone: OCR
+  (Tesseract) reads the food names on packages and an object detector (MediaPipe) spots common fruit and veggies —
+  nothing is uploaded, and after the first scan it works offline. You check what it found before it's added.
+- **Claude AI (optional)**: add your own Anthropic API key and Claude reads your kitchen photos instead (it recognizes
+  nearly any food, even without a label, and about how much is left) and writes meal ideas from exactly what you have,
+  sized to your goals and the kind of day. Those requests go straight from the phone to Anthropic's API; the key is
+  stored encrypted and never put in backups
 - Water tracker and "eating for baseball" tips
 
 **Baseball** (its own tab)
@@ -55,7 +65,11 @@ Everything is stored only on your phone, encrypted with your login, and it works
 | `foods.js` | Built-in food list |
 | `drills.js` | Baseball drills for every position and the swing problems they fix |
 | `swing.js` | Swing lab: runs the body tracking on your video and measures the swing |
-| `vendor/mediapipe-1.0.1/` | The body-tracking model (Google MediaPipe, Apache 2.0) — downloaded by the phone the first time you use the Swing lab |
+| `pantry.js` | Pantry: the food catalog (names and brands), what each recipe needs, quick plates and the matching |
+| `scan.js` | Pantry: reads your kitchen photos — on the phone, or with Claude if you added an API key |
+| `vendor/mediapipe-1.0.1/` | Google MediaPipe (Apache 2.0): the Swing lab's body-tracking model and the Pantry's fruit and veggie spotter — downloaded the first time you use them |
+| `vendor/tesseract-7.0.0/` | Tesseract.js OCR (Apache 2.0) that reads package labels for the Pantry — downloaded on the first scan |
+| `vendor/anthropic-sdk-0.128.0/` | Anthropic's TypeScript SDK (MIT), bundled — only loaded if you use the optional Claude features |
 | `db.js` | Encrypted on-phone storage |
 | `sw.js` | Offline support and updates: loads the newest version whenever there's internet |
 | `styles.css` | The look of the app |
