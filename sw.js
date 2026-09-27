@@ -10,7 +10,7 @@
    When you change the app: set VERSION below to the same number as APP_VERSION in
    app.js. If you add a new file, add its name to FILES too. */
 
-const VERSION = '2.2.0';
+const VERSION = '2.3.0';
 const CACHE = 'dugout-' + VERSION;
 const FILES = [
   './',
@@ -22,6 +22,8 @@ const FILES = [
   './exercises.js',
   './drills.js',
   './swing.js',
+  './pantry.js',
+  './scan.js',
   './db.js',
   './app.js',
   './manifest.json',
@@ -30,8 +32,9 @@ const FILES = [
   './icon-512.png'
 ];
 const INDEX = './index.html';
-// The swing-analysis body model (vendor/…, about 21 MB) is downloaded the first time you use the Swing lab and kept
-// in its own cache across app updates. Its folder name carries its version, so new files mean a new folder.
+// The big add-ons in vendor/ — the Swing lab's body model (about 21 MB), the Pantry's label reader and food spotter
+// (about 24 MB, sharing some files with the Swing lab) and the Claude library — are downloaded the first time you use
+// them and kept in their own cache across app updates. Each folder name carries its version, so new files mean a new folder.
 const MODELS = 'dugout-models-1';
 const SLOW = 3500;     // ms to wait for the internet before using the saved copy
 

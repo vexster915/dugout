@@ -855,6 +855,43 @@ i.t-rest { background: var(--muted); }
 .text-good { color: #4ade80; }
 .text-bad { color: #ff8f8f; }
 
+/* ---------- Diet → Pantry ---------- */
+.pan-shelf { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
+.pan-kitchen > .grid2 { margin-top: 10px; }
+.pan-kitchen > .hint { margin: 10px 0 0; }
+@media (max-width: 359px) { .pan-actions { grid-template-columns: minmax(0, 1fr); } }
+#pan-ideas { scroll-margin-top: 12px; }
+.nowrap { white-space: nowrap; }
+.pan-shelf + .pan-shelf { border-top: 1px solid var(--line); }
+.card > .pan-shelf:first-child { padding-top: 0; }
+.pan-shelf-name { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.pan-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.pan-chip small { font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.chip .i { width: 14px; height: 14px; vertical-align: -2px; }
+.plan-slot.need { color: var(--warn); }
+.pan-found { display: flex; flex-direction: column; }
+.pan-found .check-line { border-top: 1px solid var(--line); padding: 6px 0; font-weight: 600; align-items: center; }
+.pan-found .check-line b { display: block; font-size: 15px; }
+.pan-found .check-line small { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.pan-pick { position: relative; display: inline-flex; }
+.pan-pick input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
+.pan-pick span { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line-2);
+  background: var(--surface-2); color: var(--text-2); font-weight: 700; font-size: 14px; }
+.pan-pick input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.pan-pick input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pan-shop-row { display: flex; align-items: center; gap: 6px; }
+.pan-shop-row .check-line { flex: 1; min-width: 0; }
+.pan-shop-row .check-line span { overflow-wrap: anywhere; }
+.pan-shop-add { display: flex; gap: 8px; }
+.pan-shop-add .input { flex: 1; min-width: 0; min-height: 44px; padding: 8px 12px; }
+.pan-ai { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; color: inherit; font: inherit; }
+.pan-ai > .i:first-child { color: var(--accent); flex: none; }
+.pan-ai b { display: block; font-size: 15px; }
+.pan-ai small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+.meter.busy > span { width: 35%; animation: pan-busy 1.3s ease-in-out infinite; }
+@keyframes pan-busy { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+@media (prefers-reduced-motion: reduce) { .meter.busy > span { width: 100%; opacity: 0.45; } }
+
 :root[data-theme="light"] {
   --bg: #f3f5f8; --surface: #ffffff; --surface-2: #eef1f5; --surface-3: #e1e6ed;
   --line: #dde3ea; --line-2: #c9d1dc; --text: #0f1720; --text-2: #394556; --muted: #687385; --grid: #e7ebf0;

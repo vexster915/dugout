@@ -19,7 +19,7 @@
 
 'use strict';
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
@@ -195,7 +195,9 @@ const ICONS = {
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   drop: '<path d="M12 3.5c3 3.6 6 7 6 10.3a6 6 0 0 1-12 0C6 10.5 9 7.1 12 3.5z"/>',
   scale: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0l-2.2 2.2"/>',
-  baseball: '<circle cx="12" cy="12" r="9"/><path d="M6.3 5.2c1.9 1.8 3 4.2 3 6.8s-1.1 5-3 6.8M17.7 5.2c-1.9 1.8-3 4.2-3 6.8s1.1 5 3 6.8"/>'
+  baseball: '<circle cx="12" cy="12" r="9"/><path d="M6.3 5.2c1.9 1.8 3 4.2 3 6.8s-1.1 5-3 6.8M17.7 5.2c-1.9 1.8-3 4.2-3 6.8s1.1 5 3 6.8"/>',
+  camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.5" r="3.4"/>',
+  sparkle: '<path d="M11 3.5l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6-5.6-1.9 5.6-1.9z"/><path d="M18.5 15.5v5M16 18h5"/>'
 };
 const FILLED = new Set(['play', 'more']);
 const icon = (name, cls = '') => `<svg class="i ${FILLED.has(name) ? 'fill' : ''} ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -237,7 +239,9 @@ const DEFAULT_SETTINGS = {
   drillPlan: [],          // drill ids you starred (or the Swing lab picked for you)
   drillPlanFrom: '',      // date of the swing analysis that built the plan, if it did
   drillVideos: {},        // drill id → a YouTube link you saved for it
-  bats: 'R'               // which side you hit from (Swing lab)
+  bats: 'R',              // which side you hit from (Swing lab)
+  pantry: null,           // Diet → Pantry: the food in your kitchen, shopping list and Claude's ideas (see section 8b)
+  aiKey: ''               // your own Anthropic API key (optional; never put in backups)
 };
 
 // Everything the app is showing lives here (and is saved to the phone with DB.*).
@@ -259,6 +263,8 @@ const S = {
   dietWeek: ymd(weekStart()),
   recipeMeal: 'all',   // Meals view filters
   recipeTag: null,
+  pantryMeal: '',      // Pantry view: meal filter ('' = any)
+  panAll: false,       // Pantry view: show every ready recipe
   progEx: null,
   progMetric: null,
   progRange: 'all',
@@ -1863,11 +1869,11 @@ const sortedFavs = () => [...S.foods].sort((a, b) => a.name.localeCompare(b.name
 function renderDiet() {
   return `<div class="page">
     <div class="page-head"><div><div class="eyebrow">Nutrition</div><h1 class="page-title">Diet</h1></div></div>
-    <div class="seg" role="group" aria-label="Day, week or meal ideas">
-      ${[['day', 'Day'], ['week', 'Week totals'], ['meals', 'Meals']].map(([v, label]) =>
+    <div class="seg" role="group" aria-label="Day, week, meal ideas or pantry">
+      ${[['day', 'Day'], ['week', 'Week'], ['meals', 'Meals'], ['pantry', 'Pantry']].map(([v, label]) =>
         `<button class="${S.dietView === v ? 'on' : ''}" data-action="dietView" data-v="${v}" aria-pressed="${S.dietView === v}">${label}</button>`).join('')}
     </div>
-    ${S.dietView === 'week' ? dietWeek() : S.dietView === 'meals' ? dietMeals() : dietDay()}
+    ${S.dietView === 'week' ? dietWeek() : S.dietView === 'meals' ? dietMeals() : S.dietView === 'pantry' ? dietPantry() : dietDay()}
   </div>`;
 }
 actions.dietView = el => {
@@ -2743,6 +2749,648 @@ actions.recipeFav = el => {
   addFavorite({ name: r.name, cal: r.cal, pro: r.pro, carb: r.carb, fat: r.fat });
   closeSheet(); render(); toast(`${r.name} saved to favorites`);
 };
+
+/* ============================== 8b. PANTRY (Diet → Pantry) ============================== */
+// The food in your kitchen — from photos (scan.js) or tapped in — and the meals you can make with it (pantry.js).
+// Saved in settings.pantry: { items: { id: { at, amount } }, shop: [{ name, need, done }], ideas: { at, meal, list }, updated, how }.
+// Food that isn't in the catalog (from a Claude scan, or typed in) gets an id starting with "x-" plus its own name and shelf.
+
+const PANTRY_MEALS = [['', 'Any meal'], ['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['dinner', 'Dinner'], ['snack', 'Snack'], ['pre', 'Pre-game'], ['post', 'Post-game']];
+const PAN_MAX_PHOTOS = 6;
+// Shown after a scan ("Missed anything?") — the things photos miss most: fresh food without a label.
+const PAN_STAPLES = ['eggs', 'milk', 'bread', 'chicken-breast', 'ground-turkey', 'ground-beef', 'rice', 'pasta', 'potatoes', 'shredded-cheese',
+  'greek-yogurt', 'butter', 'bananas', 'apples', 'berries', 'oranges', 'broccoli', 'lettuce', 'tomatoes', 'onions', 'carrots', 'peanut-butter'];
+const pantry = () => {
+  if (!isObj(S.settings.pantry)) S.settings.pantry = { items: {}, shop: [], ideas: null, updated: 0, how: 'claude' };
+  return S.settings.pantry;
+};
+const panIds = () => Object.keys(pantry().items);
+const panName = id => (PANTRY_BY_ID[id] ? PANTRY_BY_ID[id].name : (pantry().items[id] || {}).name || id);
+const panShelf = id => (PANTRY_BY_ID[id] ? PANTRY_BY_ID[id].cat : (pantry().items[id] || {}).cat || 'other');
+const shelfName = k => (PANTRY_CATS.find(([c]) => c === k) || [0, 'Other'])[1];
+const customId = name => 'x-' + normName(name).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+const aiKey = () => S.settings.aiKey || '';
+const savePantry = () => { pantry().updated = Date.now(); saveSettings(); };
+const daysAgo = t => { const d = Math.round((parseYmd(ymd()) - parseYmd(ymd(new Date(t)))) / 864e5); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// A need from pantry.js (an item, a group like "cheese", or a list meaning "any of these") → one item to buy or add.
+const needItem = need => { const n = Array.isArray(need) ? need[0] : need; return PANTRY_BY_ID[n] ? n : (PANTRY.members[n] || [])[0] || null; };
+
+// found: [{ id, name, cat, amount }] — a catalog id, or 'other' with a name. A name that clearly means one catalog item
+// ("Sharp cheddar" → Cheddar) becomes that item, so recipes can use it. Returns the ids added or updated.
+function addToPantry(found, { replace = false } = {}) {
+  const p = pantry(), now = Date.now(), before = replace ? {} : p.items, items = { ...before }, ids = [];
+  for (const f of found) {
+    let id = f.id;
+    const typed = String(f.name || '').trim().slice(0, 60), name = typed.charAt(0).toUpperCase() + typed.slice(1), amount = String(f.amount || '').trim().slice(0, 40);
+    if (!PANTRY_BY_ID[id]) {
+      const hits = PANTRY.findInText(name);
+      id = hits.length === 1 ? hits[0] : customId(name);
+      if (id === 'x-') continue;
+    }
+    const keep = before[id] && before[id].amount && !amount ? { amount: before[id].amount } : {};
+    items[id] = PANTRY_BY_ID[id] ? { at: now, ...(amount ? { amount } : keep) }
+      : { at: now, name: before[id] ? before[id].name : name, cat: PANTRY_CATS.some(([k]) => k === f.cat) ? f.cat : (before[id] || {}).cat || 'other', ...(amount ? { amount } : keep) };
+    ids.push(id);
+  }
+  p.items = items;
+  const have = Object.keys(items);
+  p.shop = p.shop.filter(s => !(s.need && [].concat(s.need).some(n => PANTRY.has(have, n))));    // got it: off the shopping list
+  savePantry();
+  return ids;
+}
+function addToShop(name, need) {
+  const p = pantry(), key = normName(name);
+  if (p.shop.some(s => normName(s.name) === key && !s.done)) return false;
+  p.shop = p.shop.filter(s => normName(s.name) !== key);
+  p.shop.push({ name: String(name).slice(0, 60), ...(need ? { need } : {}), done: false });
+  return true;
+}
+const onShop = name => pantry().shop.some(s => !s.done && normName(s.name) === normName(name));
+
+// Recipes you can make now or with one more thing, and quick plates. A meal chip filters; otherwise what fits
+// this time of day comes first.
+function pantryRecs(meal) {
+  const ids = panIds(), sortBy = meal || guessMeal(), fits = list => list.filter(x => !meal || (x.r ? x.r.meals : x.meals).includes(meal));
+  const rk = PANTRY.rank(RECIPES, ids, { meal: sortBy });
+  return { ready: fits(rk.ready), one: fits(rk.one), plates: fits(PANTRY.plates(ids, { meal: sortBy })) };
+}
+
+function dietPantry() {
+  if (typeof PANTRY === 'undefined' || typeof SCAN === 'undefined') return '<div class="empty">The Pantry didn\'t load. Connect to the internet and reopen Dugout.</div>';
+  const p = pantry(), ids = panIds();
+  if (!ids.length) return pantryWelcome();
+  const meal = S.pantryMeal, { ready, one, plates } = pantryRecs(meal);
+  const chip = ([k, label]) => `<button class="chip ${meal === k ? 'on' : ''}" data-action="panMeal" data-k="${k}" aria-pressed="${meal === k}">${label}</button>`;
+  const slot = meal ? ` data-slot="${meal}"` : '';
+  const shownReady = S.panAll ? ready : ready.slice(0, 5), mealWord = meal ? PANTRY_MEALS.find(([k]) => k === meal)[1].toLowerCase() : '';
+  const recipeRow = m => `<button class="meal" data-action="openRecipe" data-id="${m.r.id}"${slot}>
+    <div><div class="meal-name">${esc(m.r.name)}</div><div class="meal-sub">${m.r.min} min · ${m.r.meals.map(k => MEAL_LABEL[k]).join(', ')}</div></div>
+    <div class="meal-nums">${fmt(m.r.cal)} cal<small>${fmt(m.r.pro)} g protein</small></div>
+  </button>`;
+  const oneRow = m => {
+    const listed = onShop(m.missing[0]);
+    return `<div class="plan-meal">
+      <button class="plan-meal-main" data-action="openRecipe" data-id="${m.r.id}"${slot}>
+        <span class="plan-slot need">Need: ${esc(m.missing[0])}</span>
+        <span class="meal-name">${esc(m.r.name)}</span>
+        <span class="meal-sub">${m.r.min} min · ${fmt(m.r.cal)} cal · ${fmt(m.r.pro)} g protein</span>
+      </button>
+      <button class="btn btn-icon sm btn-ghost" data-action="panNeed" data-id="${m.r.id}" ${listed ? 'disabled' : ''} aria-label="${listed ? `${esc(m.missing[0])} is on your shopping list` : `Add ${esc(m.missing[0])} to your shopping list`}">${icon(listed ? 'check' : 'plus', 'sm')}</button>
+    </div>`;
+  };
+  const plateRow = (pl, i) => `<button class="meal" data-action="panPlate" data-i="${i}">
+    <div><div class="meal-name">${esc(pl.title)}</div><div class="meal-sub">${esc(pl.name)}</div></div>
+    <div class="meal-nums">${fmt(pl.cal)} cal<small>${fmt(pl.pro)} g protein</small></div>
+  </button>`;
+  const title = ready.length ? `You can make ${plural(ready.length, 'recipe')}${mealWord ? ` for ${mealWord}` : ''} right now`
+    : plates.length ? `No full recipes${mealWord ? ` for ${mealWord}` : ''} yet — but you can make a plate`
+    : one.length ? `You're one ingredient away from ${plural(one.length, 'recipe')}` : 'Add a few more foods to get ideas';
+  return `
+    <section class="card hero">
+      <div class="spread wrap">
+        <span class="badge accent">${icon('diet')} ${plural(ids.length, 'food')} at home</span>
+        ${daysAgo(p.updated || Date.now()) === 'today' ? '' : `<span class="small muted nowrap">Updated ${daysAgo(p.updated)}</span>`}
+      </div>
+      <div class="card-title">${esc(title)}</div>
+      <div class="grid2 pan-actions">
+        <button class="btn btn-primary" data-action="panScan">${icon('camera', 'sm')} Scan photos</button>
+        <button class="btn btn-ghost" data-action="panAdd">${icon('plus', 'sm')} Add food</button>
+      </div>
+    </section>
+    <div class="chip-row" role="group" aria-label="Which meal">${PANTRY_MEALS.map(chip).join('')}</div>
+
+    <div class="section-title">Make it now</div>
+    <div>${shownReady.map(recipeRow).join('') || `<div class="empty">No recipes from the recipe book${mealWord ? ` for ${mealWord}` : ''} with what you have yet.${plates.length ? ' Try a quick plate below.' : ''}</div>`}
+      ${ready.length > shownReady.length ? `<button class="btn btn-ghost btn-block" data-action="panAll">Show ${ready.length - shownReady.length} more</button>` : ''}</div>
+
+    ${plates.length ? `<div class="section-title">Quick plates</div>
+    <div>${plates.slice(0, 4).map(plateRow).join('')}</div>` : ''}
+
+    ${one.length ? `<div class="section-title">One thing away</div>
+    <div class="stack-sm">${one.slice(0, 4).map(oneRow).join('')}</div>
+    <p class="hint">Tap ${icon('plus', 'sm')} to put what's missing on your shopping list.</p>` : ''}
+
+    ${pantryIdeas()}
+
+    <div class="section-title">In your kitchen</div>
+    <div class="card pan-kitchen">${pantryShelves()}
+      <div class="grid2">
+        <button class="btn btn-ghost btn-sm" data-action="panAdd">${icon('plus', 'sm')} Add food</button>
+        <button class="btn btn-ghost btn-sm" data-action="panClear">${icon('trash', 'sm')} Clear all</button>
+      </div>
+      <p class="hint">Tap a food to note how much is left or to take it off (you ate the last of it? Add it to your shopping list).</p>
+    </div>
+
+    ${pantryShop()}
+    <p class="hint center">Recipes count on salt, pepper, oil and cooking spray being in your kitchen.</p>`;
+}
+
+function pantryWelcome() {
+  return `
+    <section class="card hero">
+      <span class="badge accent">${icon('diet')} What can I make?</span>
+      <div class="card-title">Snap your kitchen — get meals you can make</div>
+      <p class="text-2 small">Take photos of your pantry, fridge and freezer. Dugout finds your food and shows what you can make right now for your calorie and protein goals — and what you're one ingredient away from.</p>
+      <button class="btn btn-primary btn-block" data-action="panScan">${icon('camera', 'sm')} Scan photos</button>
+      <button class="btn btn-ghost btn-block" data-action="panAdd">${icon('plus', 'sm')} Tap in what you have</button>
+      <p class="hint">${aiKey() ? 'Claude is on: for each scan you pick who reads the photos — Claude (they go to Anthropic) or this phone.' : 'Photos are read right on your phone — nothing is uploaded.'}</p>
+    </section>
+    <div class="section-title">Tips for good photos</div>
+    <div class="card"><ul class="steps">
+      <li>Open the doors, turn on the lights, and take one shelf or door per photo.</li>
+      <li>Get close enough to read the names on the packages, and turn them to face you.</li>
+      <li>Food without a label (eggs in a bowl, meat in foil) is easy to miss — tap it in afterwards.</li>
+    </ul></div>`;
+}
+
+function pantryShelves() {
+  const by = {}, items = pantry().items;
+  panIds().forEach(id => { (by[panShelf(id)] = by[panShelf(id)] || []).push(id); });
+  return PANTRY_CATS.filter(([k]) => by[k]).map(([k, label]) => `<div class="pan-shelf">
+    <div class="pan-shelf-name">${label}</div>
+    <div class="chips">${by[k].sort((a, b) => panName(a).localeCompare(panName(b))).map(id =>
+      `<button class="chip pan-chip" data-action="panItem" data-id="${esc(id)}">${esc(panName(id))}${items[id].amount ? `<small>${esc(items[id].amount)}</small>` : ''}</button>`).join('')}</div>
+  </div>`).join('');
+}
+
+function pantryShop() {
+  const shop = pantry().shop;
+  return `<div class="section-title">Shopping list</div>
+    <div class="card stack-sm">
+      ${shop.map((s, i) => `<div class="pan-shop-row">
+        <label class="check-line shop-item"><input type="checkbox" data-change="panShopTick" data-i="${i}" ${s.done ? 'checked' : ''}> <span>${esc(s.name)}</span></label>
+        <button class="btn btn-icon sm btn-ghost" data-action="panShopDel" data-i="${i}" aria-label="Take ${esc(s.name)} off the list">${icon('x', 'sm')}</button>
+      </div>`).join('') || '<p class="hint">Nothing on it yet. Add what you run out of, or what a recipe is missing.</p>'}
+      <form class="pan-shop-add" novalidate data-submit="panShopNew">
+        <input class="input" name="name" placeholder="Add to the list…" maxlength="60" autocomplete="off" aria-label="Add to the shopping list">
+        <button class="btn btn-icon btn-ghost" type="submit" aria-label="Add">${icon('plus', 'sm')}</button>
+      </form>
+      ${shop.length ? `<div class="grid2">
+        <button class="btn btn-ghost btn-sm" data-action="panShopGot" ${shop.some(s => s.done) ? '' : 'disabled'}>${icon('check', 'sm')} Got them</button>
+        <button class="btn btn-ghost btn-sm" data-action="panShopCopy">${icon('copy', 'sm')} Copy list</button>
+      </div>
+      <p class="hint">Check off what you buy, then tap Got them to move it into your kitchen.</p>` : ''}
+    </div>`;
+}
+
+actions.panMeal = el => { S.pantryMeal = el.dataset.k; S.panAll = false; render(); };
+actions.panAll = () => { S.panAll = true; render(); };
+
+// ----- Scanning photos -----
+actions.panScan = () => {
+  if (typeof SCAN === 'undefined') { toast('The Pantry is still loading — try again in a moment'); return; }
+  if (panJob) { showPanProgress(); return; }
+  const ai = !!aiKey();
+  openSheet('Scan your kitchen', `<form class="form" novalidate data-submit="panScanGo">
+    <label class="field"><span>Photos (up to ${PAN_MAX_PHOTOS})</span><input type="file" name="photos" accept="image/*" multiple data-external>
+      <small>Pantry shelves, the fridge, the freezer — one shelf or door per photo, close enough to read the labels.</small></label>
+    ${ai ? `<div class="field"><span>Who reads them</span>${choice('how', [['claude', 'Claude'], ['phone', 'This phone']], pantry().how === 'phone' ? 'phone' : 'claude')}
+      <small>Claude recognizes nearly any food and about how much is left (your photos go to Anthropic). This phone reads package labels and spots some fruit and veggies — free and private.</small></div>` : ''}
+    <button type="submit" class="btn btn-primary btn-block">${icon('camera', 'sm')} Find my food</button>
+    ${ai ? '' : `<p class="hint">Read right on your phone: it finds packaged food by reading the labels, and spots bananas, apples, oranges, broccoli and carrots. The first scan downloads the reader (about 24 MB), then it works offline. For much better results, turn on Claude in Settings → Claude AI.</p>`}
+  </form>`);
+};
+submits.panScanGo = f => {
+  const input = $('input[type=file]', f), files = input && input.files ? [...input.files] : [];
+  const pics = files.filter(x => !x.type || /^image\//.test(x.type));
+  if (!files.length) { toast('Choose at least one photo'); return; }
+  if (!pics.length) { toast('Those files aren\'t photos'); return; }
+  const how = aiKey() && formData(f).how !== 'phone' ? 'claude' : 'phone';
+  if (aiKey() && pantry().how !== how) { pantry().how = how; saveSettings(); }
+  runPantryScan(pics.slice(0, PAN_MAX_PHOTOS), how);
+  if (pics.length > PAN_MAX_PHOTOS) toast(`Reading the first ${PAN_MAX_PHOTOS} photos`);
+};
+
+let panJob = null;        // the scan or idea request in progress: { ac, kind, stage, pct, n, total }
+let panFound = null;      // the last scan's finds, while you check them
+const PAN_STAGE = { download: 'Getting the label reader ready', read: 'Reading your photos', prepare: 'Getting your photos ready',
+  ask: 'Claude is looking at your photos', ideas: 'Claude is coming up with meals' };
+function showPanProgress() {
+  openSheet(panJob && panJob.kind === 'ideas' ? 'Meal ideas' : 'Scanning your kitchen', `<div class="stack-sm" aria-live="polite">
+    <div class="small bold" id="pan-stage"></div>
+    <div class="meter pc" id="pan-meter"><span id="pan-bar" style="width:0%"></span></div>
+    <p class="hint" id="pan-sub"></p>
+    <button class="btn btn-ghost btn-block" data-action="panCancel">Cancel</button>
+  </div>`, { onClose: cancelPan });
+  updatePanProgress();
+}
+// Closing the progress sheet (Cancel, ×, or tapping outside) stops the job.
+function cancelPan() { if (panJob) { panJob.ac.abort(); panJob = null; toast('Cancelled'); } }
+function updatePanProgress() {
+  const st = $('#pan-stage'), bar = $('#pan-bar'), sub = $('#pan-sub'), meter = $('#pan-meter');
+  if (!panJob || !st) return;
+  const { stage, pct, n, total } = panJob, waiting = stage === 'ask' || stage === 'ideas';
+  st.textContent = PAN_STAGE[stage] || '';
+  meter.classList.toggle('busy', waiting);                 // Claude gives no percentage: a moving bar instead
+  bar.style.width = waiting ? '' : `${Math.round(clamp(pct, 0, 1) * 100)}%`;
+  sub.textContent = stage === 'download' ? (pct < 1 ? `Downloading the label reader (one time only): ${Math.round(pct * 24)} of 24 MB` : 'Starting the label reader…')
+    : stage === 'read' ? `Photo ${Math.min(total, Math.floor(pct * total) + 1)} of ${total} — keep Dugout open`
+    : stage === 'ask' ? (n ? `Found ${plural(n, 'food')} so far…` : 'Usually takes 20–60 seconds.')
+    : stage === 'ideas' ? (n ? `Writing idea ${Math.min(n, 5)} of 5…` : 'Usually takes 20–40 seconds.')
+    : 'Keep Dugout open until it\'s done.';
+}
+actions.panCancel = () => closeSheet();
+
+const PAN_PROBLEM = {
+  old: ['This phone can\'t read the photos itself', 'It needs iOS 16.4 or newer on iPhone, or a current Chrome on Android. You can still tap in your food by hand.'],
+  offline: ['Connect to the internet', 'The first scan downloads the label reader (about 24 MB) — after that it works offline. Claude always needs internet.'],
+  model: ['The label reader couldn\'t start', 'Close other apps to free up memory and try again. Restarting your phone can help.'],
+  image: ['A photo couldn\'t be opened', 'Try photos taken with your phone\'s camera app.'],
+  badkey: ['Claude didn\'t accept your key', 'The API key may have been deleted or mistyped. Check it in Settings → Claude AI.'],
+  credit: ['Your Anthropic account is out of credit', 'Add credit at console.anthropic.com (Billing), then try again.'],
+  busy: ['Claude is busy right now', 'Too many requests, or Anthropic is overloaded. Wait a minute and try again.'],
+  refused: ['Claude couldn\'t help with that', 'Try different photos, or tap your food in by hand.'],
+  ai: ['That didn\'t work', 'Claude\'s answer didn\'t come through. Try again in a moment.']
+};
+function pantryProblem(code, detail, retry = 'panScan') {
+  const [title, text] = PAN_PROBLEM[code] || ['Something went wrong', 'Try again. If it keeps happening, tap your food in by hand.'];
+  const key = code === 'badkey' || code === 'credit';
+  openSheet(title, `<p class="text-2">${esc(text)}</p>${detail && code === 'ai' ? `<p class="hint">${esc(String(detail).slice(0, 200))}</p>` : ''}
+    <div class="sheet-actions">${code === 'old' ? `<button class="btn btn-ghost" data-action="closeSheet">Close</button><button class="btn btn-primary" data-action="panAdd">Add by hand</button>`
+      : `<button class="btn btn-ghost" data-action="${key ? 'aiSetup' : 'panAdd'}">${key ? 'Check key' : 'Add by hand'}</button><button class="btn btn-primary" data-action="${retry}">Try again</button>`}</div>`);
+}
+const panFailed = (e, retry) => {
+  const code = e && e.code;
+  if (S.locked || code === 'cancelled') return;              // cancelling already closed the sheet
+  if (!PAN_PROBLEM[code] || code === 'model' || code === 'ai') console.error(e);
+  pantryProblem(code, e && e.detail, retry);
+};
+
+async function runPantryScan(files, how) {
+  if (how === 'phone' && SCAN.supported()) { pantryProblem('old'); return; }
+  panJob = { ac: new AbortController(), kind: 'scan', stage: how === 'phone' ? 'download' : 'prepare', pct: 0, n: 0, total: files.length };
+  const job = panJob;
+  showPanProgress();
+  keepAwake(true);
+  try {
+    const onProgress = (stage, v) => { job.stage = stage; if (stage === 'ask') job.n = v; else job.pct = v; updatePanProgress(); };
+    const res = how === 'claude' ? await SCAN.withClaude(files, aiKey(), { onProgress, signal: job.ac.signal })
+      : await SCAN.onPhone(files, { onProgress, signal: job.ac.signal });
+    if (job.ac.signal.aborted || S.locked) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+    panJob = null;
+    pantryReview(res.items, how, files.length);
+  } catch (e) {
+    if (panJob === job) panJob = null;
+    panFailed(e, 'panScan');
+  } finally {
+    keepAwake(!!S.active);
+  }
+}
+
+// ----- Checking what the scan found -----
+function pantryReview(items, how, photos) {
+  const seen = new Set(), rows = [];
+  for (const x of items) {
+    const key = PANTRY_BY_ID[x.id] ? x.id : 'x:' + normName(x.name);
+    if (seen.has(key) || key === 'x:') continue;
+    seen.add(key);
+    rows.push(how === 'phone' ? { id: x.id, name: panName(x.id), cat: PANTRY_BY_ID[x.id].cat, sure: true, note: x.how === 'shape' ? 'Spotted by its shape' : 'Read on a label' }
+      : { id: x.id, name: x.name || panName(x.id), cat: PANTRY_BY_ID[x.id] ? PANTRY_BY_ID[x.id].cat : x.cat, amount: x.amount, sure: x.sure, note: x.amount || '' });
+  }
+  const order = Object.fromEntries(PANTRY_CATS.map(([k], i) => [k, i]));
+  rows.sort((a, b) => (b.sure - a.sure) || (order[a.cat] ?? 9) - (order[b.cat] ?? 9) || a.name.localeCompare(b.name));
+  panFound = rows;
+  const inPantry = panIds().length, extra = PAN_STAPLES.filter(id => !seen.has(id) && !pantry().items[id]);
+  if (!rows.length) {
+    openSheet('No food found', `<p class="text-2">${how === 'phone'
+      ? `Dugout couldn't read any food labels in ${photos === 1 ? 'this photo' : 'these photos'}. Get closer so the names on the packages are big and sharp, in good light — or tap your food in by hand.${aiKey() ? '' : ' Claude (Settings → Claude AI) can recognize food without reading labels.'}`
+      : 'Claude didn\'t see any food in these photos. Try again with the doors open and the lights on.'}</p>
+      <div class="sheet-actions"><button class="btn btn-ghost" data-action="panAdd">Add by hand</button><button class="btn btn-primary" data-action="panScan">Try again</button></div>`);
+    return;
+  }
+  const maybes = rows.filter(r => !r.sure).length;
+  openSheet(`Found ${plural(rows.length, 'food')}`, `<form class="form" novalidate data-submit="panReviewAdd">
+    <p class="text-2 small">Uncheck anything that's wrong${maybes ? ', and check the maybes you really have' : ''}.</p>
+    <div class="pan-found">${rows.map((r, i) => `<label class="check-line"><input type="checkbox" name="f" value="${i}" ${r.sure ? 'checked' : ''}>
+      <span class="grow"><b>${esc(r.name)}</b><small>${[r.sure ? '' : 'Maybe', r.note, pantry().items[r.id] ? 'already in your list' : ''].filter(Boolean).map(esc).join(' · ')}</small></span></label>`).join('')}</div>
+    ${extra.length ? `<div class="field"><span>Missed anything? Tap what you also have</span>
+      <div class="chips">${extra.map(id => `<label class="pan-pick"><input type="checkbox" name="s" value="${id}"><span>${esc(panName(id))}</span></label>`).join('')}</div></div>` : ''}
+    ${inPantry ? `<label class="check-line"><input type="checkbox" name="replace"> <span>This is my whole kitchen — replace my old list of ${plural(inPantry, 'food')}</span></label>` : ''}
+    <button type="submit" class="btn btn-primary btn-block">${icon('check', 'sm')} Add to my kitchen</button>
+    ${how === 'phone' ? '<p class="hint">Read on your phone. It can miss food without a clear label — add it with the chips above or Add food.</p>' : ''}
+  </form>`);
+}
+submits.panReviewAdd = f => {
+  if (!panFound) { closeSheet(); return; }
+  const fd = new FormData(f), replace = fd.get('replace') === 'on';
+  const picked = fd.getAll('f').map(i => panFound[Number(i)]).filter(Boolean), extra = fd.getAll('s').filter(id => PANTRY_BY_ID[id]).map(id => ({ id }));
+  if (!picked.length && !extra.length) { toast('Check at least one food'); return; }
+  const before = replace ? 0 : panIds().length, ids = addToPantry([...picked, ...extra], { replace });
+  const added = replace ? ids.length : panIds().length - before;
+  panFound = null;
+  closeSheet();
+  Object.assign(S, { tab: 'diet', dietView: 'pantry', panAll: false });
+  render({ keepScroll: false });
+  const ready = pantryRecs(S.pantryMeal).ready.length;
+  toast(`${replace ? `Your kitchen: ${plural(panIds().length, 'food')}` : added ? `Added ${plural(added, 'food')}` : 'Kitchen updated'}${ready ? ` — ${plural(ready, 'recipe')} ready` : ''}`);
+};
+
+// ----- Adding food by hand -----
+actions.panAdd = () => {
+  if (typeof PANTRY === 'undefined') return;
+  openSheet('Add food', `<div class="stack">
+    <label class="field"><span>Search</span><input id="pan-q" placeholder="Eggs, rice, Greek yogurt…" autocomplete="off" autocapitalize="off" enterkeyhint="done" data-input="panSearch"></label>
+    <div class="chips" id="pan-hits"></div>
+    <p class="hint">Or tap everything you have:</p>
+    ${PANTRY_CATS.map(([k, label]) => {
+      const list = PANTRY_ITEMS.filter(it => it.cat === k && it.group !== 'basic');
+      return list.length ? `<div class="pan-shelf"><div class="pan-shelf-name">${label}</div><div class="chips">${list.map(it => panToggle(it.id)).join('')}</div></div>` : '';
+    }).join('')}
+    <button class="btn btn-primary btn-block" data-action="closeSheet">Done</button>
+  </div>`, { onClose: () => render() });
+};
+const panToggle = id => { const on = !!pantry().items[id]; return `<button class="chip ${on ? 'on' : ''}" data-action="panToggle" data-id="${esc(id)}" aria-pressed="${on}">${esc(panName(id))}</button>`; };
+actions.panToggle = el => {
+  const id = el.dataset.id, p = pantry(), on = !p.items[id];
+  if (on) addToPantry([{ id }]); else { delete p.items[id]; savePantry(); }
+  $$('[data-action="panToggle"]').filter(b => b.dataset.id === id).forEach(b => { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+};
+inputs.panSearch = el => {
+  const q = el.value.trim(), hits = q ? PANTRY.search(q, 6) : [], box = $('#pan-hits');
+  if (!box) return;
+  box.innerHTML = hits.map(it => panToggle(it.id)).join('') + (q && !hits.some(it => normName(it.name) === normName(q)) ? `<button class="chip" data-action="panCustom">${icon('plus', 'sm')} Add “${esc(q.slice(0, 40))}”</button>` : '');
+};
+actions.panCustom = () => {
+  const q = $('#pan-q'), name = q ? q.value.trim().slice(0, 60) : '';
+  if (!name) return;
+  const [id] = addToPantry([{ id: 'other', name, cat: 'other' }]);
+  q.value = ''; $('#pan-hits').innerHTML = '';
+  $$('[data-action="panToggle"]').filter(b => b.dataset.id === id).forEach(b => { b.classList.add('on'); b.setAttribute('aria-pressed', 'true'); });
+  toast(id ? `Added ${panName(id)}` : 'Type a food name first');
+};
+
+// ----- One food: how much is left, or take it off -----
+actions.panItem = el => {
+  const id = el.dataset.id, it = pantry().items[id];
+  if (!it) return;
+  openSheet(panName(id), `<form class="form" novalidate data-submit="panItemSave" data-id="${esc(id)}">
+    <p class="text-2 small">${esc(shelfName(panShelf(id)))} · added ${daysAgo(it.at)}</p>
+    <label class="field"><span>How much is left (optional)</span><input name="amount" value="${esc(it.amount || '')}" placeholder="About half a bag" maxlength="40" autocomplete="off"></label>
+    <button type="submit" class="btn btn-primary btn-block">Save</button>
+  </form>
+  <div class="grid2">
+    <button class="btn btn-ghost" data-action="panGone" data-id="${esc(id)}" data-shop="1">${icon('plus', 'sm')} Ran out — add to list</button>
+    <button class="btn btn-danger" data-action="panGone" data-id="${esc(id)}">${icon('trash', 'sm')} Remove</button>
+  </div>`);
+};
+submits.panItemSave = f => {
+  const it = pantry().items[f.dataset.id];
+  if (it) { const a = String(formData(f).amount || '').trim().slice(0, 40); if (a) it.amount = a; else delete it.amount; savePantry(); }
+  closeSheet(); render();
+};
+actions.panGone = el => {
+  const id = el.dataset.id, p = pantry(), was = p.items[id], name = panName(id), shop = !!el.dataset.shop;
+  if (!was) return;
+  delete p.items[id];
+  const listed = shop && addToShop(name, PANTRY_BY_ID[id] ? id : null);
+  savePantry(); closeSheet(); render();
+  toast(shop ? `${name} is on your shopping list` : `Removed ${name}`, { action: () => {
+    p.items[id] = was;
+    if (listed) p.shop = p.shop.filter(s => normName(s.name) !== normName(name));
+    savePantry(); render();
+  } });
+};
+actions.panClear = async () => {
+  if (!(await confirmBox('Clear your kitchen?', `Removes all ${plural(panIds().length, 'food')} so you can start fresh. Your shopping list stays.`, { ok: 'Clear', danger: true }))) return;
+  const p = pantry(), was = p.items;
+  p.items = {}; savePantry(); render();
+  toast('Kitchen cleared', { action: () => { p.items = was; savePantry(); render(); } });
+};
+
+// ----- Quick plates -----
+let foodIndex = null;
+const foodNamed = name => { if (!foodIndex) foodIndex = Object.fromEntries(FOODS.map(f => [f.name, f])); return foodIndex[name]; };
+const macroTiles = x => {
+  const tile = (label, v, u) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${fmt(v)}${u ? `<small> ${u}</small>` : ''}</div></div>`;
+  return `<div class="tiles four">${tile('Calories', x.cal)}${tile('Protein', x.pro, 'g')}${tile('Carbs', x.carb, 'g')}${tile('Fat', x.fat, 'g')}</div>`;
+};
+const logForm = (submit, meal, i) => `<form class="form" novalidate data-submit="${submit}" data-i="${i}">
+  <div class="form-grid">
+    <div class="field"><span>Servings</span>${stepper('servings', 1, 0.5, { min: 0.5, max: 10, mode: 'decimal' })}</div>
+    <label class="field"><span>Meal</span><select name="meal">${MEALS.map(([k, v]) => `<option value="${k}" ${meal === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">${icon('plus', 'sm')} Log it for today</button>
+</form>`;
+const mealFor = meals => (MEAL_LABEL[S.pantryMeal] ? S.pantryMeal : meals.includes(guessMeal()) ? guessMeal() : meals[0]);
+actions.panPlate = el => {
+  const pl = pantryRecs(S.pantryMeal).plates[Number(el.dataset.i)];
+  if (!pl) return;
+  openSheet(pl.name, `
+    ${macroTiles(pl)}
+    <p class="hint">For one plate as listed. Estimates from Dugout's food list — brands vary.</p>
+    <div class="section-title">On the plate</div>
+    <ul class="steps">${pl.items.map(id => {
+      const it = PANTRY_BY_ID[id], f = it.food && foodNamed(it.food[0]);
+      return `<li><b>${esc(it.name)}</b>${f ? ` — ${it.food[1] === 1 ? '' : `${fmt(it.food[1], 2)} × `}${esc(f.serving)}` : ''}</li>`;
+    }).join('')}</ul>
+    <div class="section-title">How to make it</div>
+    <p class="text-2 small">${esc(pl.how)}</p>
+    ${logForm('logPlate', mealFor(pl.meals), el.dataset.i)}`);
+};
+function logPantryMeal(f, x) {       // x: name plus numbers for one serving
+  const d = formData(f), servings = clamp(num(d.servings) || 1, 0.25, 20);
+  const m = {
+    id: uid(), date: ymd(), time: nowHHMM(), meal: MEAL_LABEL[d.meal] ? d.meal : guessMeal(), name: x.name, servings,
+    cal: Math.round(x.cal * servings), pro: r1(x.pro * servings), carb: r1(x.carb * servings), fat: r1(x.fat * servings), createdAt: Date.now()
+  };
+  S.meals.push(m);
+  save(() => DB.put('meals', m));
+  closeSheet(); render();
+  toast(`Logged ${x.name}`, { action: () => removeMeal(m.id) });
+}
+submits.logPlate = f => {
+  const pl = pantryRecs(S.pantryMeal).plates[Number(f.dataset.i)];
+  if (!pl) { closeSheet(); return; }
+  logPantryMeal(f, { ...pl, name: pl.title.slice(0, 80) });
+};
+
+// ----- One thing away: put it on the shopping list -----
+actions.panNeed = el => {
+  const r = RECIPE_BY_ID[el.dataset.id], m = r && PANTRY.match(r, new Set([...panIds(), ...BASICS]));
+  if (!m || !m.missing.length) return;
+  addToShop(m.missing[0], m.missingIds[0]);
+  saveSettings(); render();
+  toast(`${m.missing[0]} is on your shopping list`);
+};
+
+// ----- Shopping list -----
+changes.panShopTick = el => { const s = pantry().shop[Number(el.dataset.i)]; if (s) { s.done = el.checked; saveSettings(); render(); } };
+actions.panShopDel = el => {
+  const p = pantry(), i = Number(el.dataset.i), s = p.shop[i];
+  if (!s) return;
+  p.shop.splice(i, 1); saveSettings(); render();
+  toast(`Took ${s.name} off the list`, { action: () => { p.shop.splice(Math.min(i, p.shop.length), 0, s); saveSettings(); render(); } });
+};
+submits.panShopNew = f => {
+  const name = String(formData(f).name || '').trim().slice(0, 60);
+  if (!name) return;
+  if (!addToShop(name)) { toast(`${name} is already on the list`); return; }
+  saveSettings();
+  later(() => { const inp = $('.pan-shop-add input'); if (inp) inp.focus({ preventScroll: true }); });
+  render();
+};
+actions.panShopGot = () => {
+  const p = pantry(), got = p.shop.filter(s => s.done);
+  if (!got.length) return;
+  // Each bought thing goes into your kitchen: the catalog item it stands for, or its own name.
+  addToPantry(got.map(s => { const id = s.need ? needItem(s.need) : null; return id ? { id } : { id: 'other', name: s.name, cat: 'other' }; }));
+  p.shop = p.shop.filter(s => !s.done);
+  saveSettings(); render();
+  toast(`Moved ${plural(got.length, 'thing')} into your kitchen`);
+};
+actions.panShopCopy = async () => {
+  const text = pantry().shop.filter(s => !s.done).map(s => `- ${s.name}`).join('\n');
+  if (!text) { toast('Everything on the list is checked off'); return; }
+  try { await navigator.clipboard.writeText(`Shopping list\n${text}`); toast('Shopping list copied'); }
+  catch (e) { toast('Couldn\'t copy — take a screenshot instead'); }
+};
+
+// ----- Meal ideas from Claude (optional: your own API key) -----
+function pantryIdeas() {
+  const ideas = pantry().ideas;
+  if (!aiKey()) return `<div class="section-title">More ideas</div>
+    <button class="card pan-ai" data-action="aiSetup">${icon('sparkle')}<span class="grow"><b>Want meals beyond the recipe book?</b>
+      <small>Connect Claude with your own Anthropic API key for custom meals made from exactly what you have.</small></span>${icon('right', 'sm')}</button>`;
+  const list = ideas && ideas.list || [];
+  return `<div class="section-title" id="pan-ideas">Ideas from Claude</div>
+    ${list.length ? `<div>${list.map((x, i) => `<button class="meal" data-action="panIdea" data-i="${i}">
+        <div><div class="meal-name">${esc(x.name)}</div><div class="meal-sub">${x.minutes ? `${x.minutes} min · ` : ''}${MEAL_LABEL[x.meal] || 'Any meal'}${x.missing.length ? ` · needs ${plural(x.missing.length, 'extra')}` : ''}</div></div>
+        <div class="meal-nums">${fmt(x.cal)} cal<small>${fmt(x.pro)} g protein</small></div>
+      </button>`).join('')}</div>
+      <button class="btn btn-ghost btn-block" data-action="panAskIdeas">${icon('sparkle', 'sm')} New ideas${S.pantryMeal ? ` for ${PANTRY_MEALS.find(([k]) => k === S.pantryMeal)[1].toLowerCase()}` : ''}</button>
+      <p class="hint">Asked ${daysAgo(ideas.at)}. Numbers are Claude's estimates per serving.</p>`
+    : `<button class="btn btn-ghost btn-block" data-action="panAskIdeas">${icon('sparkle', 'sm')} Ask Claude for meal ideas${S.pantryMeal ? ` for ${PANTRY_MEALS.find(([k]) => k === S.pantryMeal)[1].toLowerCase()}` : ''}</button>
+      <p class="hint">Sends your list of foods and your daily goals to Claude — no photos.</p>`}`;
+}
+const PAN_MEAL_ASK = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'a snack', pre: 'a meal 1–2 hours before a game or practice', post: 'a meal right after a game or practice' };
+actions.panAskIdeas = () => runPantryIdeas();
+async function runPantryIdeas() {
+  if (!aiKey()) { actions.aiSetup(); return; }
+  if (panJob) { showPanProgress(); return; }
+  const p = pantry(), meal = S.pantryMeal, kind = mealPlanToday().kind;
+  const have = panIds().filter(id => !BASICS.includes(id)).map(id => (p.items[id].amount ? `${panName(id)} (${p.items[id].amount})` : panName(id)));
+  if (have.length < 3) { toast('Add a few more foods first'); return; }
+  panJob = { ac: new AbortController(), kind: 'ideas', stage: 'ideas', pct: 0, n: 0, total: 5 };
+  const job = panJob;
+  showPanProgress();
+  keepAwake(true);
+  try {
+    const list = await SCAN.ideas(aiKey(), { have, cal: S.settings.calGoal, pro: S.settings.proteinGoal, day: kind === 'game' ? 'game' : kind === 'rest' ? 'rest' : 'training', meal: PAN_MEAL_ASK[meal] || '' },
+      { signal: job.ac.signal, onProgress: (stage, n) => { job.n = n; updatePanProgress(); } });
+    if (job.ac.signal.aborted || S.locked) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+    panJob = null;
+    if (!list.length) throw Object.assign(new Error('ai'), { code: 'ai', detail: 'No ideas came back' });
+    p.ideas = { at: Date.now(), meal, list };
+    saveSettings();
+    closeSheet();
+    later(() => { const h = $('#pan-ideas'); if (h) h.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+    render();
+    toast(`${plural(list.length, 'meal idea')} from Claude`);
+  } catch (e) {
+    if (panJob === job) panJob = null;
+    panFailed(e, 'panAskIdeas');
+  } finally {
+    keepAwake(!!S.active);
+  }
+}
+const ideaAt = i => ((pantry().ideas || {}).list || [])[Number(i)];
+actions.panIdea = el => {
+  const x = ideaAt(el.dataset.i);
+  if (!x) return;
+  openSheet(x.name, `
+    <div class="row wrap" style="gap:6px">
+      ${x.minutes ? `<span class="badge">${icon('clock')} ${x.minutes} min</span>` : ''}
+      ${x.servings > 1 ? `<span class="badge">Makes ${x.servings}</span>` : ''}
+      <span class="badge accent">${icon('sparkle')} From Claude</span>
+    </div>
+    ${macroTiles(x)}
+    <p class="hint">Per serving — Claude's estimate. Check your labels.</p>
+    ${x.why ? `<p class="text-2 small">${esc(x.why)}</p>` : ''}
+    ${x.uses.length ? `<div class="section-title">From your kitchen</div><ul class="steps">${x.uses.map(u => `<li>${esc(u)}</li>`).join('')}</ul>` : ''}
+    ${x.missing.length ? `<div class="section-title">You'd also need</div><ul class="steps">${x.missing.map(u => `<li>${esc(u)}</li>`).join('')}</ul>
+      <button class="btn btn-ghost btn-block" data-action="panIdeaShop" data-i="${el.dataset.i}">${icon('plus', 'sm')} Add to shopping list</button>` : ''}
+    ${x.steps.length ? `<div class="section-title">How to make it</div><ol class="steps">${x.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
+    ${logForm('logIdea', MEAL_LABEL[S.pantryMeal] ? S.pantryMeal : MEAL_LABEL[x.meal] ? x.meal : guessMeal(), el.dataset.i)}
+    <button class="btn btn-ghost btn-block" data-action="panIdeaFav" data-i="${el.dataset.i}">${icon('star', 'sm')} Save to favorites</button>`);
+};
+submits.logIdea = f => { const x = ideaAt(f.dataset.i); if (!x) { closeSheet(); return; } logPantryMeal(f, x); };
+actions.panIdeaShop = el => {
+  const x = ideaAt(el.dataset.i);
+  if (!x) return;
+  const n = x.missing.filter(name => { const hits = PANTRY.findInText(name); return addToShop(name, hits.length === 1 ? hits[0] : null); }).length;
+  saveSettings(); closeSheet(); render();
+  toast(n ? `Added ${plural(n, 'thing')} to your shopping list` : 'Already on your shopping list');
+};
+actions.panIdeaFav = el => {
+  const x = ideaAt(el.dataset.i);
+  if (!x) return;
+  addFavorite({ name: x.name, cal: x.cal, pro: x.pro, carb: x.carb, fat: x.fat });
+  closeSheet(); render(); toast(`${x.name} saved to favorites`);
+};
+
+// ----- Settings → Claude AI: your own Anthropic API key -----
+actions.aiSetup = () => {
+  const key = aiKey();
+  openSheet('Claude AI', `<div class="stack">
+    <p class="text-2 small">Dugout works fine without this. With your own Anthropic API key, the Pantry can:</p>
+    <ul class="steps">
+      <li>send your kitchen photos to Claude, which recognizes nearly any food — even without a label — and about how much is left</li>
+      <li>come up with meals from exactly what you have, sized for your goals</li>
+    </ul>
+    <p class="text-2 small"><b>Cost:</b> Anthropic charges your account for what you use — usually about 5–25¢ per scan or set of ideas. Nothing is sent unless you tap one of those buttons.</p>
+    <p class="text-2 small"><b>Privacy:</b> those photos and your food list go to Anthropic. Your key is saved encrypted on this phone and is never put in backups.</p>
+    <details class="table-toggle"><summary>How to get a key</summary>
+      <ol class="steps"><li>Go to console.anthropic.com and sign in (billing needs a card — ask a parent if it isn't yours).</li><li>Open API keys → Create key, and copy it.</li><li>Paste it below.</li></ol></details>
+    <form class="form" novalidate data-submit="aiSave">
+      <label class="field"><span>${key ? `Your key ends in …${esc(key.slice(-4))} — paste a new one to replace it` : 'Your API key'}</span>
+        <input name="key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…"></label>
+      <button type="submit" class="btn btn-primary btn-block">${icon('check', 'sm')} ${key ? 'Replace key' : 'Save key'}</button>
+    </form>
+    ${key ? `<button class="btn btn-danger btn-block" data-action="aiRemove">${icon('trash', 'sm')} Remove key</button>` : ''}
+  </div>`);
+};
+submits.aiSave = async f => {
+  const k = String(formData(f).key || '').replace(/\s+/g, '');
+  if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) { toast('That isn\'t an Anthropic API key — it starts with sk-ant-'); return; }
+  const btn = $('button[type=submit]', f), label = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Checking the key…';
+  let note = 'Claude is on — try it in Diet → Pantry';
+  try { await SCAN.checkKey(k); }
+  catch (e) {
+    if (e && (e.code === 'badkey' || e.code === 'credit')) { btn.disabled = false; btn.innerHTML = label; toast(e.code === 'credit' ? 'That account is out of credit — add some at console.anthropic.com' : 'Anthropic didn\'t accept that key'); return; }
+    note = 'Key saved — it couldn\'t be checked right now';
+  }
+  if (S.locked) return;
+  S.settings.aiKey = k; saveSettings();
+  closeSheet(); render(); toast(note);
+};
+actions.aiRemove = async () => {
+  if (!(await confirmBox('Remove your Claude key?', 'Pantry scans go back to reading photos on this phone, and meal ideas from Claude turn off. Ideas you already have stay.', { ok: 'Remove', danger: true }))) return;
+  S.settings.aiKey = ''; saveSettings(); render(); toast('Claude key removed');
+};
+
+// Restored backups and old versions: keep only what the Pantry understands.
+function cleanPantry(p) {
+  if (!isObj(p) || typeof PANTRY_BY_ID === 'undefined') return isObj(p) ? p : null;
+  const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : ''), nums = v => Math.max(0, Math.round(Number(v) || 0));
+  const strs = (a, n) => (Array.isArray(a) ? a.filter(s => typeof s === 'string' && s.trim()).slice(0, n).map(s => s.trim().slice(0, 300)) : []);
+  const items = {};
+  for (const [id, v] of Object.entries(isObj(p.items) ? p.items : {})) {
+    if (!isObj(v)) continue;
+    const amount = str(v.amount, 40), base = { at: Number(v.at) || Date.now(), ...(amount ? { amount } : {}) };
+    if (PANTRY_BY_ID[id]) items[id] = base;
+    else if (/^x-[a-z0-9-]{1,40}$/.test(id) && str(v.name, 60)) items[id] = { ...base, name: str(v.name, 60), cat: PANTRY_CATS.some(([k]) => k === v.cat) ? v.cat : 'other' };
+  }
+  const okNeed = n => (typeof n === 'string' && n.length < 40) || (Array.isArray(n) && n.length && n.length < 8 && n.every(x => typeof x === 'string' && x.length < 40));
+  const shop = (Array.isArray(p.shop) ? p.shop : []).filter(s => isObj(s) && str(s.name, 60)).slice(0, 100)
+    .map(s => ({ name: str(s.name, 60), ...(okNeed(s.need) ? { need: s.need } : {}), done: !!s.done }));
+  const ideas = isObj(p.ideas) && Array.isArray(p.ideas.list) ? { at: Number(p.ideas.at) || 0, meal: MEAL_LABEL[p.ideas.meal] ? p.ideas.meal : '',
+    list: p.ideas.list.filter(x => isObj(x) && str(x.name, 80)).slice(0, 6).map(x => ({ name: str(x.name, 80), meal: MEAL_LABEL[x.meal] ? x.meal : '', minutes: nums(x.minutes),
+      servings: Math.max(1, nums(x.servings)), uses: strs(x.uses, 12), missing: strs(x.missing, 12), cal: nums(x.cal), pro: nums(x.pro), carb: nums(x.carb), fat: nums(x.fat),
+      why: str(x.why, 300), steps: strs(x.steps, 12) })) } : null;
+  return { items, shop, ideas: ideas && ideas.list.length ? ideas : null, updated: Number(p.updated) || 0, how: p.how === 'phone' ? 'phone' : 'claude' };
+}
 
 /* ============================== 9. PROGRESS TAB (charts + history) ============================== */
 
@@ -4435,6 +5083,12 @@ function renderSettings() {
         <div class="hint">${[st.carbGoal ? `${fmt(st.carbGoal)} g carbs` : '', st.fatGoal ? `${fmt(st.fatGoal)} g fat` : '', `${waterText(st.waterGoal)} water`].filter(Boolean).join(' · ')} · tap to edit</div></div>${icon('edit')}</button>
     </div>
 
+    <div class="section-title">Claude AI (optional)</div>
+    <div class="set-list">
+      <button class="set-item as-btn" data-action="aiSetup"><div class="grow"><div>${st.aiKey ? 'Claude is on' : 'Connect Claude'}</div>
+        <div class="hint">${st.aiKey ? `Key …${esc(st.aiKey.slice(-4))} · pantry photo scans and meal ideas` : 'Smarter pantry scans and custom meal ideas, with your own Anthropic API key'}</div></div>${icon('sparkle')}</button>
+    </div>
+
     <div class="section-title">Backup — never lose your data</div>
     <div class="card stack">
       <div class="row" style="align-items:flex-start">${icon('shield')}<div class="grow">
@@ -4534,7 +5188,7 @@ function convertWeights(to) {
 function backupData() {
   return {
     app: 'dugout', format: 1, version: APP_VERSION, exportedAt: new Date().toISOString(),
-    kv: { settings: { ...S.settings, lastBackup: Date.now() }, plan: S.plan, ...(S.active ? { active: S.active } : {}) },
+    kv: { settings: { ...S.settings, aiKey: '', lastBackup: Date.now() }, plan: S.plan, ...(S.active ? { active: S.active } : {}) },
     workouts: S.workouts, meals: S.meals, foods: S.foods, logs: S.logs
   };
 }
@@ -4712,7 +5366,7 @@ async function confirmRestore(data) {
     stopTimer();
     const username = S.settings.username;
     const kv = { ...(data.kv || {}) };
-    kv.settings = { ...(kv.settings || {}), username };      // keep this phone's login name
+    kv.settings = { ...(kv.settings || {}), username, aiKey: S.settings.aiKey || '' };      // keep this phone's login name (and Claude key)
     await DB.replaceAll({ ...data, kv });
     await loadAll();
     render({ keepScroll: false });
@@ -4756,6 +5410,11 @@ const HELP = [
   ['Logging food fast', ['Type a few letters to search 169 common foods, your favorites and anything you logged before. Change Servings and the numbers update.',
     'Use the Recent row, Favorites, the + on a meal, or "Copy yesterday\'s food" to log in one tap.',
     'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
+  ['Pantry: what can I make?', ['Diet → Pantry → Scan photos: take a photo of each pantry shelf, the fridge and the freezer (up to 6 at a time), close enough to read the labels. Check what it found, tap anything it missed, and add it to your kitchen.',
+    'Or tap Add food and pick what you have. Tap a food in "In your kitchen" to note how much is left or take it off when it runs out.',
+    'Make it now lists recipes you have everything for. Quick plates mix a protein, a carb and a fruit or veggie you have. One thing away shows what a single ingredient would unlock — tap + to put it on your shopping list. Pick a meal (Breakfast, Pre-game…) to narrow it down.',
+    'On your phone, photos are read by recognizing the words on packages plus a few fruits and veggies by shape, so food without a label is easy to miss. Nothing is uploaded, and after the first scan (a 24 MB download) it works offline.',
+    'Claude AI (optional): Settings → Claude AI takes your own Anthropic API key. Then Claude reads your photos (it recognizes nearly any food, and about how much is left) and can write meal ideas from exactly what you have. Those photos and your food list go to Anthropic, and your account is charged a few cents per use.']],
   ['Setting your goals', ['Settings → Calculate my goals turns your age, size, training and goal into calories, protein, carbs, fat and water.',
     'Weigh in once or twice a week (Progress → Body) and recalculate every month or so. If you\'re trying to gain and your weight stalls for 2–3 weeks, add about 250 calories.']],
   ['Drills for every position', ['Baseball tab → Drills: drills for hitting, pitching, catching, every infield spot, outfield, throwing and base running.',
@@ -4776,7 +5435,8 @@ const HELP = [
   ['Programs and your plan', ['Plan → Programs switches between off-season (build), pre-season (sharpen) and in-season (maintain). Your history stays.',
     'Tap any exercise to change sets, reps, rest or the video. Use the exercise library to add new ones, or swap an exercise for today during a workout.']],
   ['Backups and privacy', ['Everything stays on this phone, encrypted with your password. There is no password reset — keep it in your iPhone Passwords app.',
-    'Export a backup about once a week (Settings) and save it to Files or email it to yourself. Spreadsheet (CSV) exports are for coaches and are not encrypted.']]
+    'Export a backup about once a week (Settings) and save it to Files or email it to yourself. Spreadsheet (CSV) exports are for coaches and are not encrypted.',
+    'The one exception is the optional Claude AI (Settings → Claude AI): once you add your own API key, the kitchen photos you choose to have Claude read, and your food list when you ask for meal ideas, are sent to Anthropic. Your key is never put in backups.']]
 ];
 actions.help = () => openSheet('How to use Dugout', `<div class="guide">${HELP.map(([title, points]) => `<details><summary>${esc(title)}</summary>
   <ul class="steps">${points.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`).join('')}</div>
@@ -4844,6 +5504,8 @@ function cleanSettings(st) {
   if (!isObj(out.drillVideos)) out.drillVideos = {};
   if (!['R', 'L'].includes(out.bats)) out.bats = 'R';
   if (!Array.isArray(out.badges)) out.badges = null;
+  out.aiKey = out.aiKey.trim();
+  out.pantry = cleanPantry(out.pantry);
   return out;
 }
 function cleanExerciseData(e) {
@@ -5100,13 +5762,17 @@ async function openApp(newUsername) {
 }
 
 // ----- What's new (shown once after an update to people who already use the app) -----
-const WHATS_NEW = '2.2';
+const WHATS_NEW = '2.3';
 function whatsNew() {
   const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
-  openSheet("What's new in Dugout 2.2", `
+  openSheet("What's new in Dugout 2.3", `
+    ${item('camera', 'What can I make?', 'Diet → Pantry: take photos of your pantry, fridge and freezer (or tap in what you have) and see the meals you can make right now, quick plates, what you\'re one ingredient away from, and a shopping list. Photos are read on your phone.')}
+    ${item('sparkle', 'Claude AI (optional)', 'Settings → Claude AI: add your own Anthropic API key for much better photo scans and custom meal ideas made from exactly what you have.')}
+    <details class="table-toggle"><summary>New in 2.2</summary><div class="stack-sm">
     ${item('video', 'Swing lab', 'Baseball tab → Swing lab: film a swing from the side, front or back and get a full breakdown — stride, hip-shoulder separation, firing order, head movement, hands and finish — plus drills picked for what it finds. It all runs on your phone.')}
     ${item('baseball', '66 drills for every position', 'Baseball tab → Drills: hitting, pitching, catching, every infield spot, outfield, throwing and base running — split into drills you can do alone and drills with a partner.')}
     ${item('x', 'End a workout early', 'Tap End at the top of a workout to save what you did or cancel it.')}
+    </div></details>
     <details class="table-toggle"><summary>New in 2.1</summary><div class="stack-sm">
     ${item('flame', 'Light, Moderate or Heavy', 'Pick how hard to go each day, right on the Today screen. Moderate trims the sets and weights. Light swaps in an easy recovery workout with a form video for every exercise.')}
     ${item('dumbbell', '10 more exercises', 'Goblet squats, Bulgarian split squats, band pull-aparts and more in the exercise library.')}
@@ -5196,6 +5862,8 @@ async function lockApp(message) {
   badgeSig = ''; calcResult = null; pendingBackup = null;
   if (swingJob) swingJob.ac.abort();                 // stop a swing analysis and forget the last video
   swingJob = null; lastTrack = null;
+  if (panJob) panJob.ac.abort();                     // and a pantry scan or idea request
+  panJob = null; panFound = null;
   Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null, swingOpen: null });
   render();
   if (message) toast(message);
