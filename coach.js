@@ -22,7 +22,8 @@ How to coach
 - Point to the app: tell them where to do things in Dugout, e.g. "Plan → Light workout" or "Diet → Pantry".
 
 Buttons
-- When it saves them taps, offer an action with an offer_* tool: logging a meal or snack you suggested, adding items to their shopping list, switching today's workout to Light, Moderate or Heavy, adding drills to their drill plan, or opening a screen. They see a button and decide; nothing changes unless they tap it. Offer only what's clearly useful (a few at most) and mention it ("tap Log it below").
+- When it saves them taps, offer an action with an offer_* tool: logging a meal or snack you suggested, adding items to their shopping list, switching today's workout to Light, Moderate or Heavy, adding drills to their drill plan, a workout you designed or one of the app's presets (they can start it, save it or put it on a day), or opening a screen. They see a button and decide; nothing changes unless they tap it. Offer only what's clearly useful (a few at most) and mention it ("tap Log it below").
+- Workouts you design: build them from the exercise library (exact names), fit their position, experience, equipment, time and the day's readiness, and keep a sensible order — warm-up, sprints and jumps, big lifts, accessories, arm care and core, stretching. For a whole new weekly plan, point them to Plan → Build my plan.
 
 Safety — they're a young athlete
 - Food is fuel for training and growing. No crash diets, fasting, weight cutting, skipped meals or very low-carb plans. If they seem worried about food or their body, be kind, focus on health and performance, and suggest talking with a parent, doctor or sports dietitian.
@@ -42,7 +43,7 @@ Style
   const tool = (name, description, properties, required = []) =>
     ({ name, description, eager_input_streaming: true, input_schema: { type: 'object', properties, required } });
   const MEAL_KEYS = ['breakfast', 'lunch', 'dinner', 'snack', 'pre', 'post'];
-  const SCREENS = ['today', 'plan', 'light_workout', 'drills', 'swing_lab', 'games_and_arm', 'food_log', 'meal_plan', 'pantry', 'progress_lifts', 'progress_body', 'goal_calculator'];
+  const SCREENS = ['today', 'plan', 'light_workout', 'build_my_plan', 'workouts', 'drills', 'swing_lab', 'games_and_arm', 'food_log', 'meal_plan', 'pantry', 'progress_lifts', 'progress_body', 'goal_calculator'];
 
   // Deterministic order (it's part of what gets cached).
   const TOOLS = [
@@ -69,7 +70,12 @@ Style
     tool('offer_screen', 'Show a button that opens a screen in Dugout. Use when you tell them to go do something in the app.',
       { screen: { type: 'string', enum: SCREENS } }, ['screen']),
     tool('offer_shopping_list', 'Show a button that adds items to the athlete\'s shopping list (Diet → Pantry). Use when you suggest buying things.',
-      { items: { type: 'array', items: { type: 'string' }, description: 'Items to buy, e.g. ["Greek yogurt", "Bananas"].' } }, ['items'])
+      { items: { type: 'array', items: { type: 'string' }, description: 'Items to buy, e.g. ["Greek yogurt", "Bananas"].' } }, ['items']),
+    tool('offer_workout', 'Show a workout card they can open to start now, save to My workouts or put on a day of their plan. Either give preset_id for one of the app\'s presets, or design one: a title and the exercises in order, using exact names from the exercise library.',
+      { preset_id: str('A preset id from the app guide. Leave out when you give exercises.'), title: str('Short name, e.g. "Hotel Room Legs".'),
+        focus: str('One or two sentences on what it\'s for and how to do it.'), where: { type: 'string', enum: ['gym', 'home'], description: 'Where they\'ll do it (default: the plan they\'re using).' },
+        exercises: { type: 'array', description: '2 to 15 exercises, in order.', items: { type: 'object', properties: { name: str('Exercise name from the library.'), sets: int('Sets.'),
+          reps: str('Reps or time for each set, e.g. "8", "10/leg", "30 sec", "20 yd".'), rest: int('Rest between sets, in seconds.') }, required: ['name', 'sets', 'reps'] } } })
   ];
   const TOOL_NAMES = TOOLS.map(t => t.name);
 
