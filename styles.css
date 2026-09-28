@@ -945,6 +945,43 @@ i.t-rest { background: var(--muted); }
 @keyframes pan-busy { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 @media (prefers-reduced-motion: reduce) { .meter.busy > span { width: 100%; opacity: 0.45; } }
 
+/* ---------- Build my plan, presets & my workouts ---------- */
+.plan-tools .btn { min-height: 44px; font-size: 14px; padding: 0 10px; }
+.choice.wrap2, .choice.wrap3 { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.choice.wrap3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.choice.wrap2 .feel-opt span, .choice.wrap3 .feel-opt span { padding: 4px 6px; text-align: center; line-height: 1.2; }
+.choice.days { gap: 2px; padding: 3px; }
+.choice.days .feel-opt span { font-size: 12px; min-height: 40px; }
+.pick-rows { display: flex; flex-direction: column; gap: 6px; }
+.pick-row { position: relative; display: block; }
+.pick-row input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.pick-row span { display: block; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); }
+.pick-row b { display: block; font-size: 15px; }
+.pick-row small { display: block; font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 2px; line-height: 1.35; }
+.pick-row input:checked + span { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.pick-row input:checked + span b { color: var(--accent); }
+.pick-row input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wk-list { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.wk-day { border-bottom: 1px solid var(--line); }
+.wk-day:last-child { border-bottom: 0; }
+.wk-day summary, .wk-day.rest { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 8px 14px; cursor: pointer; list-style: none; font-size: 15px; }
+.wk-day summary::-webkit-details-marker { display: none; }
+.wk-day b { flex: none; width: 42px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.wk-day .grow { font-weight: 700; min-width: 0; }
+.wk-day small { flex: none; color: var(--muted); font-weight: 700; font-size: 13px; }
+.wk-day summary .i { flex: none; color: var(--muted); transition: transform 0.2s; }
+.wk-day[open] summary .i { transform: rotate(180deg); }
+.wk-day.rest { cursor: default; color: var(--muted); }
+.wk-day.rest .grow { font-weight: 600; }
+.wk-day.light summary b { color: var(--accent); }
+.wk-day .preview-list { margin: 0 14px 10px; }
+.wk-day .preview-list div { font-size: 14px; padding: 7px 0; }
+.wo-row[hidden], .wo-none[hidden] { display: none; }
+.wo-put summary { list-style: none; }
+.wo-put summary::-webkit-details-marker { display: none; }
+.wo-put[open] summary { margin-bottom: 12px; }
+.tune-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
 :root[data-theme="light"] {
   --bg: #f3f5f8; --surface: #ffffff; --surface-2: #eef1f5; --surface-3: #e1e6ed;
   --line: #dde3ea; --line-2: #c9d1dc; --text: #0f1720; --text-2: #394556; --muted: #687385; --grid: #e7ebf0;

@@ -8,6 +8,20 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 
 **Train**
 - Weekly gym and home (no equipment) plans — **off-season** build, **pre-season** sharpen and **in-season** maintain programs
+- **Build my plan**: answer a few questions — position (pitcher, catcher, infield, outfield, two-way), build (smaller,
+  average, bigger), lifting experience, main goal (all-around, strength & size, speed, power, arm health), the part of the
+  season, which days you train, how long you have and what you have at home — and Dugout builds a gym week, a home week
+  and a Light workout for you from the exercise library. Pitchers get arm care in every lift and no overhead pressing;
+  catchers get hip, groin and leg strength for the crouch; infielders side-to-side quickness; outfielders sprint speed
+  and healthy hamstrings. Smaller players get more muscle-building work, bigger players more mobility and easier
+  landings, newer (and younger) lifters simpler lifts — and each workout is trimmed to fit your time. Preview it, "mix
+  it up" for different exercises, then edit any day
+- **Presets & custom workouts**: 17 ready-made workouts (pitcher arm care, catcher legs & hips, infield first step,
+  outfield speed, bat speed, lower/upper strength, a 20-minute workout, a hotel-room workout, a game-day primer,
+  post-game recovery, mobility…), **Make me a workout** (pick up to 3 of full body, lower, upper, power, speed, core,
+  arm care or mobility, how long and where), and **My workouts** (save any of them, or any day of your plan). Start one
+  right now or put it on a day. Edit day also has quick changes for the whole day (a set more or less, shorter or longer
+  rests) and swapping two days
 - **Light / Moderate / Heavy** switch on the Today screen: pick how hard to go each day. Moderate trims the sets and
   starts weights at about 90% of last time; Light swaps in an easy recovery workout (mobility, arm care, core — every
   exercise has a form video) that you can edit in Plan → Light workout
@@ -38,7 +52,8 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 - While it answers it can look things up on the phone — full workout history, food log, recovery, baseball data, your
   weekly plan and the app's library (exercise how-tos, recipes, food nutrition, drills) — and offer one-tap buttons:
   log a meal it suggested, add to your shopping list, switch today to Light / Moderate / Heavy, add drills to your
-  plan, or open a screen. Nothing changes unless you tap.
+  plan, open a workout it designed for you or one of the presets (start it, save it or put it on a day), or open a
+  screen. Nothing changes unless you tap.
 - Built to be safe for a young athlete (no crash diets or risky supplements; pain → see a trainer or doctor; Pitch
   Smart limits). Answers stream in; the chat shows about what it has cost (usually a few cents a question). Chats are
   saved encrypted on the phone and erased with everything else.
@@ -74,6 +89,7 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 | `app.js` | All the screens and features |
 | `plan.js` | Starting workout programs, the Light workout and tutorial video links |
 | `exercises.js` | How-to details for every exercise |
+| `builder.js` | Build my plan, Make me a workout and the presets: which exercises fit each position, build, experience and goal |
 | `meals.js` | Recipes and eating tips |
 | `foods.js` | Built-in food list |
 | `drills.js` | Baseball drills for every position and the swing problems they fix |
