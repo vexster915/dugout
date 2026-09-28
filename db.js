@@ -1,5 +1,7 @@
 /* db.js — saves all your data on this phone using IndexedDB (the phone's built-in
-   database for web apps), ENCRYPTED. Nothing is ever sent to a server.
+   database for web apps), ENCRYPTED. Nothing is ever sent to a server. (The one exception is optional: if
+   you add your own Anthropic API key in Settings → Claude AI, what you ask the Coach or have Claude read
+   in the Pantry goes to Anthropic — see ai.js.)
 
    How the lock works
    - When you create your login, the app makes a random 256-bit key that encrypts all
@@ -10,7 +12,7 @@
    - No password (or anything that reveals it) is stored in the app's code or sent anywhere.
 
    Stores:
-     kv        settings, your weekly plan, the workout in progress (encrypted)
+     kv        settings, your weekly plan, the workout in progress, your Coach chat (encrypted)
                + "vault" (the locked key) and "lockout" (wrong-password counter)
      workouts  finished workouts (encrypted)
      meals     food log entries (encrypted)
@@ -24,6 +26,7 @@ const DB = (() => {
   const STORES = ['kv', 'workouts', 'meals', 'foods', 'logs'];
   const DATA_STORES = ['workouts', 'meals', 'foods', 'logs'];
   const RAW_KEYS = ['vault', 'lockout'];          // kv entries that are not encrypted (no personal data)
+  const DATA_KEYS = ['settings', 'plan', 'active', 'coach'];   // kv entries that are your data (erased and replaced by a restore)
   const ITERATIONS = 600000;
   const enc = new TextEncoder(), dec = new TextDecoder();
   let dbPromise = null;
@@ -236,7 +239,7 @@ const DB = (() => {
       }
       await tx(STORES, 'readwrite', t => {
         const kv = t.objectStore('kv');
-        ['settings', 'plan', 'active'].forEach(k => kv.delete(k));
+        DATA_KEYS.forEach(k => kv.delete(k));
         kvOut.forEach(([k, r]) => kv.put(r, k));
         DATA_STORES.forEach(s => { const st = t.objectStore(s); st.clear(); out[s].forEach(r => st.put(r)); });
       });
@@ -244,7 +247,7 @@ const DB = (() => {
 
     // Deletes your data but keeps your login.
     eraseData: () => tx(STORES, 'readwrite', t => {
-      ['settings', 'plan', 'active'].forEach(k => t.objectStore('kv').delete(k));
+      DATA_KEYS.forEach(k => t.objectStore('kv').delete(k));
       DATA_STORES.forEach(s => t.objectStore(s).clear());
     }),
     // Deletes everything, including the login (for a forgotten password).

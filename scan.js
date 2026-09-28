@@ -10,12 +10,11 @@
    list and your daily targets. Nothing is sent anywhere unless you tap one of those buttons. */
 
 const SCAN = (() => {
-  const TS = 'vendor/tesseract-7.0.0/', MP = 'vendor/mediapipe-1.0.1/', SDK = 'vendor/anthropic-sdk-0.128.0/anthropic.mjs';
-  const MODEL = 'claude-opus-5';
+  const TS = 'vendor/tesseract-7.0.0/', MP = 'vendor/mediapipe-1.0.1/';
   const ON_PHONE = [[TS + 'tesseract.esm.min.js', 63175], [TS + 'worker.min.js', 111269], [TS + 'tesseract-core-simd-lstm.wasm.js', 3899472],
     [TS + 'eng.traineddata.gz', 2952873], [MP + 'vision_bundle.mjs', 155393], [MP + 'vision_wasm_internal.js', 323377],
     [MP + 'vision_wasm_internal.wasm', 11756954], [MP + 'efficientdet_lite0.tflite', 4602795]];
-  const oops = (code, detail) => Object.assign(new Error(code), { code, detail });
+  const oops = AI.oops;
   const abs = p => new URL(p, location.href).href;
   const cancelled = signal => { if (signal && signal.aborted) throw oops('cancelled'); };
 
@@ -113,52 +112,24 @@ const SCAN = (() => {
     return { items: [...found.values()], text: words.join('\n') };
   }
 
-  /* ---------- With Claude (your API key) ---------- */
-  let sdk = null;
-  async function claude(key) {
-    if (!sdk) {
-      try { sdk = (await import(abs(SDK))).default; } catch (e) { throw oops('offline'); }
-    }
-    return new sdk({ apiKey: key, dangerouslyAllowBrowser: true, maxRetries: 1, timeout: 180000 });
-  }
-  function aiError(e) {
-    const A = sdk;
-    if (!A) return e && e.code ? e : oops('ai', e && e.message);
-    if (e instanceof A.APIUserAbortError) return oops('cancelled');
-    if (e instanceof A.AuthenticationError || e instanceof A.PermissionDeniedError) return oops('badkey');
-    if (e instanceof A.RateLimitError) return oops('busy');
-    if (e instanceof A.InternalServerError) return oops('busy');
-    if (e instanceof A.APIConnectionError) return oops('offline');
-    if (e instanceof A.BadRequestError) return oops(/credit balance/i.test(e.message) ? 'credit' : 'ai', e.message);
-    if (e instanceof A.APIError) return oops('ai', e.message);
-    return e && e.code ? e : oops('ai', e && e.message);
-  }
+  /* ---------- With Claude (your API key — see ai.js) ---------- */
   // One request with a JSON answer that must match `schema`. It streams, so a long answer can't time out and
   // onText(answer so far) can show progress. Medium effort: quick and cheap, and plenty for this.
   async function ask(key, system, content, schema, { signal, onText } = {}) {
-    const client = await claude(key);
+    const client = await AI.client(key);
     let msg;
     try {
       const stream = client.beta.messages.stream({
-        model: MODEL, max_tokens: 16000, thinking: { type: 'adaptive' },
-        betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',          // if Claude declines, another model answers instead
+        model: AI.MODEL, max_tokens: 16000, thinking: { type: 'adaptive' }, betas: AI.BETAS, fallbacks: 'default',
         output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
         system, messages: [{ role: 'user', content }]
       }, { signal });
-      if (onText) stream.on('text', (delta, soFar) => onText(soFar));
+      if (onText) { let so = ''; stream.on('text', delta => { so += delta; onText(so); }); }
       msg = await stream.finalMessage();
-    } catch (e) { throw aiError(e); }
+    } catch (e) { throw AI.error(e); }
     if (msg.stop_reason === 'refusal') throw oops('refused');
     if (msg.stop_reason === 'max_tokens') throw oops('ai', 'The answer was cut off');
-    // After a fallback the answer starts over, so only read what came after the last switch.
-    const from = msg.content.map(b => b.type).lastIndexOf('fallback') + 1;
-    const text = msg.content.slice(from).filter(b => b.type === 'text').map(b => b.text).join('');
-    try { return JSON.parse(text); } catch (e) { throw oops('ai', 'The answer could not be read'); }
-  }
-  // Settings → Claude AI: does Anthropic accept this key? (Listing models is free.)
-  async function checkKey(key) {
-    const client = await claude(key);
-    try { await client.models.list({ limit: 1 }); } catch (e) { throw aiError(e); }
+    try { return JSON.parse(AI.text(msg)); } catch (e) { throw oops('ai', 'The answer could not be read'); }
   }
   const countKey = (text, k) => (text.match(new RegExp(`"${k}"\\s*:`, 'g')) || []).length;
 
@@ -229,5 +200,5 @@ Suggest 5 meals I can make. Use what I have — at most 2 extra ingredients per 
       uses: strs(x.uses), missing: strs(x.missing), cal: int(x.cal), pro: int(x.pro), carb: int(x.carb), fat: int(x.fat), why: String(x.why || '').slice(0, 300), steps: strs(x.steps) }));
   }
 
-  return { supported, onPhone, withClaude, ideas, checkKey, loadImage, MODEL };
+  return { supported, onPhone, withClaude, ideas, loadImage };
 })();
