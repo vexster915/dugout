@@ -19,7 +19,7 @@
 
 'use strict';
 
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
@@ -197,7 +197,8 @@ const ICONS = {
   scale: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0l-2.2 2.2"/>',
   baseball: '<circle cx="12" cy="12" r="9"/><path d="M6.3 5.2c1.9 1.8 3 4.2 3 6.8s-1.1 5-3 6.8M17.7 5.2c-1.9 1.8-3 4.2-3 6.8s1.1 5 3 6.8"/>',
   camera: '<path d="M4 8.5h3.2L9 6h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.5" r="3.4"/>',
-  sparkle: '<path d="M11 3.5l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6-5.6-1.9 5.6-1.9z"/><path d="M18.5 15.5v5M16 18h5"/>'
+  sparkle: '<path d="M11 3.5l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6-5.6-1.9 5.6-1.9z"/><path d="M18.5 15.5v5M16 18h5"/>',
+  coach: '<path d="M20.5 11.5c0 4.1-3.8 7.4-8.5 7.4a9.6 9.6 0 0 1-3.6-.7L3.5 19.8l1.4-3.9a6.9 6.9 0 0 1-1.4-4.4c0-4.1 3.8-7.4 8.5-7.4s8.5 3.3 8.5 7.4z"/><path d="M12 8.2l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z"/>'
 };
 const FILLED = new Set(['play', 'more']);
 const icon = (name, cls = '') => `<svg class="i ${FILLED.has(name) ? 'fill' : ''} ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -263,6 +264,8 @@ const S = {
   dietWeek: ymd(weekStart()),
   recipeMeal: 'all',   // Meals view filters
   recipeTag: null,
+  coach: null,         // the Coach chat (section 8c), loaded at sign-in
+  coachDraft: '',      // what's typed in the Coach box but not sent yet
   pantryMeal: '',      // Pantry view: meal filter ('' = any)
   panAll: false,       // Pantry view: show every ready recipe
   progEx: null,
@@ -362,7 +365,7 @@ const actions = {}, inputs = {}, changes = {}, submits = {};
 let postRender = [];
 const later = fn => postRender.push(fn);
 
-const TABS = [['today', 'Today'], ['plan', 'Plan'], ['baseball', 'Baseball'], ['diet', 'Diet'], ['progress', 'Progress'], ['settings', 'Settings']];
+const TABS = [['today', 'Today'], ['plan', 'Plan'], ['baseball', 'Baseball'], ['coach', 'Coach'], ['diet', 'Diet'], ['progress', 'Progress'], ['settings', 'Settings']];
 
 function renderTabbar() {
   $('#tabbar').innerHTML = TABS.map(([id, label]) => `
@@ -383,7 +386,7 @@ function render({ keepScroll = true } = {}) {
   $('#tabbar').hidden = false;
   document.body.dataset.mode = S.active ? S.active.mode : S.settings.mode;
   const top = view.scrollTop;
-  const views = { today: renderToday, plan: renderPlan, baseball: renderBaseball, diet: renderDiet, progress: renderProgress, settings: renderSettings };
+  const views = { today: renderToday, plan: renderPlan, baseball: renderBaseball, coach: renderCoach, diet: renderDiet, progress: renderProgress, settings: renderSettings };
   view.innerHTML = views[S.tab]();
   view.scrollTop = keepScroll ? top : 0;
   renderTabbar();
@@ -3333,13 +3336,14 @@ actions.panIdeaFav = el => {
 actions.aiSetup = () => {
   const key = aiKey();
   openSheet('Claude AI', `<div class="stack">
-    <p class="text-2 small">Dugout works fine without this. With your own Anthropic API key, the Pantry can:</p>
+    <p class="text-2 small">Dugout works fine without this. With your own Anthropic API key you get:</p>
     <ul class="steps">
-      <li>send your kitchen photos to Claude, which recognizes nearly any food — even without a label — and about how much is left</li>
-      <li>come up with meals from exactly what you have, sized for your goals</li>
+      <li><b>Coach</b> — a chat with an AI coach that knows your plan, workouts, food, check-ins, goals and baseball logs</li>
+      <li>Pantry photo scans that recognize nearly any food — even without a label — and about how much is left</li>
+      <li>Meal ideas made from exactly what's in your kitchen, sized for your goals</li>
     </ul>
-    <p class="text-2 small"><b>Cost:</b> Anthropic charges your account for what you use — usually about 5–25¢ per scan or set of ideas. Nothing is sent unless you tap one of those buttons.</p>
-    <p class="text-2 small"><b>Privacy:</b> those photos and your food list go to Anthropic. Your key is saved encrypted on this phone and is never put in backups.</p>
+    <p class="text-2 small"><b>Cost:</b> Anthropic charges your account for what you use — usually a few cents per Coach question and about 5–25¢ per scan or set of meal ideas. Nothing is sent unless you use one of these.</p>
+    <p class="text-2 small"><b>Privacy:</b> what you use them for goes to Anthropic: your Coach questions with a summary of your Dugout data, the kitchen photos you have Claude read, and your food list for meal ideas. Your key is saved encrypted on this phone and is never put in backups.</p>
     <details class="table-toggle"><summary>How to get a key</summary>
       <ol class="steps"><li>Go to console.anthropic.com and sign in (billing needs a card — ask a parent if it isn't yours).</li><li>Open API keys → Create key, and copy it.</li><li>Paste it below.</li></ol></details>
     <form class="form" novalidate data-submit="aiSave">
@@ -3355,8 +3359,8 @@ submits.aiSave = async f => {
   if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) { toast('That isn\'t an Anthropic API key — it starts with sk-ant-'); return; }
   const btn = $('button[type=submit]', f), label = btn.innerHTML;
   btn.disabled = true; btn.textContent = 'Checking the key…';
-  let note = 'Claude is on — try it in Diet → Pantry';
-  try { await SCAN.checkKey(k); }
+  let note = 'Claude is on — say hi in the Coach tab';
+  try { await AI.checkKey(k); }
   catch (e) {
     if (e && (e.code === 'badkey' || e.code === 'credit')) { btn.disabled = false; btn.innerHTML = label; toast(e.code === 'credit' ? 'That account is out of credit — add some at console.anthropic.com' : 'Anthropic didn\'t accept that key'); return; }
     note = 'Key saved — it couldn\'t be checked right now';
@@ -3366,7 +3370,7 @@ submits.aiSave = async f => {
   closeSheet(); render(); toast(note);
 };
 actions.aiRemove = async () => {
-  if (!(await confirmBox('Remove your Claude key?', 'Pantry scans go back to reading photos on this phone, and meal ideas from Claude turn off. Ideas you already have stay.', { ok: 'Remove', danger: true }))) return;
+  if (!(await confirmBox('Remove your Claude key?', 'The Coach and meal ideas from Claude turn off, and Pantry scans go back to reading photos on this phone. Your chats and ideas stay.', { ok: 'Remove', danger: true }))) return;
   S.settings.aiKey = ''; saveSettings(); render(); toast('Claude key removed');
 };
 
@@ -3390,6 +3394,516 @@ function cleanPantry(p) {
       servings: Math.max(1, nums(x.servings)), uses: strs(x.uses, 12), missing: strs(x.missing, 12), cal: nums(x.cal), pro: nums(x.pro), carb: nums(x.carb), fat: nums(x.fat),
       why: str(x.why, 300), steps: strs(x.steps, 12) })) } : null;
   return { items, shop, ideas: ideas && ideas.list.length ? ideas : null, updated: Number(p.updated) || 0, how: p.how === 'phone' ? 'phone' : 'claude' };
+}
+
+/* ============================== 8c. COACH (AI chat — coach.js) ============================== */
+// A chat with Claude (your own API key) that knows your Dugout. This section builds what Claude is told about the app
+// and about you, runs the look-ups it asks for (on this phone), applies the buttons it offers when you tap them, and
+// draws the chat. Saved encrypted as "coach": { msgs: [...what's on screen], api: [[...API messages of one turn]], cost }.
+
+let coachJob = null;              // the reply being written: { ac, id, text, looked, offers, status }
+let coachGuide = null;            // the app guide Claude reads (built once — it only changes with a new Dugout version)
+const COACH_TURNS = 12;           // back-and-forths sent with each question (older ones stay on screen)
+const coachChat = () => (S.coach || (S.coach = { msgs: [], api: [], cost: 0 }));
+const saveCoach = () => { if (S.coach) save(() => DB.set('coach', S.coach)); };
+const COACH_LOOK = { get_training_history: 'your workouts', get_food_log: 'your food log', get_body_and_recovery: 'your weight and recovery',
+  get_baseball_data: 'your baseball data', get_plan: 'your plan', look_up: 'the Dugout library' };
+
+// ----- What Claude knows about the app (the same for everyone, so it can be cached) -----
+function coachGuideText() {
+  if (coachGuide) return coachGuide;
+  const L = [`<dugout_app version="${APP_VERSION}">`, `# Where things are
+- Today tab: the date, the Gym / Home switch, today's workout with a Light / Moderate / Heavy switch and Start, the daily check-in (sleep, energy, soreness → a readiness score), food so far against the goals, water, an arm-care card after throwing, this week's summary, and a review of last week (Monday–Wednesday).
+- During a workout: log each set (weight × reps, or time), a rest timer, a form video and how-to for every exercise, next-weight tips, warm-up sets, a plate calculator, exercise swaps, End (save what they did or cancel), then an effort rating (1–10) and notes. Moderate = about ⅔ of the sets starting around 90% of last time's weights; Light = their Light workout (mobility, arm care and core).
+- Plan tab: the 7-day Gym and Home plans and the Light workout — edit any exercise (sets, reps, rest, cues, video link) and reorder; Programs (off-season, pre-season, in-season); the exercise library.
+- Baseball tab: Drills (by position, alone or with a partner; star drills to build a drill plan; log practice), Swing lab (film one swing from the side, front or back → score, priorities with the numbers behind them, pictures, charts and drills), Games & arm (game log with season stats, speed and power tests, throwing log, a live pitch counter with Pitch Smart rest days, a stopwatch and a practice log).
+- Diet tab: Day (the food log: search the food list, favorites, recent foods, copy yesterday; water), Week (weekly totals), Meals (a daily meal plan for training, rest and game days, the recipe book, a game-day timeline, the week ahead with a shopping list, eating tips), Pantry (scan kitchen photos or tap in food → recipes they can make now, quick plates, recipes one ingredient away, a shopping list, Claude meal ideas).
+- Coach tab: this chat.
+- Progress tab: Lifts (a chart for every exercise, personal records, a training calendar, badges, workout history) and Body (body-weight trend, recovery trends, goals).
+- Settings: login and auto-lock, workout time, light or dark look, lb or kg, timer options, daily nutrition goals and the goal calculator, Claude AI, backups and spreadsheet export, program and plan resets, updates, help.`];
+  L.push('', '# Programs (Plan → Programs)', ...Object.values(PROGRAMS).map(p => `- ${p.name} (${p.tag}): ${p.about}`));
+  L.push('', '# Exercise library (look_up "exercise" for how-tos)', ...EXERCISE_GROUPS.map(([g, list]) => `- ${g}: ${list.join(', ')}`));
+  L.push('', '# Recipe book (per serving; look_up "recipe" for ingredients and steps)',
+    ...RECIPES.map(r => `- ${r.name} [${r.meals.map(k => MEAL_LABEL[k]).join(', ')}] ${r.min} min · ${r.cal} cal, ${r.pro} g protein, ${r.carb} g carbs, ${r.fat} g fat${r.makes > 1 ? ` · makes ${r.makes}` : ''}${r.tags.length ? ` · ${r.tags.map(t => MEAL_TAGS[t]).join(', ')}` : ''}`));
+  L.push('', `# Food list: ${FOODS.length} common foods with nutrition per serving (look_up "food"): ${[...new Set(FOODS.map(f => f.group))].join(', ')}.`);
+  L.push('', '# Drills (id: name — positions, alone or with a partner; the swing problems it helps)',
+    ...DRILLS.map(d => `- ${d.id}: ${d.n} — ${d.pos.map(p => (DRILL_POSITIONS.find(([k]) => k === p) || [p, p])[1]).join(', ')}, ${d.who === 'solo' ? 'alone' : 'partner'}${d.fixes && d.fixes.length ? `; helps ${d.fixes.join(', ')}` : ''}`));
+  L.push('', '# Swing lab problems (id: name — the cue)', ...Object.entries(SWING_FAULTS).map(([id, f]) => `- ${id}: ${f.name} — "${f.cue}"`));
+  L.push('', '# Tests (Baseball → Games & arm)', ...TESTS.map(t => `- ${t.name}, in ${t.unit}${t.lower ? ' (lower is better)' : ''}${t.good ? `; strong high-school mark ${t.lower ? '≤' : '≥'} ${t.good}` : ''}. ${t.hint}`));
+  L.push('', '# Pitch Smart (what the app uses): most pitches in a day by age, and rest days after more than each count');
+  PITCH_SMART.forEach((r, i) => L.push(`- Ages ${i ? PITCH_SMART[i - 1].upTo + 1 : 7}–${r.upTo}: max ${r.max}; ${r.tiers.map((t, j) => `over ${t} → ${j + 1} day${j ? 's' : ''}`).join(', ')}`));
+  L.push('', '# Eating for baseball (the app\'s tips)', ...DIET_GUIDE.flatMap(g => [`## ${g.title}`, ...g.points.map(p => `- ${p}`)]));
+  L.push('', '# Help topics (how the app works)', ...HELP.flatMap(([t, pts]) => [`## ${t}`, ...pts.map(p => `- ${p}`)]));
+  L.push('</dugout_app>');
+  return (coachGuide = L.join('\n'));
+}
+
+// ----- What Claude knows about you right now (sent fresh with every question) -----
+const setTxt = (e, s) => (e.track === 'time' ? `${fmt(s.r, 1)}s` : e.track === 'weight' && s.w ? `${fmt(s.w, 1)}×${s.r ?? '?'}` : s.r != null ? `${fmt(s.r)} reps` : 'done');
+const dayWord = d => fmtDate(parseYmd(d), { weekday: 'short', month: 'short', day: 'numeric' });
+function coachContext() {
+  const st = S.settings, p = st.profile || {}, u = st.unit, now = new Date(), today = ymd(now), L = ['<athlete>'];
+  L.push(`Now: ${fmtDate(now, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, ${clockTime(nowHHMM(now))}.`);
+  const lw = latestWeight(), wlog = logsOf('weight');
+  const height = u === 'kg' ? (p.cm ? `${fmt(p.cm)} cm` : '') : (p.ft ? `${p.ft} ft ${p.inch || 0} in` : '');
+  const act = ACTIVITY.find(a => a[0] === p.activity);
+  L.push(`Profile: ${[p.age ? `${p.age} years old` : 'age not set (goal calculator not used)', p.sex || '', height, lw ? `${fmt(lw, 1)} ${u} (weighed ${dayWord(wlog[wlog.length - 1].date)})` : p.weight ? `${fmt(p.weight, 1)} ${u}` : '',
+    GOALS[p.goal] ? `goal: ${GOALS[p.goal][0].toLowerCase()}` : '', act ? `activity: ${act[1].toLowerCase()} (${act[2].toLowerCase()})` : ''].filter(Boolean).join(', ')}. Bats ${st.bats === 'L' ? 'left' : 'right'}. Units: ${u}.`);
+  L.push(`Daily goals: ${fmt(st.calGoal)} cal, ${fmt(st.proteinGoal)} g protein${st.carbGoal ? `, ${fmt(st.carbGoal)} g carbs` : ''}${st.fatGoal ? `, ${fmt(st.fatGoal)} g fat` : ''}, ${waterText(st.waterGoal)} water.`);
+  L.push(`Training: ${program().name} program, ${MODES[st.mode].label.toLowerCase()} plan, workout time ${clockTime(st.workoutTime)}.`);
+
+  // Today
+  const di = dayIdx(now), day = dayPlan(di), level = todayLevel(), done = S.workouts.find(w => w.date === today);
+  const exList = d => d.exercises.map(e => `${e.name} ${e.sets}×${e.reps}`).join('; ');
+  if (S.active) L.push(`Right now: in the middle of "${S.active.title}" (${S.active.exercises.reduce((n, e) => n + e.sets.filter(s => s.done).length, 0)} sets done).`);
+  if (day.type === 'rest') L.push(`Today's plan: rest day${level === 'light' ? ' (they picked Light: ' + exList(dayPlan(LIGHT)) + ')' : ''}.`);
+  else L.push(`Today's plan: ${day.title} (${TYPES[day.type]}${day.focus ? ` — ${day.focus}` : ''}), set to ${LEVELS[level].label}${level === 'light' ? ` → Light workout: ${exList(dayPlan(LIGHT))}` : `: ${exList(level === 'moderate' ? levelDay(day, 'moderate') : day)}`}.`);
+  if (done) L.push(`Done today: ${done.title} (${LEVELS[done.intensity] ? LEVELS[done.intensity].label : 'Heavy'}, ${fmtDur((done.finishedAt || done.startedAt) - done.startedAt)}${done.rpe ? `, effort ${done.rpe}/10` : ''}).`);
+  const c = checkinOf(today);
+  L.push(c ? `Check-in today: slept ${c.sleep} h, energy ${c.energy}/5, soreness ${c.sore}/5 → readiness ${readiness(c)} (${readyInfo(readiness(c))[2]}).` : 'Check-in today: not done.');
+  const t = dayTotals(today), eaten = S.meals.filter(m => m.date === today).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  L.push(`Eaten today: ${fmt(t.cal)} cal, ${fmt(t.pro)} g protein, ${fmt(t.carb)} g carbs, ${fmt(t.fat)} g fat${eaten.length ? ` — ${eaten.map(m => `${MEAL_LABEL[m.meal] || m.meal}: ${m.name} (${fmt(m.cal)} cal, ${fmt(m.pro)} g protein)`).join('; ')}` : ' (nothing logged yet)'}. Water: ${waterText(waterOf(today))}.`);
+  L.push(`Meal plan today: ${(PLAN_KINDS.find(([k]) => k === mealPlanToday().kind) || [0, 'Training'])[1].toLowerCase()}.`);
+
+  // The last week or so
+  const wk = ymd(addDays(now, -6)), recent = S.workouts.filter(w => w.date >= wk);
+  L.push(`Last 7 days: ${recent.length ? `${plural(recent.length, 'workout')} — ${recent.map(w => `${dayWord(w.date)} ${w.title}${w.intensity && w.intensity !== 'heavy' ? ` (${w.intensity})` : ''}`).join('; ')}` : 'no workouts logged'}.`);
+  const fed = [...new Set(S.meals.filter(m => m.date >= wk && m.date < today).map(m => m.date))];
+  if (fed.length) {
+    const tt = fed.map(dayTotals);
+    L.push(`Food, last 7 days before today (${plural(fed.length, 'day')} logged): about ${fmt(sum(tt, x => x.cal) / fed.length)} cal and ${fmt(sum(tt, x => x.pro) / fed.length)} g protein a day.`);
+  }
+  const cks = S.logs.filter(l => l.kind === 'checkin' && l.date >= wk);
+  if (cks.length) L.push(`Check-ins, last 7 days: average sleep ${fmt(sum(cks, x => x.sleep) / cks.length, 1)} h, energy ${fmt(sum(cks, x => x.energy) / cks.length, 1)}/5, soreness ${fmt(sum(cks, x => x.sore) / cks.length, 1)}/5.`);
+
+  // Lifts: the best recent set of each exercise (last 8 weeks)
+  const since8 = ymd(addDays(now, -56)), best = new Map();
+  for (const w of S.workouts) {
+    if (w.date < since8) continue;
+    for (const e of w.exercises) {
+      if (e.track !== 'weight') continue;
+      for (const s of e.sets) if (s.done && s.w > 0) { const b = best.get(e.name); if (!b || s.w > b.w || (s.w === b.w && (s.r || 0) > (b.r || 0))) best.set(e.name, { w: s.w, r: s.r, date: w.date }); }
+    }
+  }
+  if (best.size) L.push(`Best sets, last 8 weeks: ${[...best].slice(0, 14).map(([n, b]) => `${n} ${fmt(b.w, 1)}×${b.r ?? '?'} (${shortDate(b.date)})`).join('; ')}.`);
+  if (wlog.length >= 2) {
+    const old = wlog.filter(l => l.date <= ymd(addDays(now, -28))).pop() || wlog[0], last = wlog[wlog.length - 1];
+    if (old !== last) L.push(`Body weight: ${fmt(last.w, 1)} ${u} on ${shortDate(last.date)}, ${fmt(old.w, 1)} on ${shortDate(old.date)} (${last.w >= old.w ? '+' : ''}${fmt(last.w - old.w, 1)} ${u}).`);
+  }
+
+  // Baseball
+  const arm = armStatus(), throws = logsOf('throw').filter(l => l.date >= wk);
+  if (throws.length || arm.until) L.push(`Arm: ${throws.length ? `last 7 days ${throws.map(l => `${shortDate(l.date)} ${throwText(l)}`).join('; ')}` : 'no throwing logged this week'}${arm.until ? `. Pitch Smart rest: no pitching until ${fmtDate(arm.until, { weekday: 'long', month: 'short', day: 'numeric' })}` : ''}${!arm.age ? ' (age not set, so rest days aren\'t tracked)' : ''}.`);
+  const games = logsOf('game').filter(g => g.date >= `${now.getFullYear()}-01-01`);
+  if (games.length) {
+    const s = seasonStats(games);
+    L.push(`This year's games: ${games.length} — ${s.b.ab ? `${avgText(s.avg)} AVG / ${avgText(s.obp)} OBP / ${avgText(s.slg)} SLG, ${s.b.hr} HR, ${s.b.sb} SB` : 'no at-bats'}${s.p.outs ? `; pitching ${ipText(s.p.outs)} IP, ${fmt(s.era, 2)} ERA, ${s.p.k} K, ${s.p.bb} BB` : ''}.`);
+  }
+  const tests = TESTS.map(tt => [tt, bestOf(tt, testLogs(tt.id))]).filter(([, b]) => b);
+  if (tests.length) L.push(`Best tests: ${tests.map(([tt, b]) => `${tt.name} ${testFmt(tt, b.v)} (${shortDate(b.date)})`).join('; ')}.`);
+  const sw = logsOf('swing').slice(-1)[0];
+  if (sw) L.push(`Latest Swing lab (${shortDate(sw.date)}, ${sw.view} view): score ${sw.score}/100; priorities: ${sw.faults.length ? sw.faults.slice(0, 3).map(f => swFaultName(f.id)).join(', ') : 'none'}${sw.strengths && sw.strengths.length ? `; strengths: ${sw.strengths.slice(0, 3).join(', ')}` : ''}.`);
+  const plan = S.settings.drillPlan.map(id => DRILL_BY_ID[id]).filter(Boolean);
+  if (plan.length) L.push(`Drill plan: ${plan.map(d => d.n).join('; ')}.`);
+
+  // Kitchen and favorites
+  const pp = st.pantry, have = pp && isObj(pp.items) ? Object.keys(pp.items) : [];
+  if (have.length) L.push(`In their kitchen (Pantry, updated ${daysAgo(pp.updated || Date.now())}): ${have.slice(0, 80).map(id => panName(id) + (pp.items[id].amount ? ` (${pp.items[id].amount})` : '')).join(', ')}. Shopping list: ${pp.shop.filter(s => !s.done).map(s => s.name).join(', ') || 'empty'}.`);
+  if (S.foods.length) L.push(`Saved favorite foods: ${sortedFavs().slice(0, 20).map(f => `${f.name} (${fmt(f.cal)} cal, ${fmt(f.pro)} g protein)`).join('; ')}.`);
+  L.push('</athlete>');
+  return L.join('\n');
+}
+
+// ----- Look-ups Claude can ask for while answering (they run here, on the phone) -----
+function bestMatches(list, text, q, n) {
+  const t = normName(q).replace(/[^a-z0-9 ]/g, ' ').trim(), words = t.split(/\s+/).filter(w => w.length > 1);
+  if (!t) return [];
+  return list.map(x => {
+    const s = normName(text(x)).replace(/[^a-z0-9 ]/g, ' ');
+    const score = (s === t ? 100 : 0) + (s.startsWith(t) ? 40 : 0) + (s.includes(t) ? 30 : 0) + words.filter(w => s.includes(w)).length * 10;
+    return [x, score];
+  }).filter(([, sc]) => sc >= 10).sort((a, b) => b[1] - a[1]).slice(0, n).map(([x]) => x);
+}
+function coachTool(name, input, job) {
+  const i = isObj(input) ? input : {}, u = S.settings.unit;
+  const days = (v, d, max) => clamp(Math.round(Number(v)) || d, 1, max), from = n => ymd(addDays(new Date(), -(n - 1)));
+  const offer = (o, what) => { if (job.offers.length >= 6) return { content: 'Too many buttons already — skip this one.', error: true }; job.offers.push(o); coachPaint(); return { content: `A button (${what}) is showing under your reply. Nothing changes unless they tap it.` }; };
+  switch (name) {
+    case 'get_training_history': {
+      const n = days(i.days, 28, 365), q = normName(i.exercise || ''), ws = S.workouts.filter(w => w.date >= from(n));
+      const lines = [], bests = new Map();
+      for (const w of ws.slice(0, 80)) {
+        const ex = w.exercises.filter(e => (!q || normName(e.name).includes(q)) && e.sets.some(s => s.done));
+        if (q && !ex.length) continue;
+        ex.forEach(e => e.sets.filter(s => s.done).forEach(s => {
+          const b = bests.get(e.name), better = !b || (e.track === 'weight' ? (s.w || 0) > (b.w || 0) || ((s.w || 0) === (b.w || 0) && (s.r || 0) > (b.r || 0)) : lowerIsBetter(e) ? s.r < b.r : (s.r || 0) > (b.r || 0));
+          if (better && (s.w || s.r)) bests.set(e.name, { ...s, e, date: w.date });
+        }));
+        lines.push(`${w.date} ${w.title} — ${w.mode}, ${LEVELS[w.intensity] ? LEVELS[w.intensity].label : 'Heavy'}, ${fmtDur((w.finishedAt || w.startedAt) - w.startedAt)}${w.early ? ', ended early' : ''}${w.rpe ? `, effort ${w.rpe}/10` : ''}: ${ex.map(e => `${e.name} ${e.sets.filter(s => s.done).map(s => setTxt(e, s)).join(', ')}`).join(' | ') || 'no sets logged'}${w.notes ? ` [notes: ${w.notes.slice(0, 200)}]` : ''}`);
+      }
+      if (!lines.length) return { content: `No workouts${q ? ` with "${i.exercise}"` : ''} logged in the last ${n} days.` };
+      return { content: `Weights in ${u}. ${plural(lines.length, 'workout')} in the last ${n} days, newest first:\n${lines.join('\n')}\nBest sets: ${[...bests].map(([nm, b]) => `${nm} ${setTxt(b.e, b)} (${b.date})`).join('; ')}` };
+    }
+    case 'get_food_log': {
+      const n = days(i.days, 7, 60), st = S.settings, lines = [];
+      for (let k = 0; k < n; k++) {
+        const d = ymd(addDays(new Date(), -k)), list = S.meals.filter(m => m.date === d).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        const t = dayTotals(d), water = waterOf(d);
+        if (!list.length && !water) continue;
+        lines.push(`${d}: ${fmt(t.cal)} cal, ${fmt(t.pro)} g protein, ${fmt(t.carb)} g carbs, ${fmt(t.fat)} g fat, water ${waterText(water)}${list.length && k < 14 ? ` — ${list.map(m => `${m.time || ''} ${MEAL_LABEL[m.meal] || m.meal}: ${m.name}${m.servings && m.servings !== 1 ? ` ×${fmt(m.servings, 2)}` : ''} (${fmt(m.cal)} cal, ${fmt(m.pro)} P, ${m.carb != null ? fmt(m.carb) : '?'} C, ${m.fat != null ? fmt(m.fat) : '?'} F)`).join('; ')}` : ''}`);
+      }
+      if (!lines.length) return { content: `Nothing logged in the last ${n} days.` };
+      return { content: `Goals: ${fmt(st.calGoal)} cal, ${fmt(st.proteinGoal)} g protein${st.carbGoal ? `, ${fmt(st.carbGoal)} g carbs` : ''}${st.fatGoal ? `, ${fmt(st.fatGoal)} g fat` : ''}, ${waterText(st.waterGoal)} water. Days with entries, newest first:\n${lines.join('\n')}` };
+    }
+    case 'get_body_and_recovery': {
+      const n = days(i.days, 30, 365), f = from(n);
+      const w = logsOf('weight').filter(l => l.date >= f), c = logsOf('checkin').filter(l => l.date >= f);
+      if (!w.length && !c.length) return { content: `No body weight or check-ins in the last ${n} days.` };
+      return { content: `Body weight (${u}): ${w.length ? w.slice(-60).map(l => `${l.date} ${fmt(l.w, 1)}`).join(', ') : 'none'}\nCheck-ins (sleep h / energy 1–5 / soreness 1–5 → readiness): ${c.length ? c.slice(-60).map(l => `${l.date} ${l.sleep}/${l.energy}/${l.sore} → ${readiness(l)}`).join(', ') : 'none'}` };
+    }
+    case 'get_baseball_data': {
+      const n = days(i.days, 60, 365), f = from(n), part = ['games', 'tests', 'arm', 'practice', 'swing'].includes(i.section) ? i.section : 'all', out = [];
+      const want = k => part === 'all' || part === k;
+      if (want('games')) {
+        const g = logsOf('game').filter(x => x.date >= f);
+        if (g.length) {
+          const s = seasonStats(g);
+          out.push(`Games (last ${n} days): ${g.length}. Batting ${s.b.ab} AB, ${s.b.h} H, ${s.b.d} 2B, ${s.b.t} 3B, ${s.b.hr} HR, ${s.b.bb} BB, ${s.b.k} K, ${s.b.rbi} RBI, ${s.b.sb} SB → ${avgText(s.avg)} AVG / ${avgText(s.obp)} OBP / ${avgText(s.slg)} SLG.${s.p.outs ? ` Pitching ${ipText(s.p.outs)} IP, ${s.p.h} H, ${s.p.er} ER, ${s.p.bb} BB, ${s.p.k} K → ${fmt(s.era, 2)} ERA, ${fmt(s.whip, 2)} WHIP.` : ''}`,
+            ...g.slice(-25).map(x => `${x.date}${x.opp ? ` vs ${x.opp}` : ''}${x.result ? ` ${x.result}${x.score ? ' ' + x.score : ''}` : ''}: ${x.bat.ab ? `${x.bat.h}-for-${x.bat.ab}${x.bat.hr ? `, ${x.bat.hr} HR` : ''}${x.bat.d ? `, ${x.bat.d} 2B` : ''}${x.bat.bb ? `, ${x.bat.bb} BB` : ''}${x.bat.k ? `, ${x.bat.k} K` : ''}${x.bat.rbi ? `, ${x.bat.rbi} RBI` : ''}` : 'no at-bats'}${x.pitch ? `; pitched ${ipText(x.pitch.outs)} IP, ${x.pitch.er} ER, ${x.pitch.k} K, ${x.pitch.bb} BB${x.pitch.pc ? `, ${x.pitch.pc} pitches` : ''}` : ''}${x.note ? ` [${x.note.slice(0, 120)}]` : ''}`));
+        } else out.push(`Games: none logged in the last ${n} days.`);
+      }
+      if (want('tests')) {
+        const lines = TESTS.map(t => { const l = testLogs(t.id); if (!l.length) return ''; const b = bestOf(t, l), last = l[l.length - 1]; return `${t.name}: best ${testFmt(t, b.v)} (${b.date}), latest ${testFmt(t, last.v)} (${last.date}), ${l.length} logged${t.good ? `; strong high-school mark ${t.lower ? '≤' : '≥'} ${testFmt(t, t.good)}` : ''}`; }).filter(Boolean);
+        out.push(lines.length ? `Tests:\n${lines.join('\n')}` : 'Tests: none logged.');
+      }
+      if (want('arm')) {
+        const a = armStatus(), th = logsOf('throw').filter(x => x.date >= f);
+        out.push(`Arm (Pitch Smart ${a.rule ? `for age ${a.age}: max ${a.rule.max} pitches a day` : 'rest days not tracked — no age set'})${a.until ? `: no pitching until ${ymd(a.until)} (after ${a.from.count} pitches on ${a.from.date})` : ': no required rest right now'}.\nThrowing (last ${n} days): ${th.length ? th.slice(-40).map(x => `${x.date} ${throwText(x)}`).join('; ') : 'none'}`);
+      }
+      if (want('practice')) {
+        const sk = logsOf('skill').filter(x => x.date >= f);
+        out.push(`Practice (last ${n} days): ${sk.length ? sk.slice(-40).map(x => `${x.date} ${skillText(x)}`).join('; ') : 'none'}. Drill plan: ${S.settings.drillPlan.map(id => DRILL_BY_ID[id]).filter(Boolean).map(d => `${d.id} (${d.n})`).join(', ') || 'empty'}.`);
+      }
+      if (want('swing')) {
+        const sws = logsOf('swing').slice(-3).reverse();
+        out.push(sws.length ? sws.map(r => `Swing lab ${r.date}: ${r.view} view, bats ${r.bats}, score ${r.score}/100 (${swScoreWord(r.score)}), confidence ${r.confidence}.\nPriorities: ${r.faults.map(x => `${swFaultName(x.id)} [${x.id}] (severity ${x.sev}${x.evidence ? `: ${x.evidence}` : ''})`).join('; ') || 'none'}.\nStrengths: ${(r.strengths || []).join('; ') || '–'}.\nMeasurements: ${r.metrics.filter(m => m.value != null).map(m => `${m.label} ${fmt(m.value, 1)}${m.unit || ''} (${m.status}${m.target ? `, target ${m.target}` : ''})`).join('; ')}`).join('\n\n') : 'Swing lab: no analyses yet.');
+      }
+      return { content: out.join('\n\n') };
+    }
+    case 'get_plan': {
+      const mode = MODES[i.mode] ? i.mode : S.settings.mode, di = dayIdx();
+      const dayTxt = (d, label) => `${label}: ${d.title} (${TYPES[d.type]}${d.focus ? ` — ${d.focus}` : ''})${d.exercises.length ? `\n${d.exercises.map(e => `  - ${e.name}: ${e.sets} × ${e.reps}${e.rest ? `, rest ${restLabel(e.rest)}` : ''}${e.track === 'check' ? '' : ` (${TRACK_SHORT[e.track]})`}${e.cues ? ` — ${e.cues.slice(0, 160)}` : ''}`).join('\n')}` : ''}`;
+      return { content: `${program().name} program, ${MODES[mode].label} plan (today is ${DAYS[di]}, set to ${LEVELS[todayLevel()].label}):\n${planFor(mode).map((d, k) => dayTxt(d, DAYS[k])).join('\n')}\n${dayTxt(S.plan.light[mode], 'Light workout')}` };
+    }
+    case 'look_up': {
+      const q = String(i.query || '').slice(0, 80);
+      if (!q.trim()) return { content: 'Say what to look up.', error: true };
+      if (i.type === 'exercise') {
+        const hits = bestMatches(Object.keys(EXERCISE_INFO), x => x, q, 3);
+        return { content: hits.length ? hits.map(n => { const x = EXERCISE_INFO[n]; return `${n}\nWorks: ${x.muscles}. Why: ${x.why}\nHow: ${x.steps.join(' ')}\nMistakes: ${x.mistakes.join('; ')}\nEasier: ${x.easier}. Harder: ${x.harder}.${x.swap && x.swap.length ? ` Swaps: ${x.swap.join(', ')}.` : ''}`; }).join('\n\n') : `No exercise called "${q}" in the library.` };
+      }
+      if (i.type === 'recipe') {
+        const hits = bestMatches(RECIPES, r => `${r.name} ${r.ing.join(' ')}`, q, 3);
+        return { content: hits.length ? hits.map(r => `${r.name} (${r.meals.map(k => MEAL_LABEL[k]).join(', ')}; ${r.min} min; makes ${r.makes}). Per serving: ${r.cal} cal, ${r.pro} g protein, ${r.carb} g carbs, ${r.fat} g fat. ${r.why}\nIngredients: ${r.ing.join('; ')}\nSteps: ${r.steps.join(' ')}`).join('\n\n') : `No recipe matching "${q}".` };
+      }
+      if (i.type === 'food') {
+        const list = [...S.foods.map(f => ({ ...f, fav: true })), ...FOODS];
+        const hits = bestMatches(list, f => f.name, q, 8);
+        return { content: hits.length ? hits.map(f => `${f.name}${f.fav ? ' (their favorite)' : ''} — ${f.serving || '1 serving'}: ${fmt(f.cal)} cal, ${fmt(f.pro, 1)} g protein, ${f.carb != null ? fmt(f.carb, 1) : '?'} g carbs, ${f.fat != null ? fmt(f.fat, 1) : '?'} g fat`).join('\n') : `"${q}" isn't in the app's food list — use standard nutrition data.` };
+      }
+      if (i.type === 'drill') {
+        const hits = bestMatches(DRILLS, d => `${d.n} ${d.id} ${d.pos.join(' ')}`, q, 3);
+        return { content: hits.length ? hits.map(d => `${d.n} [${d.id}] — ${d.who === 'solo' ? 'alone' : 'with a partner'}; gear: ${d.gear}; dose: ${d.dose}. ${d.why}\nSteps: ${d.steps.join(' ')}\nCues: ${d.cues.join('; ')}\nAvoid: ${d.avoid.join('; ')}\nHarder: ${d.harder}${d.fixes && d.fixes.length ? `\nHelps: ${d.fixes.map(swFaultName).join(', ')}` : ''}`).join('\n\n') : `No drill matching "${q}".` };
+      }
+      if (i.type === 'swing_problem') {
+        const hits = bestMatches(Object.entries(SWING_FAULTS), ([id, f]) => `${id} ${f.name}`, q, 2);
+        return { content: hits.length ? hits.map(([id, f]) => `${f.name} [${id}]: ${f.what} ${f.why} Cue: "${f.cue}". Drills that help: ${DRILLS.filter(d => (d.fixes || []).includes(id)).map(d => `${d.id} (${d.n}, ${d.who === 'solo' ? 'alone' : 'partner'})`).join(', ') || 'none listed'}.`).join('\n\n') : `No swing problem matching "${q}".` };
+      }
+      return { content: 'type must be exercise, recipe, food, drill or swing_problem.', error: true };
+    }
+    case 'offer_food_log': {
+      const nm = String(i.name || '').trim().slice(0, 80), n0 = (v, max) => clamp(Math.round((Number(v) || 0) * 10) / 10, 0, max);
+      if (!nm || !(Number(i.cal) > 0)) return { content: 'A food needs a name and calories.', error: true };
+      return offer({ kind: 'food', name: nm, meal: MEAL_LABEL[i.meal] ? i.meal : guessMeal(), servings: clamp(Number(i.servings) || 1, 0.25, 10),
+        cal: Math.round(n0(i.cal, 5000)), pro: n0(i.pro, 400), carb: n0(i.carb, 800), fat: n0(i.fat, 300) }, `Log ${nm}`);
+    }
+    case 'offer_shopping_list': {
+      const items = (Array.isArray(i.items) ? i.items : []).map(x => String(x).trim().slice(0, 60)).filter(Boolean).slice(0, 15);
+      return items.length ? offer({ kind: 'shop', items }, `add ${plural(items.length, 'item')} to the shopping list`) : { content: 'No items given.', error: true };
+    }
+    case 'offer_intensity':
+      return LEVELS[i.level] ? offer({ kind: 'level', level: i.level }, `switch today to ${LEVELS[i.level].label}`) : { content: 'level must be light, moderate or heavy.', error: true };
+    case 'offer_drills': {
+      const ids = [...new Set((Array.isArray(i.drill_ids) ? i.drill_ids : []).map(String))].filter(id => DRILL_BY_ID[id]).slice(0, 8);
+      return ids.length ? offer({ kind: 'drills', ids }, `add ${plural(ids.length, 'drill')} to the drill plan`) : { content: 'None of those are drill ids from the library.', error: true };
+    }
+    case 'offer_screen':
+      return COACH_SCREENS[i.screen] ? offer({ kind: 'screen', screen: i.screen }, COACH_SCREENS[i.screen][0]) : { content: 'Unknown screen.', error: true };
+  }
+  return { content: `Unknown tool ${name}.`, error: true };
+}
+
+// ----- The buttons Claude can offer -----
+const COACH_SCREENS = {
+  today: ['Open Today', () => { S.tab = 'today'; }],
+  plan: ['Open your plan', () => { S.tab = 'plan'; S.planDay = dayIdx(); }],
+  light_workout: ['Open the Light workout', () => { S.tab = 'plan'; S.planDay = LIGHT; }],
+  drills: ['Open Drills', () => { S.tab = 'baseball'; S.ballView = 'drills'; }],
+  swing_lab: ['Open the Swing lab', () => { S.tab = 'baseball'; S.ballView = 'swing'; S.swingOpen = null; }],
+  games_and_arm: ['Open Games & arm', () => { S.tab = 'baseball'; S.ballView = 'stats'; }],
+  food_log: ['Open today\'s food log', () => { S.tab = 'diet'; S.dietView = 'day'; S.dietDate = ymd(); }],
+  meal_plan: ['Open the meal plan', () => { S.tab = 'diet'; S.dietView = 'meals'; }],
+  pantry: ['Open the Pantry', () => { S.tab = 'diet'; S.dietView = 'pantry'; }],
+  progress_lifts: ['Open lift progress', () => { S.tab = 'progress'; S.progView = 'lifts'; }],
+  progress_body: ['Open body progress', () => { S.tab = 'progress'; S.progView = 'body'; }],
+  goal_calculator: ['Open the goal calculator', () => { S.tab = 'settings'; later(() => actions.calcGoals()); }]
+};
+function offerHtml(o, m, k) {
+  const btn = (label, ic) => (o.done ? `<span class="coach-done">${icon('check', 'sm')} Done</span>` : `<button class="btn btn-sm btn-primary" data-action="coachOffer" data-m="${m.id}" data-o="${k}">${ic ? icon(ic, 'sm') : ''} ${label}</button>`);
+  if (o.kind === 'food') return `<div class="coach-offer"><div class="grow"><b>${esc(o.name)}</b><small>${MEAL_LABEL[o.meal]} · ${o.servings !== 1 ? `${fmt(o.servings, 2)} × ` : ''}${fmt(o.cal)} cal · ${fmt(o.pro)} g protein</small></div>${btn('Log it', 'plus')}</div>`;
+  if (o.kind === 'shop') return `<div class="coach-offer"><div class="grow"><b>Shopping list</b><small>${esc(o.items.join(', '))}</small></div>${btn('Add', 'plus')}</div>`;
+  if (o.kind === 'level') return `<div class="coach-offer"><div class="grow"><b>Today: ${LEVELS[o.level].label}</b><small>${esc(LEVELS[o.level].sub)}</small></div>${btn('Switch', 'check')}</div>`;
+  if (o.kind === 'drills') return `<div class="coach-offer"><div class="grow"><b>Drill plan</b><small>${esc(o.ids.map(id => DRILL_BY_ID[id].n).join(', '))}</small></div>${btn('Add', 'plus')}</div>`;
+  if (o.kind === 'screen') return `<div class="coach-offer"><div class="grow"><b>${esc(COACH_SCREENS[o.screen][0])}</b></div><button class="btn btn-sm btn-ghost" data-action="coachOffer" data-m="${m.id}" data-o="${k}" aria-label="${esc(COACH_SCREENS[o.screen][0])}">${icon('right', 'sm')}</button></div>`;
+  return '';
+}
+actions.coachOffer = el => {
+  const m = (S.coach ? S.coach.msgs : []).find(x => x.id === el.dataset.m), o = m && m.offers[Number(el.dataset.o)];
+  if (!o || o.done) return;
+  if (o.kind === 'screen') { COACH_SCREENS[o.screen][1](); render({ keepScroll: false }); return; }
+  let msg = '', undo = null;
+  if (o.kind === 'food') {
+    const s = o.servings || 1;
+    const meal = { id: uid(), date: ymd(), time: nowHHMM(), meal: o.meal, name: o.name, servings: s, cal: Math.round(o.cal * s), pro: r1(o.pro * s), carb: r1(o.carb * s), fat: r1(o.fat * s), createdAt: Date.now() };
+    S.meals.push(meal); save(() => DB.put('meals', meal));
+    msg = `Logged ${o.name}`; undo = () => { removeMeal(meal.id); o.done = false; saveCoach(); render(); };
+  } else if (o.kind === 'shop') {
+    const n = o.items.filter(x => { const hits = PANTRY.findInText(x); return addToShop(x, hits.length === 1 ? hits[0] : null); }).length;
+    saveSettings(); msg = n ? `Added ${plural(n, 'item')} to your shopping list` : 'Already on your shopping list';
+  } else if (o.kind === 'level') {
+    const was = S.settings.intensity;
+    S.settings.intensity = { date: ymd(), level: o.level }; saveSettings();
+    msg = `Today is set to ${LEVELS[o.level].label}`; undo = () => { S.settings.intensity = was; saveSettings(); o.done = false; saveCoach(); render(); };
+  } else if (o.kind === 'drills') {
+    const was = [...S.settings.drillPlan], wasFrom = S.settings.drillPlanFrom;
+    S.settings.drillPlan = [...new Set([...S.settings.drillPlan, ...o.ids])]; S.settings.drillPlanFrom = ''; saveSettings();
+    msg = `Added to your drill plan`; undo = () => { S.settings.drillPlan = was; S.settings.drillPlanFrom = wasFrom; saveSettings(); o.done = false; saveCoach(); render(); };
+  }
+  o.done = true; saveCoach(); render();
+  toast(msg, undo ? { action: undo } : {});
+};
+
+// ----- Chat text: a small, safe Markdown (bold, italics, lists, headings, tables, links) -----
+function coachMd(src) {
+  const inline = s => esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\w)/g, '$1<i>$2</i>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (x, t, url) => `<a href="${url}" target="_blank" rel="noopener" data-external>${t}</a>`);
+  const out = [], lines = String(src || '').replace(/\r/g, '').split('\n');
+  let list = null, para = [], table = [];
+  const flush = () => {
+    if (para.length) { out.push(`<p>${para.map(inline).join('<br>')}</p>`); para = []; }
+    if (list) { out.push(`<${list.tag}>${list.items.map(x => `<li>${inline(x)}</li>`).join('')}</${list.tag}>`); list = null; }
+    if (table.length) {
+      const rows = table.filter(r => !/^\|?[\s:|-]+\|?$/.test(r)).map(r => r.replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
+      if (rows.length) out.push(`<div class="md-table"><table><thead><tr>${rows[0].map(c => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      table = [];
+    }
+  };
+  for (const raw of lines) {
+    const line = raw.trimEnd(), t = line.trim();
+    let m;
+    if (!t) { flush(); continue; }
+    if (t.startsWith('|')) { if (para.length || list) flush(); table.push(t); continue; }     // (while a table is open, nothing else is)
+    if (table.length) flush();
+    if ((m = t.match(/^#{1,4}\s+(.*)$/))) { flush(); out.push(`<div class="md-h">${inline(m[1])}</div>`); continue; }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) { flush(); out.push('<hr>'); continue; }
+    if ((m = t.match(/^[-*•]\s+(.*)$/))) { if (para.length || (list && list.tag !== 'ul')) flush(); list = list || { tag: 'ul', items: [] }; list.items.push(m[1]); continue; }
+    if ((m = t.match(/^\d+[.)]\s+(.*)$/))) { if (para.length || (list && list.tag !== 'ol')) flush(); list = list || { tag: 'ol', items: [] }; list.items.push(m[1]); continue; }
+    if (list && /^\s{2,}\S/.test(raw)) { list.items[list.items.length - 1] += ' ' + t; continue; }   // a wrapped list line
+    if (list) flush();
+    para.push(t);
+  }
+  flush();
+  return out.join('');
+}
+
+// ----- The chat screen -----
+const COACH_PROBLEM = {
+  badkey: 'Claude didn\'t accept your API key. Check it in Settings → Claude AI.',
+  credit: 'Your Anthropic account is out of credit. Add some at console.anthropic.com (Billing).',
+  busy: 'Claude is busy right now. Wait a minute and try again.',
+  offline: 'Couldn\'t reach Claude. Check your internet connection and try again.',
+  refusal: 'Coach can\'t help with that one. Try asking it a different way.',
+  interrupted: 'Dugout closed before Coach finished.',
+  ai: 'Something went wrong on the way. Try again in a moment.'
+};
+function coachSuggestions() {
+  const out = [`What should I eat before my ${clockTime(S.settings.workoutTime)} workout?`];
+  out.push(checkinOf(ymd()) ? 'Based on my check-in, how hard should I go today?' : 'How hard should I train today?');
+  const sw = logsOf('swing').slice(-1)[0];
+  out.push(sw && sw.faults.length ? `How do I fix my ${swFaultName(sw.faults[0].id).toLowerCase()}?` : 'How can I hit the ball harder?');
+  out.push(S.workouts.length >= 3 ? 'How are my lifts progressing?' : `What should I focus on in my ${program().name.toLowerCase()} program?`);
+  out.push(S.meals.some(m => m.date === ymd()) ? 'Am I on track with my food today?' : 'How much protein do I need, and from what foods?');
+  if (panIds().length >= 5) out.push('What can I cook with what\'s in my kitchen?');
+  out.push('Give me a 15-minute arm care routine');
+  return out.slice(0, 7);
+}
+const coachCents = d => (d < 0.995 ? `${Math.max(1, Math.round(d * 100))}¢` : `$${d.toFixed(2)}`);
+function coachMsgHtml(m) {
+  if (m.who === 'me') return `<div class="coach-msg me"><div class="bubble">${esc(m.text).replace(/\n/g, '<br>')}</div></div>`;
+  const live = coachJob && coachJob.id === m.id, text = live ? coachJob.text : m.text, looked = live ? coachJob.looked : m.looked || [];
+  return `<div class="coach-msg bot" id="cm-${m.id}">
+    <div class="coach-looked"${looked.length ? '' : ' hidden'}>${icon('check', 'sm')} <span>Looked at ${looked.map(k => COACH_LOOK[k]).join(', ')}</span></div>
+    <div class="bubble md">${text ? coachMd(text) : live ? '<span class="coach-typing" aria-label="Coach is thinking"><i></i><i></i><i></i></span>' : ''}</div>
+    <div class="coach-offers">${(m.offers || []).map((o, k) => offerHtml(o, m, k)).join('')}</div>
+    ${m.failed ? `<div class="coach-fail">${esc(COACH_PROBLEM[m.failed] || COACH_PROBLEM.ai)} <button class="btn-link inline-link" data-action="coachRetry" data-id="${m.id}">Try again</button>${m.failed === 'badkey' || m.failed === 'credit' ? ` · <button class="btn-link inline-link" data-action="aiSetup">Check key</button>` : ''}</div>` : ''}
+    ${m.stop === 'max_tokens' ? '<div class="hint">That answer was cut off — ask Coach to keep going.</div>' : m.stop === 'stopped' ? '<div class="hint">Stopped.</div>' : ''}
+  </div>`;
+}
+function renderCoach() {
+  const c = S.coach, msgs = c ? c.msgs : [], key = !!aiKey();
+  const intro = !key ? `<section class="card hero">
+      <span class="badge accent">${icon('sparkle')} AI coach</span>
+      <div class="card-title">Ask anything about your training, food and baseball</div>
+      <p class="text-2 small">Coach knows your plan, workouts, food log, check-ins, goals, swing analyses and stats — so the answers are about you. What to eat before practice, why a lift stalled, how hard to go today, how to fix your swing, what your numbers mean…</p>
+      <button class="btn btn-primary btn-block" data-action="aiSetup">${icon('sparkle', 'sm')} Connect Claude</button>
+      <p class="hint">Coach runs on Claude, Anthropic's AI, with your own API key — usually a few cents a question. Settings → Claude AI explains how.</p>
+    </section>
+    <div class="section-title">You could ask</div>
+    <div class="card"><ul class="steps">${coachSuggestions().slice(0, 5).map(q => `<li>${esc(q)}</li>`).join('')}</ul></div>`
+    : !msgs.length ? `<section class="card coach-hello">
+      <div class="row">${icon('sparkle')}<b>Hi! I'm your Coach.</b></div>
+      <p class="text-2 small">I can see your plan, workouts, food, check-ins, goals and baseball logs in Dugout. Ask me anything — what to eat, how hard to train, how to fix your swing, what a stat means.</p>
+      <div class="coach-sugg">${coachSuggestions().map(q => `<button class="chip" data-action="coachAsk" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <p class="hint">Your question and a summary of your Dugout data go to Anthropic to answer it.</p>
+    </section>` : '';
+  const turns = msgs.filter(m => m.who === 'me').length;
+  return `<div class="page coach-page">
+    <div class="page-head"><div><div class="eyebrow">Ask anything</div><h1 class="page-title">Coach</h1></div>
+      ${msgs.length ? `<button class="btn btn-sm btn-ghost" data-action="coachNew">${icon('plus', 'sm')} New chat</button>` : ''}</div>
+    ${intro}
+    <div class="coach-log" id="coach-log">${msgs.map(coachMsgHtml).join('')}</div>
+    ${msgs.length && c.cost ? `<p class="hint center">This chat so far: about ${coachCents(c.cost)}${turns >= 15 ? ' · long chats cost more per question — tap New chat to start fresh' : ''}</p>` : ''}
+    ${key ? `<form class="coach-bar" novalidate data-submit="coachSend">
+      <textarea id="coach-q" name="q" rows="1" maxlength="2000" placeholder="Ask Coach anything…" aria-label="Your question for Coach" data-input="coachDraft">${esc(S.coachDraft || '')}</textarea>
+      ${coachJob ? `<button type="button" class="btn btn-icon coach-send" data-action="coachStop" aria-label="Stop">${icon('x')}</button>`
+        : `<button type="submit" class="btn btn-icon btn-primary coach-send" aria-label="Send">${icon('up')}</button>`}
+    </form>` : ''}
+  </div>`;
+}
+// While a reply streams in, only its bubble is redrawn (at most once a frame).
+let coachPaintQueued = false;
+function coachPaint() {
+  if (coachPaintQueued) return;
+  coachPaintQueued = true;
+  requestAnimationFrame(() => {
+    coachPaintQueued = false;
+    const job = coachJob, el = job && $(`#cm-${job.id}`);
+    if (!el) return;
+    const view = $('#view'), atBottom = view.scrollHeight - view.scrollTop - view.clientHeight < 120;
+    $('.bubble', el).innerHTML = job.text ? coachMd(job.text) : '<span class="coach-typing" aria-label="Coach is thinking"><i></i><i></i><i></i></span>';
+    const lk = $('.coach-looked', el);
+    lk.hidden = !job.looked.length;
+    $('span', lk).textContent = `Looked at ${job.looked.map(k => COACH_LOOK[k]).join(', ')}`;
+    const m = S.coach && S.coach.msgs.find(x => x.id === job.id);
+    if (m) $('.coach-offers', el).innerHTML = m.offers.map((o, k) => offerHtml(o, m, k)).join('');
+    if (atBottom) view.scrollTop = view.scrollHeight;
+  });
+}
+const coachScroll = () => later(() => { const v = $('#view'); v.scrollTop = v.scrollHeight; });
+inputs.coachDraft = el => {
+  S.coachDraft = el.value;
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+};
+// Enter sends (Shift+Enter for a new line) on a keyboard; the phone keyboard's return key adds a line.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.id === 'coach-q' && matchMedia('(hover: hover)').matches) {
+    e.preventDefault();
+    e.target.form.requestSubmit();
+  }
+});
+submits.coachSend = f => {
+  const q = (formData(f).q || '').trim();
+  if (!q) return;
+  if (coachJob) { toast('Coach is still answering — tap × to stop it'); return; }
+  coachAsk(q);
+};
+actions.coachAsk = el => coachAsk(el.dataset.q);
+actions.coachStop = () => {
+  const job = coachJob;
+  if (!job) return;
+  job.ac.abort();
+};
+actions.coachRetry = el => {
+  const c = S.coach, k = c ? c.msgs.findIndex(m => m.id === el.dataset.id) : -1;
+  if (k < 1 || coachJob || c.msgs[k - 1].who !== 'me') return;
+  const q = c.msgs[k - 1].text;
+  c.msgs.splice(k - 1, 2);
+  coachAsk(q);
+};
+actions.coachNew = async () => {
+  if (!(await confirmBox('Start a new chat?', 'This chat will be cleared from this phone. Coach still knows everything in your Dugout.', { ok: 'New chat' }))) return;
+  if (coachJob) { coachJob.ac.abort(); coachJob = null; }
+  S.coach = { msgs: [], api: [], cost: 0 };
+  saveCoach(); render({ keepScroll: false });
+};
+
+async function coachAsk(question) {
+  question = String(question || '').trim().slice(0, 2000);
+  if (!question || coachJob) return;
+  if (!aiKey()) { actions.aiSetup(); return; }
+  if (typeof COACH === 'undefined') { toast('Coach is still loading — try again in a moment'); return; }
+  const c = coachChat(), bot = { id: uid(), who: 'coach', text: '', at: Date.now(), offers: [], looked: [] };
+  c.msgs.push({ id: uid(), who: 'me', text: question, at: Date.now() }, bot);
+  if (c.msgs.length > 200) c.msgs = c.msgs.slice(-200);
+  const job = coachJob = { ac: new AbortController(), id: bot.id, text: '', looked: bot.looked, offers: bot.offers };
+  S.coachDraft = '';
+  S.tab = 'coach';
+  coachScroll(); render();
+  try {
+    const res = await COACH.reply({
+      key: aiKey(), knowledge: coachGuideText(), history: c.api.slice(-COACH_TURNS).flat(), question, context: coachContext(), signal: job.ac.signal,
+      runTool: async (name, input) => { try { return coachTool(name, input, job); } catch (e) { console.error(e); return { content: 'That look-up failed on the phone.', error: true }; } },
+      onText: t => { job.text = t; coachPaint(); },
+      onTool: name => { if (COACH_LOOK[name] && !job.looked.includes(name)) job.looked.push(name); coachPaint(); }
+    });
+    if (coachJob !== job) return;                               // a new chat was started meanwhile
+    bot.text = res.text || job.text;
+    bot.cost = COACH.cost(res.usage); c.cost = (c.cost || 0) + bot.cost;
+    if (res.stop === 'refusal') { bot.failed = 'refusal'; bot.text = ''; }      // a declined answer's partial text isn't shown
+    else if (res.stop === 'max_tokens') bot.stop = 'max_tokens';
+    if (res.turn) { c.api.push(res.turn); if (c.api.length > 40) c.api = c.api.slice(-40); }
+    if (!bot.text && !bot.failed) bot.failed = 'ai';
+  } catch (e) {
+    if (coachJob !== job) return;
+    bot.text = job.text;
+    if (e && e.code === 'cancelled') bot.stop = 'stopped';
+    else { bot.failed = COACH_PROBLEM[e && e.code] ? e.code : 'ai'; if (!COACH_PROBLEM[e && e.code] || e.code === 'ai') console.error(e); }
+  } finally {
+    if (coachJob === job) coachJob = null;
+  }
+  if (S.locked) return;
+  saveCoach();
+  if (S.tab === 'coach') { const v = $('#view'), atBottom = v.scrollHeight - v.scrollTop - v.clientHeight < 160; render(); if (atBottom) v.scrollTop = v.scrollHeight; }
+}
+
+// Loaded chats: only what the screen and the API understand; a reply cut short by closing the app says so.
+function cleanCoach(c) {
+  if (!isObj(c) || !Array.isArray(c.msgs)) return null;
+  const okOffer = o => isObj(o) && ((o.kind === 'food' && typeof o.name === 'string' && MEAL_LABEL[o.meal] && [o.cal, o.pro, o.carb, o.fat, o.servings].every(v => Number.isFinite(v) && v >= 0))
+    || (o.kind === 'shop' && Array.isArray(o.items) && o.items.every(x => typeof x === 'string'))
+    || (o.kind === 'level' && LEVELS[o.level]) || (o.kind === 'drills' && Array.isArray(o.ids) && o.ids.every(id => DRILL_BY_ID[id]))
+    || (o.kind === 'screen' && COACH_SCREENS[o.screen]));
+  const msgs = c.msgs.filter(m => isObj(m) && typeof m.text === 'string' && (m.who === 'me' || m.who === 'coach')).slice(-200).map(m => (m.who === 'me'
+    ? { id: String(m.id || uid()), who: 'me', text: m.text.slice(0, 2000), at: Number(m.at) || 0 }
+    : { id: String(m.id || uid()), who: 'coach', text: m.text.slice(0, 30000), at: Number(m.at) || 0, offers: (Array.isArray(m.offers) ? m.offers : []).filter(okOffer),
+      looked: (Array.isArray(m.looked) ? m.looked : []).filter(k => COACH_LOOK[k]), cost: Number(m.cost) || 0,
+      ...(COACH_PROBLEM[m.failed] ? { failed: m.failed } : !m.text ? { failed: 'interrupted' } : {}), ...(['max_tokens', 'stopped'].includes(m.stop) ? { stop: m.stop } : {}) }));
+  const api = (Array.isArray(c.api) ? c.api : []).filter(t => Array.isArray(t) && t.length && t.every(x => isObj(x) && ['user', 'assistant', 'system'].includes(x.role))).slice(-40);
+  return { msgs, api, cost: Number(c.cost) || 0 };
 }
 
 /* ============================== 9. PROGRESS TAB (charts + history) ============================== */
@@ -5086,7 +5600,7 @@ function renderSettings() {
     <div class="section-title">Claude AI (optional)</div>
     <div class="set-list">
       <button class="set-item as-btn" data-action="aiSetup"><div class="grow"><div>${st.aiKey ? 'Claude is on' : 'Connect Claude'}</div>
-        <div class="hint">${st.aiKey ? `Key …${esc(st.aiKey.slice(-4))} · pantry photo scans and meal ideas` : 'Smarter pantry scans and custom meal ideas, with your own Anthropic API key'}</div></div>${icon('sparkle')}</button>
+        <div class="hint">${st.aiKey ? `Key …${esc(st.aiKey.slice(-4))} · the Coach, pantry photo scans and meal ideas` : 'The AI Coach, smarter pantry scans and meal ideas, with your own Anthropic API key'}</div></div>${icon('sparkle')}</button>
     </div>
 
     <div class="section-title">Backup — never lose your data</div>
@@ -5410,6 +5924,11 @@ const HELP = [
   ['Logging food fast', ['Type a few letters to search 169 common foods, your favorites and anything you logged before. Change Servings and the numbers update.',
     'Use the Recent row, Favorites, the + on a meal, or "Copy yesterday\'s food" to log in one tap.',
     'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
+  ['Coach (AI chat)', ['The Coach tab is a chat with an AI coach (Claude, by Anthropic). It sees your plan, workouts, food log, check-ins, goals, body weight, swing analyses, stats and kitchen, so its answers are about you.',
+    'Ask anything: what to eat before a game, how hard to go today, why a lift stalled, what weight to use next, how to fix a swing problem, how many pitches you can throw, what a stat means.',
+    'It looks things up while it answers (you\'ll see "Looked at your workouts"), and can offer buttons — log a meal it suggested, add things to your shopping list, switch today to Light, add drills to your plan, or open a screen. Nothing changes unless you tap.',
+    'It needs your own Anthropic API key (Settings → Claude AI) and internet, and usually costs a few cents a question — the chat shows about how much. Long chats cost more per question: tap New chat to start fresh.',
+    'Your question and a summary of your Dugout data go to Anthropic to answer it. Chats are saved encrypted on this phone. It\'s a helpful coach, not a doctor — for pain or an injury, see an athletic trainer or doctor.']],
   ['Pantry: what can I make?', ['Diet → Pantry → Scan photos: take a photo of each pantry shelf, the fridge and the freezer (up to 6 at a time), close enough to read the labels. Check what it found, tap anything it missed, and add it to your kitchen.',
     'Or tap Add food and pick what you have. Tap a food in "In your kitchen" to note how much is left or take it off when it runs out.',
     'Make it now lists recipes you have everything for. Quick plates mix a protein, a carb and a fruit or veggie you have. One thing away shows what a single ingredient would unlock — tap + to put it on your shopping list. Pick a meal (Breakfast, Pre-game…) to narrow it down.',
@@ -5436,7 +5955,7 @@ const HELP = [
     'Tap any exercise to change sets, reps, rest or the video. Use the exercise library to add new ones, or swap an exercise for today during a workout.']],
   ['Backups and privacy', ['Everything stays on this phone, encrypted with your password. There is no password reset — keep it in your iPhone Passwords app.',
     'Export a backup about once a week (Settings) and save it to Files or email it to yourself. Spreadsheet (CSV) exports are for coaches and are not encrypted.',
-    'The one exception is the optional Claude AI (Settings → Claude AI): once you add your own API key, the kitchen photos you choose to have Claude read, and your food list when you ask for meal ideas, are sent to Anthropic. Your key is never put in backups.']]
+    'The one exception is the optional Claude AI (Settings → Claude AI): once you add your own API key, your Coach questions (with a summary of your Dugout data), the kitchen photos you choose to have Claude read, and your food list when you ask for meal ideas are sent to Anthropic. Your key is never put in backups.']]
 ];
 actions.help = () => openSheet('How to use Dugout', `<div class="guide">${HELP.map(([title, points]) => `<details><summary>${esc(title)}</summary>
   <ul class="steps">${points.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`).join('')}</div>
@@ -5585,9 +6104,10 @@ function cleanLog(l) {
 }
 
 async function loadAll() {
-  const [settings, plan, active, workouts, meals, foods, logs] = await Promise.all([
-    DB.get('settings'), DB.get('plan'), DB.get('active'), DB.all('workouts'), DB.all('meals'), DB.all('foods'), DB.all('logs')
+  const [settings, plan, active, workouts, meals, foods, logs, coach] = await Promise.all([
+    DB.get('settings'), DB.get('plan'), DB.get('active'), DB.all('workouts'), DB.all('meals'), DB.all('foods'), DB.all('logs'), DB.get('coach')
   ]);
+  S.coach = cleanCoach(coach);
   S.settings = cleanSettings(settings);
   const cleanP = cleanPlan(plan);
   if (cleanP) {
@@ -5762,12 +6282,15 @@ async function openApp(newUsername) {
 }
 
 // ----- What's new (shown once after an update to people who already use the app) -----
-const WHATS_NEW = '2.3';
+const WHATS_NEW = '2.4';
 function whatsNew() {
   const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
-  openSheet("What's new in Dugout 2.3", `
+  openSheet("What's new in Dugout 2.4", `
+    ${item('coach', 'Coach', 'A new Coach tab: chat with an AI coach that knows your plan, workouts, food, check-ins, goals and baseball logs. Ask what to eat, how hard to train, why a lift stalled or how to fix your swing — it can log food, fill your shopping list or change today\'s workout with one tap. Needs your own Anthropic API key (Settings → Claude AI).')}
+    <details class="table-toggle"><summary>New in 2.3</summary><div class="stack-sm">
     ${item('camera', 'What can I make?', 'Diet → Pantry: take photos of your pantry, fridge and freezer (or tap in what you have) and see the meals you can make right now, quick plates, what you\'re one ingredient away from, and a shopping list. Photos are read on your phone.')}
     ${item('sparkle', 'Claude AI (optional)', 'Settings → Claude AI: add your own Anthropic API key for much better photo scans and custom meal ideas made from exactly what you have.')}
+    </div></details>
     <details class="table-toggle"><summary>New in 2.2</summary><div class="stack-sm">
     ${item('video', 'Swing lab', 'Baseball tab → Swing lab: film a swing from the side, front or back and get a full breakdown — stride, hip-shoulder separation, firing order, head movement, hands and finish — plus drills picked for what it finds. It all runs on your phone.')}
     ${item('baseball', '66 drills for every position', 'Baseball tab → Drills: hitting, pitching, catching, every infield spot, outfield, throwing and base running — split into drills you can do alone and drills with a partner.')}
@@ -5864,7 +6387,9 @@ async function lockApp(message) {
   swingJob = null; lastTrack = null;
   if (panJob) panJob.ac.abort();                     // and a pantry scan or idea request
   panJob = null; panFound = null;
-  Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null, swingOpen: null });
+  if (coachJob) coachJob.ac.abort();                 // and a Coach reply
+  coachJob = null;
+  Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null, swingOpen: null, coach: null, coachDraft: '' });
   render();
   if (message) toast(message);
   if (updateReady) reloadForUpdate(updateReady);        // a new version was waiting: switch to it now

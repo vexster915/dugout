@@ -30,6 +30,19 @@ unless you turn on the optional Claude features with your own Anthropic API key 
   stored encrypted and never put in backups
 - Water tracker and "eating for baseball" tips
 
+**Coach** (its own tab — optional, uses your own Anthropic API key)
+- A chat with an AI coach (Claude) that knows your Dugout: profile and goals, today's plan and check-in, what you've
+  eaten, recent workouts and best lifts, body weight, throwing and Pitch Smart rest, games, tests, swing analyses and
+  what's in your kitchen. Ask what to eat before a game, how hard to go today, why a lift stalled, what weight to use,
+  how to fix a swing problem…
+- While it answers it can look things up on the phone — full workout history, food log, recovery, baseball data, your
+  weekly plan and the app's library (exercise how-tos, recipes, food nutrition, drills) — and offer one-tap buttons:
+  log a meal it suggested, add to your shopping list, switch today to Light / Moderate / Heavy, add drills to your
+  plan, or open a screen. Nothing changes unless you tap.
+- Built to be safe for a young athlete (no crash diets or risky supplements; pain → see a trainer or doctor; Pitch
+  Smart limits). Answers stream in; the chat shows about what it has cost (usually a few cents a question). Chats are
+  saved encrypted on the phone and erased with everything else.
+
 **Baseball** (its own tab)
 - 66 drills for every position — hitting, pitching, catcher, first base, second base / shortstop, third base,
   outfield, throwing and base running — split into drills you can do **alone** and drills **with a partner**,
@@ -67,9 +80,11 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 | `swing.js` | Swing lab: runs the body tracking on your video and measures the swing |
 | `pantry.js` | Pantry: the food catalog (names and brands), what each recipe needs, quick plates and the matching |
 | `scan.js` | Pantry: reads your kitchen photos — on the phone, or with Claude if you added an API key |
+| `ai.js` | The connection to Claude (Anthropic's API) with your own key — shared by the Pantry and the Coach |
+| `coach.js` | Coach: what Claude is told, the look-ups and buttons it can use, and the conversation |
 | `vendor/mediapipe-1.0.1/` | Google MediaPipe (Apache 2.0): the Swing lab's body-tracking model and the Pantry's fruit and veggie spotter — downloaded the first time you use them |
 | `vendor/tesseract-7.0.0/` | Tesseract.js OCR (Apache 2.0) that reads package labels for the Pantry — downloaded on the first scan |
-| `vendor/anthropic-sdk-0.128.0/` | Anthropic's TypeScript SDK (MIT), bundled — only loaded if you use the optional Claude features |
+| `vendor/anthropic-sdk-0.128.0/` | Anthropic's TypeScript SDK (MIT), bundled — only loaded if you use the optional Claude features (Coach, Pantry) |
 | `db.js` | Encrypted on-phone storage |
 | `sw.js` | Offline support and updates: loads the newest version whenever there's internet |
 | `styles.css` | The look of the app |

@@ -9,7 +9,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://api.anthropic.com; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Dugout</title>
-  <meta name="description" content="Baseball training app: workouts with form videos, speed and arm care, swing analysis, meal plans, recipes and what-can-I-make pantry scans, and progress tracking. Works offline.">
+  <meta name="description" content="Baseball training app: workouts with form videos, speed and arm care, swing analysis, meal plans, recipes, pantry scans, an AI coach, and progress tracking. Works offline.">
 
   <!-- These make it open full-screen (no Safari bars) when launched from the home screen -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,7 +22,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=2.3.0">
+  <link rel="stylesheet" href="styles.css?v=2.4.0">
 </head>
 <body data-mode="gym">
   <div id="app">
@@ -38,18 +38,21 @@
 
   <noscript><p style="padding:24px;color:#fff">Please turn on JavaScript to use Dugout.</p></noscript>
 
-  <!-- Order matters: the data files (plan, meals, foods, exercises, drills, pantry) and db.js must load before app.js.
+  <!-- Order matters: the data files (plan, meals, foods, exercises, drills, pantry) and db.js must load before app.js,
+       and ai.js (the Claude connection) before scan.js and coach.js, which use it.
        ?v= is the app version. On every release set it (here and on styles.css) to the same number as
        APP_VERSION in app.js and VERSION in sw.js, so phones load the new files instead of old copies. -->
-  <script src="plan.js?v=2.3.0" defer></script>
-  <script src="meals.js?v=2.3.0" defer></script>
-  <script src="foods.js?v=2.3.0" defer></script>
-  <script src="exercises.js?v=2.3.0" defer></script>
-  <script src="drills.js?v=2.3.0" defer></script>
-  <script src="swing.js?v=2.3.0" defer></script>
-  <script src="pantry.js?v=2.3.0" defer></script>
-  <script src="scan.js?v=2.3.0" defer></script>
-  <script src="db.js?v=2.3.0" defer></script>
-  <script src="app.js?v=2.3.0" defer></script>
+  <script src="plan.js?v=2.4.0" defer></script>
+  <script src="meals.js?v=2.4.0" defer></script>
+  <script src="foods.js?v=2.4.0" defer></script>
+  <script src="exercises.js?v=2.4.0" defer></script>
+  <script src="drills.js?v=2.4.0" defer></script>
+  <script src="swing.js?v=2.4.0" defer></script>
+  <script src="pantry.js?v=2.4.0" defer></script>
+  <script src="ai.js?v=2.4.0" defer></script>
+  <script src="scan.js?v=2.4.0" defer></script>
+  <script src="coach.js?v=2.4.0" defer></script>
+  <script src="db.js?v=2.4.0" defer></script>
+  <script src="app.js?v=2.4.0" defer></script>
 </body>
 </html>
