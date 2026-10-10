@@ -19,7 +19,7 @@
 
 'use strict';
 
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
@@ -84,8 +84,13 @@ const normUrl = v => {
 const safeUrl = u => /^https?:\/\/[^\s]+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
 const isSearchLink = u => /youtube\.com\/results/i.test(String(u || ''));
 const placeholderVideo = name => ytSearch(name + ' proper form');   // ytSearch() lives in plan.js
-// The tutorial picked for this exercise in plan.js (VIDEOS), or a YouTube search if there isn't one.
-const defaultVideo = name => VIDEOS[String(name || '').trim()] || placeholderVideo(name);
+// The tutorial picked for this exercise in plan.js (VIDEOS), or a YouTube search if there isn't one. A baseball drill in a
+// workout (the 12-week plan's hitting days) gets the video you saved for it, or its demo search.
+const drillByName = name => (typeof DRILLS !== 'undefined' ? DRILLS.find(d => d.n === String(name || '').trim()) : null) || null;
+const defaultVideo = name => {
+  const n = String(name || '').trim(), d = !VIDEOS[n] && drillByName(n);
+  return VIDEOS[n] || (d ? (S.settings.drillVideos || {})[d.id] || ytSearch(d.yt) : placeholderVideo(name));
+};
 
 // Give exercises that still have a placeholder search link their real tutorial video.
 // Links you picked yourself are never changed.
@@ -110,13 +115,16 @@ const repSeconds = reps => {
   return null;
 };
 
+// "45 sec/side", "10/leg", "30 sec each": done once for each side (or each arm or leg)
+const twoSided = reps => /\/\s*(leg|side|arm)|each/i.test(String(reps || ''));
+
 // Rough workout length: work + rest for every set, plus changeover time.
 function estMinutes(day) {
   let sec = 0;
   for (const e of day.exercises) {
     const sets = Math.max(1, e.sets | 0);
     const timed = repSeconds(e.reps);
-    const sides = /\/\s*(leg|side|arm)|each/i.test(e.reps) ? 2 : 1;
+    const sides = twoSided(e.reps) ? 2 : 1;
     sec += sets * (timed != null ? timed : 35) * sides + (sets - 1) * (e.rest || 0) + 30;
   }
   return Math.max(5, Math.round(sec / 300) * 5);
@@ -243,6 +251,7 @@ const DEFAULT_SETTINGS = {
   bats: 'R',              // which side you hit from (Swing lab)
   pantry: null,           // Diet → Pantry: the food in your kitchen, shopping list and Claude's ideas (see section 8b)
   athlete: null,          // Build my plan answers: { pos, build, exp, goal, season, days, minutes, homeEquip, seed, built } (section 7b)
+  block: null,            // the 12-week plan: your answers (block.js) + { start: Monday of week 1, week: the week in your plan } (section 7c)
   aiKey: ''               // your own Anthropic API key (optional; never put in backups)
 };
 
@@ -553,6 +562,7 @@ function renderToday() {
       <h1 class="page-title">Today</h1>
     </div></div>
     ${modeToggle()}
+    ${blockCard()}
     ${installBanner()}
     ${backupBanner()}
     ${weekReview()}
@@ -1030,7 +1040,7 @@ function woExercise(e, i, open) {
     <div class="wo-ex-body">
       ${e.cues ? `<p class="wo-cues">${esc(e.cues)}</p>` : ''}
       ${videoCard(e, i)}
-      ${secs && secs <= 600 ? `<div class="wo-tools"><button class="btn btn-sm btn-ghost" data-action="workTimer" data-i="${i}" data-sec="${secs}">${icon('timer', 'sm')} ${restLabel(secs)} timer</button></div>` : ''}
+      ${secs && secs <= 600 ? `<div class="wo-tools"><button class="btn btn-sm btn-ghost" data-action="workTimer" data-i="${i}" data-sec="${secs}" data-sides="${twoSided(e.reps) ? 2 : 1}">${icon('timer', 'sm')} ${restLabel(secs)}${twoSided(e.reps) ? ' × 2 sides' : ''} timer</button></div>` : ''}
       ${last && e.track !== 'check' ? `<div class="wo-last">Last time (${shortDate(last.date)}): <b>${last.sets.map(s => setText(s, e.track)).join(' · ')}</b></div>` : ''}
       ${coachTips(e, i, last)}
       <div class="set-grid">${labels}${e.sets.map((s, j) => setRow(e, i, s, j, last)).join('')}</div>
@@ -1078,7 +1088,8 @@ inputs.setVal = el => {
 actions.toggleSet = el => {
   if (!S.active) return;
   const i = +el.dataset.i, j = +el.dataset.j;
-  const e = S.active.exercises[i], s = e.sets[j];
+  const e = S.active.exercises[i], s = e && e.sets[j];
+  if (!s) return;
   const row = document.getElementById(`set-${i}-${j}`);
   if (row) $$('[data-f]', row).forEach(inp => { s[inp.dataset.f] = num(inp.value); });
   s.done = !s.done;
@@ -1161,18 +1172,30 @@ actions.removeSet = el => {
 actions.workTimer = el => {
   if (!S.active) return;
   unlockAudio();
-  startTimer(+el.dataset.sec, `Work · ${S.active.exercises[+el.dataset.i].name}`);
+  const sec = +el.dataset.sec, name = S.active.exercises[+el.dataset.i].name;
+  if (el.dataset.sides === '2') startTimer(sec, `Work · ${name} · side 1`, [[5, 'Switch sides'], [sec, `Work · ${name} · side 2`]]);
+  else startTimer(sec, `Work · ${name}`);
 };
 
 actions.workoutMenu = () => openSheet('Workout options', `<div class="stack">
   <button class="btn btn-primary btn-block" data-action="finishWorkout">${icon('check', 'sm')} Finish workout</button>
   <button class="btn btn-ghost btn-block" data-action="addWorkoutExercise">${icon('plus', 'sm')} Add an exercise</button>
+  <button class="btn btn-ghost btn-block" data-action="woFinisher">${icon('refresh', 'sm')} Add a stretch finisher</button>
   <button class="btn btn-ghost btn-block" data-action="plateCalc">${icon('dumbbell', 'sm')} Plate calculator</button>
   <div class="field"><span>Quick timer</span>
     <div class="chips">${[30, 45, 60, 90, 120, 180].map(s => `<button class="chip" data-action="customTimer" data-s="${s}">${restLabel(s)}</button>`).join('')}</div>
   </div>
   <button class="btn btn-ghost btn-block" data-action="exitWorkout">${icon('x', 'sm')} End early or cancel</button>
 </div>`);
+actions.woFinisher = () => {
+  if (!S.active) return;
+  const list = BUILDER.finisher(S.active.exercises, addOnOpts(S.active.mode));
+  closeSheet();
+  if (!list.length) { toast('No more stretches to add'); return; }
+  S.active.exercises.push(...list.map(e => ({ planId: null, name: e.name, reps: String(e.reps), rest: 0, track: e.track, cues: e.cues || '', video: defaultVideo(e.name), sets: makeSets(1, e.track, null) })));
+  saveActive(); render();
+  toast(`Added ${list.map(e => e.name).join(' + ')} (today only)`);
+};
 actions.customTimer = el => { closeSheet(); unlockAudio(); startTimer(+el.dataset.s, 'Timer'); };
 
 actions.addWorkoutExercise = () => {
@@ -1397,7 +1420,16 @@ actions.exProgress = el => { S.progEx = el.dataset.name; S.progMetric = null; S.
 // How-to details from exercises.js. A renamed exercise like "Push-ups (weighted)" falls back to "Push-ups".
 const exerciseInfo = name => EXERCISE_INFO[name] || EXERCISE_INFO[String(name || '').replace(/\s*\(.*\)\s*$/, '')] || null;
 function infoBlock(name) {
-  const x = exerciseInfo(name);
+  const x = exerciseInfo(name), d = !x && drillByName(name);
+  const items = (tag, list) => `<${tag} class="steps">${list.map(t => `<li>${esc(t)}</li>`).join('')}</${tag}>`;
+  if (d) return `<div class="ex-info">
+    <div><span class="badge">${icon('baseball')} ${esc(d.gear)}</span></div>
+    <p class="text-2 small"><b>Why it matters:</b> ${esc(d.why)}</p>
+    <div class="section-title">How to do it</div>${items('ol', d.steps)}
+    <div class="section-title">Coaching points</div>${items('ul', d.cues)}
+    <div class="section-title">Watch out for</div>${items('ul', d.avoid)}
+    <div class="tile"><div class="tile-label">Make it harder</div><div class="small">${esc(d.harder)}</div></div>
+  </div>`;
   if (!x) return '';
   const list = (tag, items) => `<${tag} class="steps">${items.map(t => `<li>${esc(t)}</li>`).join('')}</${tag}>`;
   return `<div class="ex-info">
@@ -1460,6 +1492,7 @@ function planTemplate(name, mode) {
   const find = m => { for (const plan of plans) for (const d of plan[m]) { const e = d.exercises.find(x => x.name === name); if (e) return e; } return null; };
   if (MODES[mode]) { const e = find(mode) || find(mode === 'gym' ? 'home' : 'gym'); if (e) return e; }
   else for (const plan of plans) for (const m of ['gym', 'home']) for (const d of plan[m]) { const e = d.exercises.find(x => x.name === name); if (e) return e; }
+  if (typeof FIRST !== 'undefined' && FIRST[name]) return FIRST[name];        // plan.js CATALOG
   const x = EXERCISE_INFO[name];
   return x && x.plan ? x.plan : null;
 }
@@ -1511,10 +1544,11 @@ actions.pasteLink = async el => {
 
 /* ============================== 6. REST TIMER, SOUND, SCREEN-AWAKE ============================== */
 
-const T = { end: 0, total: 0, label: '', id: null, doneAt: 0 };
+const T = { end: 0, total: 0, label: '', id: null, doneAt: 0, queue: [] };
 
-function startTimer(sec, label) {
-  T.total = Math.max(1, sec); T.end = Date.now() + sec * 1000; T.label = label; T.doneAt = 0;
+// queue: timers that run right after this one ([seconds, label] — e.g. "switch sides", then the other side)
+function startTimer(sec, label, queue = []) {
+  T.total = Math.max(1, sec); T.end = Date.now() + sec * 1000; T.label = label; T.doneAt = 0; T.queue = queue;
   clearInterval(T.id);
   T.id = setInterval(timerTick, 250);
   drawTimer();
@@ -1522,7 +1556,7 @@ function startTimer(sec, label) {
 }
 function stopTimer() {
   clearInterval(T.id);
-  T.id = null; T.end = 0; T.doneAt = 0;
+  T.id = null; T.end = 0; T.doneAt = 0; T.queue = [];
   const el = $('#timer');
   el.hidden = true; el.classList.remove('done'); el.innerHTML = '';
 }
@@ -1546,6 +1580,12 @@ function timerTick() {
   if (!time) return;
   const left = (T.end - Date.now()) / 1000;
   if (left <= 0) {
+    if (!T.doneAt && T.queue.length) {          // next in line: beep and keep going
+      const [sec, next] = T.queue.shift();
+      timerAlert(-left > 3);
+      startTimer(sec, next, T.queue);
+      return;
+    }
     if (!T.doneAt) {
       T.doneAt = Date.now();
       $('#timer').classList.add('done');
@@ -1641,6 +1681,7 @@ document.addEventListener('visibilitychange', () => {
   try { if (audioCtx && audioCtx.state !== 'running') audioCtx.resume(); } catch (e) { /* ignore */ }
   timerTick();
   const newDay = rollDay();
+  if (newDay) checkBlockWeek();
   if (S.plan && (S.tab === 'today' || newDay) && !S.active && !$('#sheet-root').classList.contains('open')) render();
 });
 document.addEventListener('pointerdown', () => {
@@ -1670,6 +1711,7 @@ function renderPlan() {
       <button class="btn btn-ghost" data-action="buildPlan">${icon('sparkle', 'sm')} Build my plan</button>
       <button class="btn btn-ghost" data-action="workouts">${icon('dumbbell', 'sm')} Presets &amp; custom</button>
     </div>
+    ${blockOn() ? blockCard() : `<button class="banner as-btn goal-nudge" data-action="block">${icon('flame')}<span class="grow"><b>12-week plan: muscle, power &amp; bat speed.</b> Add 5–15 lb, hit harder and move better — built from your size, position and numbers.</span>${icon('right', 'sm')}</button>`}
     <div class="days">${chips}</div>
     <div class="small muted center">${(() => { const days = planFor(mode).filter(d => d.type !== 'rest' && d.exercises.length), mins = sum(days, d => estMinutes(d));
       return `${days.length} training day${days.length === 1 ? '' : 's'} · about ${mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`} a week`; })()}</div>
@@ -1725,10 +1767,20 @@ actions.planDay = el => { S.planDay = +el.dataset.i; render(); };
 
 // ----- Programs (plan.js PROGRAMS): switch between off-season and in-season plans -----
 actions.programs = () => openSheet('Programs', `<div class="stack">
+  <div class="card stack-sm program ${blockOn() ? 'current' : ''}">
+    <div class="spread"><div class="card-title">${icon('flame', 'sm')} 12-week plan</div><span class="badge ${blockOn() ? 'accent' : ''}">${blockOn() ? `Week ${clamp(blockWeekNow(), 1, 12)}` : 'Muscle + power + swing'}</span></div>
+    <p class="text-2 small">Add 5–15 lb of mostly muscle, more bat speed and exit velo, speed and flexibility in 12 weeks — analyzed and built from your position, height, weight, experience, numbers and Swing lab.</p>
+    <button class="btn ${blockOn() ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="block">${blockOn() ? 'Open my 12 weeks' : 'Analyze me and build it'}</button>
+  </div>
   <div class="card stack-sm program ${planBuilt() ? 'current' : ''}">
     <div class="spread"><div class="card-title">${icon('sparkle', 'sm')} Build my own plan</div><span class="badge ${planBuilt() ? 'accent' : ''}">${planBuilt() ? 'Current' : 'Made for you'}</span></div>
     <p class="text-2 small">${S.settings.athlete ? esc(BUILDER.summary(BUILDER.profileOf(S.settings.athlete))) : 'A week of workouts made from your position, build, lifting experience, goal, the part of the season, the days you train and how long you have.'}</p>
     <button class="btn ${planBuilt() ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="buildPlan">${S.settings.athlete ? 'Change my answers' : 'Build my plan'}</button>
+  </div>
+  <div class="card stack-sm">
+    <div class="card-title">${icon('refresh', 'sm')} Stretch finishers</div>
+    <p class="text-2 small">Keep your plan and your edits — just add 1–2 stretches you hold to the end of every training day that doesn't have them. Or add one day at a time in Plan → Edit day.</p>
+    <button class="btn btn-ghost btn-block" data-action="addFinishersAll">Add to my plan</button>
   </div>
   <div class="section-title">Starting programs</div>
   ${Object.entries(PROGRAMS).map(([k, p]) => { const cur = !planBuilt() && S.settings.program === k; return `<div class="card stack-sm program ${cur ? 'current' : ''}">
@@ -1832,6 +1884,10 @@ actions.editDay = () => {
     <button class="btn btn-primary btn-block" type="submit">Save</button>
     ${day.exercises.length ? `<div class="field"><span>Quick changes to the whole day</span><div class="tune-row">${Object.entries(TUNES).map(([k, l]) =>
       `<button class="chip" type="button" data-action="tuneDay" data-t="${k}">${l}</button>`).join('')}</div><small>Warm-ups and cool-downs stay the same. Undo from the message that pops up.</small></div>` : ''}
+    ${day.exercises.length && day.type !== 'rest' ? `<div class="field"><span>Add to this day</span><div class="tune-row">
+      <button class="chip" type="button" data-action="addOn" data-k="primer">${icon('flame', 'sm')} Explosive start</button>
+      <button class="chip" type="button" data-action="addOn" data-k="finisher">${icon('refresh', 'sm')} Stretch finisher</button></div>
+      <small>Explosive start: a jump and a med ball throw (or plyo push-ups) right after the warm-up. Stretch finisher: two holds for what the day works. Picked for your position and equipment — tap again for different ones.</small></div>` : ''}
     <label class="field"><span>Copy another day's workout here</span>
       <select data-change="copyDayFrom"><option value="">Choose a day…</option>${[...planFor().keys(), LIGHT].map(i => (i === S.planDay ? '' : `<option value="${i}">${dayName(i)} — ${esc(dayPlan(i).title)}</option>`)).join('')}</select></label>
     ${S.planDay === LIGHT ? '' : `<label class="field"><span>Swap with another day</span>
@@ -2052,7 +2108,7 @@ submits.woPut = async f => {
     : `${dayName(di)} (${MODES[mode].label} plan) becomes ${w.title}, replacing ${old.title}. Workout history is kept.`, { ok: add ? 'Add' : 'Replace' });
   if (!ok) { openWorkout(w); return; }
   const was = clone(old), ex = w.exercises.map(e => cleanExerciseData({ ...e, id: uid() }));
-  if (add) old.exercises.push(...ex);
+  if (add) { old.exercises.push(...ex); if (old.type === 'rest') old.type = TYPES[w.type] && w.type !== 'rest' ? w.type : 'strength'; }   // a rest day you add a workout to is a training day now
   else setDayPlan(di, { title: w.title, type: TYPES[w.type] && w.type !== 'rest' ? w.type : 'strength', focus: w.focus || '', exercises: ex }, mode);
   if (S.settings.mode !== mode) { S.settings.mode = mode; saveSettings(); }
   S.tab = 'plan'; S.planDay = di;
@@ -2162,12 +2218,309 @@ actions.tuneDay = el => {
   toast(`${TUNES[t]} · now ~${estMinutes(day)} min`, { action: () => { day.exercises = was; savePlan(); render(); } });
 };
 
+// ----- Add-ons (builder.js): an explosive start after the warm-up, or stretches you hold at the end -----
+let addOnSeed = 0;
+const addOnOpts = where => ({ where, profile: trainingProfile(), age: athleteAge(), seed: ++addOnSeed });
+const isHold = name => !!(BUILDER.EX_BY_NAME[name] && BUILDER.EX_BY_NAME[name].tags.includes('hold'));
+// Already ends with a stretch (or the cool-down walk + stretch)?
+const endsStretched = day => day.exercises.slice(-2).some(e => isHold(e.name) || e.name === 'Cool-down walk + stretch');
+const afterWarmup = list => { let i = 0; while (i < list.length && /warm-up/i.test(list[i].name)) i++; return i; };
+function addOnTo(day, k, where) {
+  const list = BUILDER[k](day.exercises, addOnOpts(where)).map(e => cleanExerciseData({ ...e, id: uid() }));
+  if (k === 'finisher') day.exercises.push(...list); else day.exercises.splice(afterWarmup(day.exercises), 0, ...list);
+  return list;
+}
+actions.addOn = el => {
+  const k = el.dataset.k, day = dayPlan(S.planDay), was = clone(day.exercises);
+  if (!['finisher', 'primer'].includes(k) || !day.exercises.length) return;
+  const list = addOnTo(day, k, S.settings.mode);
+  if (!list.length) { toast(k === 'finisher' ? 'No more stretches to add to this day' : 'Nothing explosive fits your equipment here'); return; }
+  savePlan(); closeSheet(); render();
+  toast(`Added ${list.map(e => e.name).join(' + ')}`, { action: () => { day.exercises = was; savePlan(); render(); } });
+};
+// Every training day in both plans that doesn't end with a stretch gets a finisher (nothing else changes).
+actions.addFinishersAll = async () => {
+  const todo = [];
+  for (const mode of ['gym', 'home']) S.plan[mode].forEach((d, i) => { if ((d.type === 'strength' || d.type === 'agility') && d.exercises.length && !endsStretched(d)) todo.push([mode, i]); });
+  if (!todo.length) { closeSheet(); toast('Every training day already ends with a stretch'); return; }
+  if (!(await confirmBox('Add stretch finishers?', `${plural(todo.length, 'training day')} in your gym and home plans get 1–2 stretches you hold at the end, picked for what each day works. Nothing else changes, and you can undo it.`, { ok: 'Add them' }))) return;
+  const was = clone({ gym: S.plan.gym, home: S.plan.home });
+  for (const [mode, i] of todo) addOnTo(S.plan[mode][i], 'finisher', mode);
+  savePlan(); render();
+  toast(`Stretch finishers added to ${plural(todo.length, 'day')}`, { action: () => { Object.assign(S.plan, was); savePlan(); render(); } });
+};
+
 // Saved workouts in a restored backup or an old version: keep only what makes sense.
 const cleanSaved = list => (Array.isArray(list) ? list : []).filter(w => isObj(w) && Array.isArray(w.exercises)).slice(0, 60).map(w => ({
   id: typeof w.id === 'string' && w.id ? w.id : uid(), title: String(w.title || 'My workout').slice(0, 60), type: TYPES[w.type] && w.type !== 'rest' ? w.type : 'strength',
   focus: String(w.focus || '').slice(0, 400), where: MODES[w.where] ? w.where : 'gym', savedAt: Number(w.savedAt) || Date.now(),
   exercises: w.exercises.filter(e => isObj(e) && e.name).slice(0, 30).map(cleanExerciseData)
 })).filter(w => w.exercises.length);
+
+/* ============================== 7c. 12-WEEK PLAN (block.js) ============================== */
+// Add muscle, power and bat speed in 12 weeks. Your answers (height in inches and weight in lb, whatever units you use)
+// are kept in settings.block with the Monday it starts ("start") and the week now in your plan ("week"). Each new week
+// Dugout puts that week's workouts into your Gym or Home plan; your plan from before is kept in plan.before and comes
+// back if you end the 12 weeks early.
+
+const blockOn = () => !!(S.settings.block && S.settings.block.start);
+const blockWeekNow = () => (blockOn() ? BLOCK.weekOn(S.settings.block.start, ymd()) : 0);
+const kgUnits = () => S.settings.unit === 'kg';
+const toLb = v => (kgUnits() ? v / LB : v), fromLb = v => (kgUnits() ? v * LB : v);
+const wText = lb => `${fmt(fromLb(lb), 1)} ${S.settings.unit}`;
+const latestSwingFaults = () => { const sw = logsOf('swing').slice(-1)[0]; return sw ? sw.faults.slice(0, 3).map(f => f.id) : []; };
+const bestTest = id => { const t = TEST_BY_ID[id], b = t && bestOf(t, testLogs(id)); return b ? b.v : null; };
+const BLOCK_TESTS = [['exitvelo', 'Exit velo (mph)'], ['batspeed', 'Bat speed (mph)'], ['sixty', '60-yard (s)'], ['vertical', 'Vertical (in)'], ['broad', 'Broad jump (in)'], ['mbthrow', 'Med ball throw (ft)']];
+
+// Your answers so far: last time's, or filled in from what Dugout already knows about you.
+function blockDefaults() {
+  const p = S.settings.profile || {}, a = S.settings.athlete || {}, w = latestWeight() ?? p.weight;
+  const h = kgUnits() ? (p.cm ? p.cm / 2.54 : null) : (p.ft ? p.ft * 12 + (p.inch || 0) : null);
+  return BLOCK.answersOf({
+    pos: a.pos, exp: a.exp, homeEquip: a.homeEquip, days: a.days && a.days.length >= 3 && a.days.length <= 5 ? a.days : [0, 1, 3, 4], minutes: 60,
+    where: S.settings.mode, season: a.season || (S.settings.program === 'inseason' ? 'inseason' : 'offseason'),
+    bats: ['R', 'L'].includes(S.settings.bats) ? S.settings.bats : 'R', age: p.age, sex: p.sex, heightIn: h, weightLb: w != null ? toLb(w) : null,
+    tests: Object.fromEntries(BLOCK_TESTS.map(([k]) => [k, bestTest(k)])), faults: latestSwingFaults(), ...(S.settings.block || {})
+  });
+}
+
+let blockDraft = null;     // answers being looked at (before you start, or when you change them)
+actions.block = () => { blockDraft = null; if (blockOn()) blockHome(); else blockForm(); };
+actions.blockForm = () => blockForm();
+function blockForm() {
+  const a = blockDraft || blockDefaults(), kg = kgUnits();
+  const numIn = (name, label, v, ph = '') => `<label class="field"><span>${label}</span><input name="${name}" inputmode="decimal" value="${v == null ? '' : esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
+  openSheet('12-week plan', `<form class="form" novalidate data-submit="blockAnalyze">
+    <p class="text-2 small">Add muscle, power and bat speed in 12 weeks. Answer everything you can — Dugout uses each answer to work out what's realistic for you, what to eat and which workouts fit you best.</p>
+    <div class="section-title">You</div>
+    <div class="field"><span>Position</span>${pickRows('pos', BUILDER.POSITIONS, a.pos)}</div>
+    <div class="form-grid">
+      <div class="field"><span>Bats</span>${choice('bats', [['R', 'Right'], ['L', 'Left'], ['S', 'Switch']], a.bats)}</div>
+      <div class="field"><span>Throws</span>${choice('throws', [['R', 'Right'], ['L', 'Left']], a.throws)}</div>
+    </div>
+    <div class="form-grid">
+      ${numIn('age', 'Age', a.age)}
+      <div class="field"><span>Sex</span>${choice('sex', [['male', 'Male'], ['female', 'Female']], a.sex)}</div>
+    </div>
+    <div class="form-grid">
+      ${kg ? numIn('cm', 'Height (cm)', Math.round(a.heightIn * 2.54)) : `${numIn('ft', 'Height (feet)', Math.floor(a.heightIn / 12))}${numIn('inch', '+ inches', Math.round(a.heightIn % 12))}`}
+      ${numIn('weight', `Weight (${S.settings.unit})`, Math.round(fromLb(a.weightLb) * 10) / 10)}
+    </div>
+    <div class="field"><span>How much do you want to add in 12 weeks?</span>${optGrid('gain', BLOCK.GAINS.map(g => [g, kg ? `+${fmt(g * LB, 1)} kg` : `+${g} lb`]), a.gain, { cls: 'wrap3' })}
+      <small>Dugout checks it against your frame and experience and tells you what's realistic.</small></div>
+    <div class="field"><span>Lifting experience</span>${pickRows('exp', BUILDER.EXPERIENCE, a.exp)}</div>
+    <div class="field"><span>Part of the season</span>${optGrid('season', BUILDER.SEASONS, a.season)}</div>
+    <div class="section-title">Training</div>
+    <div class="field"><span>Lifting days (pick 3 to 5)</span>${optGrid('day', DAYS_SHORT.map((d, i) => [i, d]), a.days, { multi: true, cls: 'days' })}
+      <small>Most of the other days become hitting days; one stays a rest day.</small></div>
+    <div class="field"><span>Time for each lift</span>${optGrid('minutes', [[45, '45 min'], [60, '60 min'], [75, '75 min']], a.minutes)}</div>
+    <div class="field"><span>Where</span>${optGrid('where', [['gym', 'Gym'], ['home', 'Home']], a.where)}</div>
+    <div class="field"><span>Equipment at home</span>${optGrid('homeEquip', BUILDER.HOME_EQUIP, a.homeEquip, { cls: 'wrap3' })}</div>
+    <label class="check-line"><input type="checkbox" name="medball" value="1" ${a.medball ? 'checked' : ''}> <span>I have a med ball (4–8 lb) and a wall to throw it at</span></label>
+    <div class="field"><span>Sore spots to work around</span>${optGrid('sore', BLOCK.SORE, a.sore, { multi: true, cls: 'wrap2' })}</div>
+    <div class="section-title">Hitting</div>
+    <div class="field"><span>Hitting days?</span>${choice('hits', [['yes', 'Yes — I hit'], ['no', 'No — pitcher only']], a.hits ? 'yes' : 'no')}</div>
+    <div class="field"><span>Your hitting setup</span>${pickRows('setup', BLOCK.SETUP, a.setup)}</div>
+    <p class="hint">${a.faults.length ? `Your latest Swing lab priorities (${esc(a.faults.map(swFaultName).join(', ').toLowerCase())}) pick the first drills.` : 'Tip: film a swing in Baseball → Swing lab first, and the hitting days start with drills for what it finds.'}</p>
+    <div class="section-title">Your numbers now <small class="muted">optional</small></div>
+    <div class="form-grid">${BLOCK_TESTS.map(([k, l]) => numIn(`t_${k}`, l, a.tests[k], '–')).join('')}</div>
+    <p class="hint">Filled in from your best Baseball tests. They decide what gets extra work, and week 12 shows how much you gained.</p>
+    <button class="btn btn-primary btn-xl" type="submit">${icon('sparkle', 'sm')} Analyze me</button>
+  </form>`);
+}
+submits.blockAnalyze = f => {
+  const d = formData(f), days = DAYS.map((_, i) => i).filter(i => d[`day_${i}`]), kg = kgUnits();
+  if (days.length < 3 || days.length > 5) { toast('Pick 3, 4 or 5 lifting days'); return; }
+  const age = num(d.age), weight = num(d.weight), heightIn = kg ? num(d.cm) / 2.54 : (num(d.ft) || 0) * 12 + (num(d.inch) || 0);
+  if (!(age >= 12 && age <= 25)) { toast('Enter your age (12–25)'); return; }
+  if (!(heightIn >= 54 && heightIn <= 84)) { toast(kg ? 'Enter your height in cm' : 'Enter your height in feet and inches'); return; }
+  const lb = weight != null ? toLb(weight) : null;
+  if (!(lb >= 80 && lb <= 330)) { toast(`Enter your weight in ${S.settings.unit}`); return; }
+  const tests = Object.fromEntries(BLOCK_TESTS.map(([k]) => [k, num(d[`t_${k}`])]));
+  const old = blockDraft || S.settings.block || {};
+  blockDraft = BLOCK.answersOf({ ...old, pos: d.pos, bats: d.bats, throws: d.throws, age, sex: d.sex, heightIn: Math.round(heightIn * 10) / 10, weightLb: Math.round(lb * 10) / 10,
+    gain: Number(d.gain), exp: d.exp, season: d.season, days, minutes: Number(d.minutes), where: d.where, homeEquip: d.homeEquip, medball: !!d.medball,
+    sore: BLOCK.SORE.map(([k]) => k).filter(k => d[`sore_${k}`]), hits: d.hits !== 'no', setup: d.setup, tests, faults: latestSwingFaults() });
+  blockReport(blockDraft);
+};
+
+// The analysis: what's realistic, what to eat, how the 12 weeks go — and Start.
+function blockReport(a, { started = false } = {}) {
+  const an = BLOCK.analyze(a), tile = (label, v, sub) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${v}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
+  const sec = (title, ic, list) => `<div class="card stack-sm"><div class="card-title row">${icon(ic, 'sm')} ${title}</div><ul class="steps">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  const monday = ymd(weekStart()), next = ymd(addDays(weekStart(), 7)), late = dayIdx() >= 3;
+  openSheet(started ? 'Your analysis' : 'Your 12-week analysis', `<div class="stack">
+    <div class="small muted">${esc(an.position)} · ${esc(BLOCK.fmtHeight(an.a.heightIn))} · ${wText(an.a.weightLb)} · age ${an.a.age} · ${esc(BUILDER.label(BUILDER.EXPERIENCE, an.a.exp).toLowerCase())}</div>
+    <div class="tiles two">
+      ${tile('12-week target', `+${fmt(fromLb(an.target), 1)}<small> ${S.settings.unit}</small>`, `${wText(an.a.weightLb)} → ${wText(an.weights[12])}`)}
+      ${tile('Realistic range', `${fmt(fromLb(an.range[0]), 0)}–${fmt(fromLb(an.range[1]), 0)}<small> ${S.settings.unit}</small>`, `about ${fmt(fromLb(an.pace), 2)} ${S.settings.unit} a week`)}
+      ${tile('Calories a day', fmt(an.cal), `${fmt(an.maintain)} + ${an.surplus} to grow`)}
+      ${tile('Protein a day', `${an.pro}<small> g</small>`, `${an.carb} g carbs · ${an.fat} g fat`)}
+    </div>
+    ${sec('Your body', 'scale', an.notes.body)}
+    ${sec('How much you can gain', 'progress', an.notes.gain)}
+    ${sec('What to eat', 'diet', an.notes.food)}
+    ${sec('How you\'ll train', 'dumbbell', an.notes.training)}
+    ${sec('Power and speed', 'flame', an.notes.power)}
+    ${sec('Hitting', 'baseball', an.notes.hitting)}
+    ${sec('Flexibility', 'refresh', an.notes.flex)}
+    <div class="card stack-sm"><div class="card-title row">${icon('plan', 'sm')} The 12 weeks</div>
+      ${BLOCK.PHASES.map(p => `<div class="small"><b>Weeks ${p.weeks} · ${p.name}.</b> <span class="text-2">${esc(p.goal)}</span></div>`).join('')}
+      <div class="small text-2">Weeks 4 and 8 are lighter so you recover and grow. Week 12 is a test week.</div>
+      <button class="btn btn-ghost btn-block" data-action="blockWeeks">${icon('plan', 'sm')} See every week's workouts</button></div>
+    <details class="table-toggle"><summary>Weight targets week by week</summary><table class="table"><thead><tr><th>Week</th><th>Target</th></tr></thead>
+      <tbody>${an.weights.map((w, k) => `<tr><td>${k ? `End of week ${k}` : 'Start'}</td><td>${wText(w)}</td></tr>`).join('')}</tbody></table></details>
+    ${started ? `<button class="btn btn-ghost btn-block" data-action="blockChange">${icon('edit', 'sm')} Change my answers</button>`
+      : blockOn() ? `<button class="btn btn-primary btn-xl" data-action="blockApply">${icon('check')} Use my new answers</button>
+      <button class="btn btn-ghost btn-block" data-action="blockForm">${icon('edit', 'sm')} Change them again</button>
+      <p class="hint">Your start date stays the same, this week is rebuilt right away, and your nutrition goals stay as they are (change them in Diet → Goals).</p>`
+      : `<form class="form" novalidate data-submit="blockStart">
+      <div class="field"><span>Start</span>${optGrid('start', [[monday, late ? 'This week (already started)' : 'This week'], [next, `Next Monday (${fmtDate(parseYmd(next), { month: 'short', day: 'numeric' })})`]], late ? next : monday)}</div>
+      <label class="check-line"><input type="checkbox" name="goals" value="1" checked> <span>Set my nutrition goals to ${fmt(an.cal)} cal and ${an.pro} g protein</span></label>
+      <button class="btn btn-primary btn-xl" type="submit">${icon('play')} Start my 12 weeks</button>
+      <button class="btn btn-ghost btn-block" type="button" data-action="blockForm">${icon('edit', 'sm')} Change my answers</button>
+      <p class="hint">Each week, that week's workouts go into your ${MODES[an.a.where].label} plan (you can still edit them). Your current plan is saved and comes back if you end early. Workout history is never touched.</p>
+    </form>`}
+    <p class="hint">Estimates for healthy athletes. Growth, sleep and how consistently you eat change everything — check with a doctor, athletic trainer or sports dietitian for anything specific to you.</p>
+  </div>`);
+}
+
+// Every week's workouts (from the analysis, or the dashboard).
+actions.blockWeeks = () => {
+  const a = blockDraft || S.settings.block;
+  if (!a) return;
+  const now = blockWeekNow();
+  openSheet('The 12 weeks', `<div class="stack-sm">${Array.from({ length: BLOCK.WEEKS }, (_, k) => {
+    const w = k + 1, wk = BLOCK.week(a, w, { age: athleteAge() }), lift = wk.days.filter(d => d.type === 'strength').length;
+    return `<details class="wk-day ${w === now ? 'light' : ''}"><summary><b>Wk ${w}</b><span class="grow">${esc(wk.phase.name)}${wk.kind === 'deload' ? ' · lighter week' : wk.kind === 'test' ? ' · test week' : ''}${w === now ? ' · now' : ''}</span><small>${lift} lifts</small>${icon('down', 'sm')}</summary>
+      ${wk.days.map((d, i) => `<div class="small" style="margin-top:8px"><b>${DAYS_SHORT[i]} · ${esc(d.title.replace(/^Wk \d+ · /, ''))}</b> <span class="muted">~${estMinutes(d)} min</span><div class="text-2">${d.exercises.map(e => `${esc(e.name)} ${e.sets}×${esc(e.reps)}`).join(' · ')}</div></div>`).join('')}</details>`;
+  }).join('')}</div>
+  <button class="btn btn-ghost btn-block" data-action="${blockDraft ? 'blockBack' : 'block'}">Back</button>`);
+};
+actions.blockBack = () => { if (blockDraft) blockReport(blockDraft); else closeSheet(); };
+
+submits.blockStart = async f => {
+  const a = blockDraft, d = formData(f);
+  if (!a) return;
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(d.start) ? d.start : ymd(weekStart());
+  if (!(await confirmBox('Start the 12 weeks?', `Your ${MODES[a.where].label.toLowerCase()} plan becomes week 1 of the plan${start > ymd() ? ` on ${fmtDate(parseYmd(start), { weekday: 'long', month: 'short', day: 'numeric' })}` : ''}. Your current plan is saved — end early any time to get it back. Workout history stays.`, { ok: 'Start' }))) { blockReport(a); return; }
+  const an = BLOCK.analyze(a);
+  if (!blockOn() || !S.plan.before) S.plan.before = clone({ gym: S.plan.gym, home: S.plan.home });
+  S.settings.block = { ...a, start, week: 0 };
+  S.settings.mode = a.where;
+  S.settings.bats = a.bats === 'L' ? 'L' : 'R';
+  if (d.goals) {
+    const kg = kgUnits(), w = Math.round(fromLb(a.weightLb) * 10) / 10, inch = Math.round(a.heightIn);
+    Object.assign(S.settings, { calGoal: an.cal, proteinGoal: an.pro, carbGoal: an.carb, fatGoal: an.fat, waterGoal: an.water, goalsSet: true,
+      profile: { ...(S.settings.profile || {}), sex: a.sex, age: a.age, weight: w, ft: Math.floor(inch / 12), inch: inch % 12, cm: Math.round(a.heightIn * 2.54), goal: 'gain', activity: S.settings.profile && S.settings.profile.activity || 1.725 } });
+    if (latestWeight() == null || Math.abs(latestWeight() - w) > 0.05) putLog({ id: uid(), kind: 'weight', date: ymd(), w, at: Date.now() });
+    if (!kg) S.settings.profile.cm = Math.round(a.heightIn * 2.54);
+  }
+  blockDraft = null;
+  installBlockWeek(true);
+  saveSettings(); savePlan();
+  S.tab = 'plan'; S.planDay = dayIdx();
+  closeSheet(); render({ keepScroll: false });
+  toast(start > ymd() ? 'Your 12 weeks start Monday — week 1 is in your plan' : 'Week 1 is in your plan — let\'s go');
+};
+
+// Put this week's workouts into the plan (once per week, so your edits during the week stay).
+function installBlockWeek(force = false) {
+  const b = S.settings.block;
+  if (!b || !b.start || !S.plan) return false;
+  const w = clamp(BLOCK.weekOn(b.start, ymd()), 1, BLOCK.WEEKS + 1);
+  if (w > BLOCK.WEEKS || (!force && b.week === w)) return false;
+  const wk = BLOCK.week(b, w, { age: athleteAge() });
+  S.plan[b.where] = wk.days.map(asPlanDay);
+  b.week = w;
+  saveSettings(); savePlan();
+  return true;
+}
+function checkBlockWeek() {
+  if (S.locked || !blockOn()) return;
+  const was = S.settings.block.week;
+  if (installBlockWeek() && was) toast(`Week ${S.settings.block.week} of your 12-week plan is in your Plan tab`);
+}
+
+// Dashboard: where you are, weight on pace, tests, and the way out.
+function blockStatus() {
+  const b = S.settings.block, an = BLOCK.analyze(b), now = blockWeekNow(), w = clamp(now, 0, BLOCK.WEEKS);
+  const days = Math.max(0, (parseYmd(ymd()) - parseYmd(b.start)) / 86400000), expect = an.a.weightLb + an.pace * Math.min(days, 84) / 7;
+  const wl = logsOf('weight').filter(l => l.date >= b.start), last = wl[wl.length - 1], cur = last ? toLb(last.w) : null;
+  const diff = cur != null ? cur - expect : null, stale = !last || (parseYmd(ymd()) - parseYmd(last.date)) / 86400000 > 7;
+  const pace = diff == null || days < 10 ? null : diff < -1.5 ? 'behind' : diff > 2 ? 'ahead' : 'on';
+  return { b, an, now, w, expect, cur, diff, pace, stale, last, done: now > BLOCK.WEEKS, notYet: now < 1, phase: BLOCK.PHASES[BLOCK.phaseOf(Math.max(1, w)) - 1], kind: BLOCK.kindOf(Math.max(1, w)) };
+}
+const paceText = st => st.pace === 'behind' ? `${wText(-st.diff)} behind — add about 250 calories a day (a shake or a PB&J) and weigh in again in a week.`
+  : st.pace === 'ahead' ? `${wText(st.diff)} ahead — faster than muscle can be built. Trim about 200 calories a day.`
+  : st.pace === 'on' ? 'Right on pace — keep eating like this.' : '';
+function blockHome() {
+  const st = blockStatus(), { b, an } = st, tests = BLOCK_TESTS.map(([k, l]) => {
+    const list = testLogs(k), before = list.filter(x => x.date < b.start).pop() || null, since = list.filter(x => x.date >= b.start), t = TEST_BY_ID[k];
+    const best = since.length ? bestOf(t, since) : null, base = before ? before.v : b.tests[k] || null;
+    return best || base ? `<div class="log-row"><span class="grow small">${esc(l)}</span><span class="small">${base ? testFmt(t, base) : '–'} → <b>${best ? testFmt(t, best.v) : '–'}</b></span></div>` : '';
+  }).join('');
+  const testWeek = [1, 6, 12].includes(st.w);
+  const ws = S.workouts.filter(x => x.date >= b.start && x.mode === b.where);
+  openSheet('12-week plan', `<div class="stack">
+    <div class="card stack-sm">
+      <div class="spread"><div class="card-title">${st.done ? 'Finished!' : st.notYet ? `Starts ${fmtDate(parseYmd(b.start), { weekday: 'long', month: 'short', day: 'numeric' })}` : `Week ${st.w} of 12 · ${esc(st.phase.name)}`}</div>
+        <span class="badge accent">${esc(an.position)}</span></div>
+      <div class="meter pro"><span style="width:${clamp((Math.min(st.now, 12) / 12) * 100, 0, 100)}%"></span></div>
+      <p class="small text-2">${st.done ? 'You finished all 12 weeks. Retest, compare, and pick what\'s next below.' : st.kind === 'deload' ? 'Lighter week: fewer sets, same weights. Recover and grow.' : st.kind === 'test' ? 'Test week: lighter lifts, then retest everything below.' : esc(st.phase.goal)}</p>
+    </div>
+    <div class="tiles two">
+      <div class="tile"><div class="tile-label">Weight</div><div class="tile-value">${st.cur != null ? fmt(fromLb(st.cur), 1) : '–'}<small> ${S.settings.unit}</small></div><div class="hint">started ${wText(an.a.weightLb)}${st.cur != null ? ` · ${st.cur >= an.a.weightLb ? '+' : ''}${fmt(fromLb(st.cur - an.a.weightLb), 1)}` : ''}</div></div>
+      <div class="tile"><div class="tile-label">Target today</div><div class="tile-value">${fmt(fromLb(st.expect), 1)}<small> ${S.settings.unit}</small></div><div class="hint">goal ${wText(an.weights[12])} by week 12</div></div>
+      <div class="tile"><div class="tile-label">Workouts done</div><div class="tile-value">${ws.length}</div><div class="hint">lifts and hitting days since you started</div></div>
+      <div class="tile"><div class="tile-label">Eat</div><div class="tile-value">${fmt(an.cal)}<small> cal</small></div><div class="hint">${an.pro} g protein a day</div></div>
+    </div>
+    ${st.pace ? `<div class="banner ${st.pace === 'on' ? '' : 'warn'}">${icon(st.pace === 'on' ? 'check' : 'info')}<div>${paceText(st)}</div></div>` : ''}
+    ${st.stale && !st.done ? `<div class="banner">${icon('scale')}<div class="grow">Weigh in 2–3 mornings a week so Dugout can keep you on pace.</div><button class="btn btn-sm btn-primary" data-action="logWeight">Log</button></div>` : ''}
+    ${testWeek && !st.done ? `<div class="banner">${icon('timer')}<div class="grow"><b>Test week.</b> ${st.w === 1 ? 'Set your starting numbers' : st.w === 6 ? 'Halfway check' : 'Final numbers'}: vertical, broad jump, 60, rotational med ball throw, exit velo and bat speed. Warm up fully, best of 2–3.</div><button class="btn btn-sm btn-primary" data-action="logTest">Log</button></div>` : ''}
+    ${tests ? `<div class="card stack-sm"><div class="card-title">Your numbers: start → now</div>${tests}</div>` : ''}
+    <button class="btn btn-primary btn-block" data-action="blockToPlan">${icon('plan', 'sm')} This week's workouts</button>
+    <div class="grid2">
+      <button class="btn btn-ghost" data-action="blockWeeks">${icon('plan', 'sm')} All 12 weeks</button>
+      <button class="btn btn-ghost" data-action="blockAnalysis">${icon('sparkle', 'sm')} My analysis</button>
+    </div>
+    <button class="btn btn-ghost btn-block" data-action="blockChange">${icon('edit', 'sm')} Change my answers</button>
+    ${st.done ? `<button class="btn btn-primary btn-block" data-action="blockAgain">${icon('refresh', 'sm')} Start another 12 weeks</button>` : ''}
+    <button class="btn btn-danger btn-block" data-action="blockEnd">${st.done ? 'Close the plan' : 'End the 12 weeks early'}</button>
+    <p class="hint">Each Monday that week's workouts go into your ${MODES[b.where].label} plan. Edits you make during the week stay until the next week starts.</p>
+  </div>`);
+}
+actions.blockToPlan = () => { closeSheet(); S.tab = 'plan'; S.settings.mode = S.settings.block.where; S.planDay = dayIdx(); saveSettings(); render({ keepScroll: false }); };
+actions.blockAnalysis = () => { blockDraft = null; blockReport(S.settings.block, { started: true }); };
+actions.blockChange = () => { blockDraft = BLOCK.answersOf(S.settings.block); blockForm(); };
+actions.blockAgain = () => { blockDraft = BLOCK.answersOf({ ...S.settings.block, weightLb: latestWeight() != null ? toLb(latestWeight()) : S.settings.block.weightLb, tests: Object.fromEntries(BLOCK_TESTS.map(([k]) => [k, bestTest(k)])), faults: latestSwingFaults(), seed: (S.settings.block.seed || 0) + 1 }); S.settings.block = null; blockForm(); };
+actions.blockEnd = async () => {
+  const st = blockStatus();
+  if (!(await confirmBox(st.done ? 'Close the 12-week plan?' : 'End the 12 weeks early?', S.plan.before ? 'Your plan from before the 12 weeks comes back. Workout history stays.' : 'Your plan stays as it is now. Workout history stays.', { ok: st.done ? 'Close it' : 'End it', danger: !st.done }))) return;
+  if (S.plan.before) { S.plan.gym = S.plan.before.gym; S.plan.home = S.plan.before.home; }
+  delete S.plan.before;
+  S.settings.block = null; blockDraft = null;
+  saveSettings(); savePlan(); closeSheet(); render();
+  toast('12-week plan ended');
+};
+// Changing your answers mid-plan: same start date, this week rebuilt now.
+actions.blockApply = () => {
+  const a = blockDraft, b = S.settings.block;
+  if (!a || !b) return;
+  S.settings.block = { ...a, start: b.start, week: 0 };
+  blockDraft = null;
+  installBlockWeek(true); saveSettings(); savePlan(); render();
+  blockHome();
+  toast('Plan updated — this week is rebuilt');
+};
+
+// Today and Plan: where you are in the 12 weeks.
+function blockCard() {
+  if (!blockOn()) return '';
+  const st = blockStatus();
+  return `<button class="banner as-btn goal-nudge" data-action="block">${icon('sparkle')}<span class="grow"><b>${st.done ? '12 weeks done — see your results' : st.notYet ? '12-week plan starts Monday' : `12-week plan · week ${st.w} · ${esc(st.phase.name)}${st.kind === 'deload' ? ' (lighter)' : st.kind === 'test' ? ' (test week)' : ''}`}</b>
+    ${!st.done && !st.notYet ? `<br><span class="small">Target ${fmt(fromLb(st.expect), 1)} ${S.settings.unit}${st.cur != null ? ` · you ${fmt(fromLb(st.cur), 1)}` : ''}${st.pace === 'behind' ? ' — eat more' : st.pace === 'ahead' ? ' — a bit fast' : ''}</span>` : ''}</span>${icon('right', 'sm')}</button>`;
+}
 
 /* ============================== 8. DIET TAB ============================== */
 
@@ -3739,8 +4092,8 @@ function coachGuideText() {
   if (coachGuide) return coachGuide;
   const L = [`<dugout_app version="${APP_VERSION}">`, `# Where things are
 - Today tab: the date, the Gym / Home switch, today's workout with a Light / Moderate / Heavy switch and Start, the daily check-in (sleep, energy, soreness → a readiness score), food so far against the goals, water, an arm-care card after throwing, this week's summary, and a review of last week (Monday–Wednesday).
-- During a workout: log each set (weight × reps, or time), a rest timer, a form video and how-to for every exercise, next-weight tips, warm-up sets, a plate calculator, exercise swaps, End (save what they did or cancel), then an effort rating (1–10) and notes. Moderate = about ⅔ of the sets starting around 90% of last time's weights; Light = their Light workout (mobility, arm care and core).
-- Plan tab: the 7-day Gym and Home plans and the Light workout — edit any exercise (sets, reps, rest, cues, video link) and reorder; Edit day (rename, quick changes to the whole day: one less/more set, shorter/longer rests; copy or swap days; save the day to My workouts); Build my plan; Presets & custom (make a workout now, presets, My workouts); Programs (their own built plan, or the off-season, pre-season and in-season starting programs); the exercise library.
+- During a workout: log each set (weight × reps, or time), a rest timer, a form video and how-to for every exercise, next-weight tips, warm-up sets, a plate calculator, exercise swaps, a timer for holds that runs both sides, adding a stretch finisher, End (save what they did or cancel), then an effort rating (1–10) and notes. Moderate = about ⅔ of the sets starting around 90% of last time's weights; Light = their Light workout (mobility, arm care and core).
+- Plan tab: the 7-day Gym and Home plans and the Light workout — edit any exercise (sets, reps, rest, cues, video link) and reorder; Edit day (rename, quick changes to the whole day: one less/more set, shorter/longer rests; add an explosive start (a jump and a med ball throw after the warm-up) or a stretch finisher (two holds at the end); copy or swap days; save the day to My workouts); Build my plan; Presets & custom (make a workout now, presets, My workouts); Programs (their own built plan, the starting programs, or one tap to add stretch finishers to every training day); the exercise library.
 - Baseball tab: Drills (by position, alone or with a partner; star drills to build a drill plan; log practice), Swing lab (film one swing from the side, front or back → score, priorities with the numbers behind them, pictures, charts and drills), Games & arm (game log with season stats, speed and power tests, throwing log, a live pitch counter with Pitch Smart rest days, a stopwatch and a practice log).
 - Diet tab: Day (the food log: search the food list, favorites, recent foods, copy yesterday; water), Week (weekly totals), Meals (a daily meal plan for training, rest and game days, the recipe book, a game-day timeline, the week ahead with a shopping list, eating tips), Pantry (scan kitchen photos or tap in food → recipes they can make now, quick plates, recipes one ingredient away, a shopping list, Claude meal ideas).
 - Coach tab: this chat.
@@ -3752,7 +4105,9 @@ function coachGuideText() {
     '- Smaller/lean: an extra set on the big lifts and more muscle-building accessories. Bigger: more mobility and low-impact conditioning, fewer hard landings.',
     '- New lifters: simpler lifts, 3 × 8 with 2–3 reps in the tank. Some experience: sets of 5–6. Experienced: sets of 3–5 with longer rest. Under 13: only simple lifts; under 15: nothing advanced.',
     '- Off-season: lower, upper, speed and total-body days. Pre-season: heavier, lower reps and more sprinting. In-season: two short total-body lifts plus a speed tune-up and mobility.',
+    '- Every lifting day starts with jumps or med ball throws while fresh and ends with 1–2 stretches they hold. Power goal: 3–4 sets of each explosive exercise and, after a few months of lifting, a jump right after the first heavy leg lift. Mobility & flexibility goal: a mobility drill after every warm-up, both finisher stretches and a mobility day.',
     '- Then the least important exercises come off until each workout fits the time they have.');
+  L.push('', '# 12-week plan (Plan → 12-week plan)', 'Add muscle (5–15 lb asked; Dugout caps it at a realistic range for frame, experience, age and season), power, bat speed, speed and flexibility in 12 weeks. Intake: position, bats/throws, age, sex, height, weight, gain target, experience, season, 3–5 lifting days, 45–75 min, gym or home (+ med ball), sore spots (shoulder, elbow, lower back, knees), hitting setup (tee / partner / cage), current tests and Swing lab priorities. Analysis: BMI and frame, realistic gain range and weekly pace, calories (Mifflin × training + a surplus) and macros, weekly weight targets, power/speed gaps vs strong high-school marks. Phases: Build (weeks 1–4, sets of 8–12), Strength (5–8, sets of 5–8 plus a jump after the heavy leg lift), Power (9–12, sets of 4–6, more sprinting and game-speed hitting); weeks 4 and 8 lighter, week 12 a test week. Every lift: a mobility drill, a jump and a rotational med ball throw first, two stretches you hold last. Off days: hitting (drills for the phase and their Swing lab priorities) with mobility and, from week 5, sprints; one rest day with an optional 10-minute stretch. Each week its workouts go into their plan; ending early brings back their old plan. The dashboard (tap the 12-week card) shows the week, weight vs. target, tests start → now.');
   L.push('', '# Presets (Plan → Presets & custom; id: name — category, where, about minutes)', ...BUILDER.PRESETS.map(p => `- ${p.id}: ${p.name} — ${p.cat}, ${p.where === 'any' ? 'gym or home' : p.where}, ~${BUILDER.presetMinutes(p.id)} min${p.pos.length ? `, for ${p.pos.join('/')}` : ''}. ${p.about} (${p.list.map(([n, st, r]) => `${n} ${st}×${r}`).join('; ')})`));
   L.push('', `# Make me a workout (Plan → Presets & custom): pick up to 3 of ${BUILDER.FOCUS.map(x => x[1].toLowerCase()).join(', ')}; 15–60 minutes; gym or home. It fits their Build my plan answers.`);
   L.push('', '# Exercise library (look_up "exercise" for how-tos)', ...EXERCISE_GROUPS.map(([g, list]) => `- ${g}: ${list.join(', ')}`));
@@ -3786,6 +4141,7 @@ function coachContext() {
   L.push(`Training: ${planBuilt() ? `their own plan from Build my plan (${program().name.toLowerCase()} season)` : `${program().name} program`}, ${MODES[st.mode].label.toLowerCase()} plan, workout time ${clockTime(st.workoutTime)}.`);
   L.push(st.athlete ? `Training profile (Build my plan answers): ${BUILDER.summary(BUILDER.profileOf(st.athlete))}, training ${st.athlete.days.map(i => DAYS_SHORT[i]).join('/')}, home equipment: ${BUILDER.label(BUILDER.HOME_EQUIP, st.athlete.homeEquip).toLowerCase()}.`
     : 'Training profile: not set up (position, build, experience and goal are unknown unless they tell you — Plan → Build my plan).');
+  if (blockOn()) { const st = blockStatus(); L.push(`12-week plan: ${st.done ? 'finished' : st.notYet ? `starts ${st.b.start}` : `week ${st.w} of 12 (${st.phase.name}${st.kind !== 'normal' ? `, ${st.kind === 'deload' ? 'lighter week' : 'test week'}` : ''})`}; started at ${wText(st.an.a.weightLb)}, target ${wText(st.an.weights[12])} (+${fmt(fromLb(st.an.target), 1)} ${S.settings.unit}); target today ${wText(st.expect)}${st.cur != null ? `, latest weigh-in ${wText(st.cur)}${st.pace ? ` (${st.pace === 'on' ? 'on pace' : st.pace})` : ''}` : ''}; ${st.an.cal} cal and ${st.an.pro} g protein a day; ${st.b.days.length} lifting days, ${st.b.minutes} min, ${st.b.where}.`); }
   if (savedWorkouts().length) L.push(`My workouts (saved): ${savedWorkouts().slice(0, 15).map(w => `${w.title} (${MODES[w.where].label.toLowerCase()}, ${plural(w.exercises.length, 'exercise')})`).join('; ')}.`);
 
   // Today
@@ -4822,6 +5178,7 @@ const TESTS = [
   { id: 'agility', name: 'Pro agility (5-10-5)', unit: 's', lower: true, hint: 'Best of 2 tries, touching each line.' },
   { id: 'vertical', name: 'Vertical jump', unit: 'in', hint: 'Standing reach to the highest point you touch.' },
   { id: 'broad', name: 'Broad jump', unit: 'in', hint: 'In inches — 8 ft 2 in is 98.' },
+  { id: 'mbthrow', name: 'Rotational med ball throw', unit: 'ft', hint: 'A 6 lb ball thrown side-on for distance, like a swing — best of 3 from your hitting side. Same ball and spot every time.' },
   { id: 'exitvelo', name: 'Exit velocity', unit: 'mph', good: 90, hint: 'Best ball off a tee, measured with a radar or sensor.' },
   { id: 'batspeed', name: 'Bat speed', unit: 'mph', hint: 'Peak bat speed from a swing sensor.' },
   { id: 'throwvelo', name: 'Throwing velocity', unit: 'mph', good: 85, hint: 'Infield or outfield throw, or off the mound.' },
@@ -5981,7 +6338,8 @@ function renderSettings() {
     <div class="section-title">Plan</div>
     <div class="set-list">
       <button class="set-item as-btn" data-action="buildPlan"><div class="grow"><div>Build my plan</div><div class="hint">${st.athlete ? esc(BUILDER.summary(BUILDER.profileOf(st.athlete))) : 'A week made for your position, build, experience and goal'}</div></div>${icon('sparkle')}</button>
-      <button class="set-item as-btn" data-action="programs"><div class="grow"><div>Program: ${esc(planBuilt() ? 'My plan (built for you)' : program().name)}</div><div class="hint">Your own plan, or the off-season, pre-season and in-season plans</div></div>${icon('plan')}</button>
+      <button class="set-item as-btn" data-action="block"><div class="grow"><div>12-week plan</div><div class="hint">${blockOn() ? `Week ${clamp(blockWeekNow(), 1, 12)} of 12 — muscle, power and bat speed` : 'Add muscle, power and bat speed — analyzed for you'}</div></div>${icon('flame')}</button>
+      <button class="set-item as-btn" data-action="programs"><div class="grow"><div>Program: ${esc(planBuilt() ? 'My plan (built for you)' : program().name)}</div><div class="hint">Your own plan, or the off-season, power & speed, pre-season and in-season plans</div></div>${icon('plan')}</button>
       <button class="set-item as-btn" data-action="workouts"><div class="grow"><div>Presets &amp; my workouts</div><div class="hint">${BUILDER.PRESETS.length} ready-made workouts${savedWorkouts().length ? ` · ${plural(savedWorkouts().length, 'saved workout')}` : ''}</div></div>${icon('dumbbell')}</button>
       <button class="set-item as-btn" data-action="resetPlan" data-mode="gym"><div class="grow"><div>Reset Gym plan</div><div class="hint">Back to ${planBuilt() ? 'the gym plan you built' : `the ${esc(program().name)} gym plan`}</div></div>${icon('refresh')}</button>
       <button class="set-item as-btn" data-action="resetPlan" data-mode="home"><div class="grow"><div>Reset Home plan</div><div class="hint">Back to ${planBuilt() ? 'the home plan you built' : `the ${esc(program().name)} home plan`}</div></div>${icon('refresh')}</button>
@@ -6315,10 +6673,21 @@ const HELP = [
   ['Arm care and pitch counts', ['Log every throwing session with how your arm feels. Big week-to-week jumps in throwing are a common cause of arm trouble.',
     'During games use the pitch counter: it shows your Pitch Smart limit for your age and the rest days you\'ll need. Your league\'s rules come first.',
     'Soreness that fades in a day is normal. Pain, numbness or pain that lingers is not — stop throwing and tell a coach, athletic trainer or doctor.']],
+  ['12-week plan: muscle, power and bat speed', ['Plan → 12-week plan: answer questions about your position, size, experience, schedule, hitting setup and numbers. Dugout analyzes them — how much weight is realistic for you, what to eat, your weekly weight targets and what needs the most work — then builds 12 weeks.',
+    'Weeks 1–4 build muscle (sets of 8–12), 5–8 build strength (5–8 reps, jumps after heavy leg lifts), 9–12 turn it into power and speed. Weeks 4 and 8 are lighter; week 12 is a test week.',
+    'Every lift starts with a mobility drill, a jump and a rotational med ball throw, and ends with stretches. Off days are hitting sessions with drills for your Swing lab priorities, mobility and sprints.',
+    'Each Monday that week\'s workouts go into your plan. Tap the 12-week card on Today or Plan to see where you are, whether your weight is on pace, and your test numbers start → now.',
+    'Weigh in 2–3 mornings a week. Behind for 2 weeks? Add about 250 calories a day. End early any time and your old plan comes back.']],
+  ['Explosive power and flexibility', ['Jumps, med ball throws and sprints go first in a workout, right after the warm-up, while you\'re fresh. Every rep all-out with full rest — if your jumps get lower or sprints slower, stop for the day.',
+    'Plan → Programs → Power & speed block is 4–6 off-season weeks built to make you more explosive: heavy lifts followed by jumps, rotational throws, a sprint day and a long flexibility day.',
+    'Plan → Edit day → Explosive start adds a jump and a throw after the warm-up; Stretch finisher adds two stretches you hold at the end. Programs → Stretch finishers adds them to every training day at once.',
+    'For stretches like "45 sec/side", tap the timer in the workout: it times one side, beeps, gives you 5 seconds to switch and times the other.',
+    'Stretch after you train or on recovery days, not right before sprinting — warm up by moving instead. You should feel a stretch, never pain.',
+    'Track it: log your vertical jump, broad jump and rotational med ball throw (Baseball → Games & arm → Tests) every 4–6 weeks.']],
   ['Build my plan', ['Plan → Build my plan: answer a few questions — position, build, lifting experience, main goal, the part of the season, the days you train, how long you have and what you have at home — and Dugout builds a gym week, a home week and a Light workout made for you.',
     'Pitchers get arm care in every lift and no overhead pressing; catchers get hip, groin and leg strength for the crouch; infielders get side-to-side quickness; outfielders get sprint speed and healthy hamstrings. Smaller players get more muscle-building work, bigger players more mobility and easier landings, and newer lifters simpler lifts.',
     'Look it over first (switch Gym and Home, tap a day to see its exercises). Mix it up picks different exercises for the same plan. After you use it, every day is still yours to edit, and resets go back to the plan you built.']],
-  ['Presets and your own workouts', ['Plan → Presets & custom has ready-made workouts — pitcher arm care, catcher legs, infield agility, outfield speed, bat speed, a 20-minute workout, a hotel-room workout, a game-day primer, post-game recovery and more.',
+  ['Presets and your own workouts', ['Plan → Presets & custom has ready-made workouts — pitcher arm care, catcher legs, infield agility, outfield speed, bat speed, explosive legs, rotational throws, flexibility and daily stretching, a 20-minute workout, a hotel-room workout, a game-day primer, post-game recovery and more.',
     'Make me a workout: pick up to 3 things to work on (lower body, speed, arm care, core…), how long you have and gym or home, and it puts one together. Mix it up for different exercises.',
     'Any workout can start right now (your plan doesn\'t change), go on a day of your plan (replace the day or add to it), or be saved to My workouts. Save any day of your plan too: Plan → Edit day → Save a copy to My workouts.',
     'Edit day also has quick changes for the whole day — one less or one more set, shorter or longer rests — and can swap two days.']],
@@ -6399,6 +6768,7 @@ function cleanSettings(st) {
   out.pantry = cleanPantry(out.pantry);
   out.athlete = isObj(out.athlete) ? { ...BUILDER.profileOf(out.athlete), built: !!out.athlete.built } : null;
   if (out.athlete && out.athlete.pos === 'none') out.athlete = null;
+  out.block = isObj(out.block) && /^\d{4}-\d{2}-\d{2}$/.test(out.block.start || '') ? { ...BLOCK.answersOf(out.block), start: out.block.start, week: Number(out.block.week) || 0 } : null;
   return out;
 }
 function cleanExerciseData(e) {
@@ -6431,6 +6801,10 @@ function cleanPlan(plan) {
     } : fresh[mode];
   }
   out.saved = cleanSaved(plan.saved);                     // My workouts (added in 2.5)
+  if (isObj(plan.before) && ['gym', 'home'].every(m => Array.isArray(plan.before[m]) && plan.before[m].length === 7)) {   // your plan from before the 12 weeks (2.6)
+    const b = cleanPlan({ gym: plan.before.gym, home: plan.before.home });
+    if (b) out.before = { gym: b.gym, home: b.home };
+  }
   return out;
 }
 const cleanWorkout = w => {
@@ -6532,7 +6906,7 @@ async function boot() {
       if (c) c.textContent = clock((Date.now() - S.active.startedAt) / 1000);
     }
     if (ticks % 30) return;
-    if (rollDay()) stale = true;
+    if (rollDay()) { stale = true; checkBlockWeek(); }
     if (S.active || $('#sheet-root').classList.contains('open')) return;
     if (stale) { stale = false; render(); return; }
     if (S.tab === 'today') {
@@ -6645,6 +7019,7 @@ async function openApp(newUsername) {
   if (newUsername) { S.settings.username = newUsername; await DB.set('settings', S.settings); }
   rollDay(true);
   S.locked = false;
+  checkBlockWeek();                                            // a new week of the 12-week plan?
   S.tab = 'today';
   render({ keepScroll: false });
   if (S.active) keepAwake(true);
@@ -6657,13 +7032,23 @@ async function openApp(newUsername) {
 }
 
 // ----- What's new (shown once after an update to people who already use the app) -----
-const WHATS_NEW = '2.5';
+const WHATS_NEW = '2.6';
 function whatsNew() {
   const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
-  openSheet("What's new in Dugout 2.5", `
+  openSheet("What's new in Dugout 2.6", `
+    ${item('flame', 'More explosive', 'Every starting lift now opens with jumps or med ball throws while you\'re fresh. New: pogo hops, squat jumps, seated box jumps, hurdle hops, depth jumps, trap bar jumps, rotational shot puts, step-behind throws, backward tosses, wall drives, falling starts and flying sprints — each with a form video. Plus a Power & speed block program, explosive presets and a rotational med ball throw test.')}
+    ${item('refresh', 'Flexibility everywhere', 'Every training day ends with 1–2 stretches you hold, the mobility day is now a full Flexibility & Mobility day, and there are 13 new mobility drills and stretches, a Stretching option in Make me a workout and five flexibility presets (including a 10-minute daily stretch). The timer for "45 sec/side" holds now does both sides.')}
+    ${item('sparkle', '12-week plan: muscle, power & bat speed', 'Plan → 12-week plan: tell Dugout your position, size, experience, schedule and numbers, get an analysis (what\'s realistic, what to eat, weekly weight targets) and 12 weeks of lifting, hitting, speed and flexibility built from it — with a dashboard to keep you on pace.')}
+    ${item('plan', 'Keep your plan, add the new stuff', 'Your plan wasn\'t changed. Tap below to add stretch finishers to it, or use Plan → Edit day → Explosive start / Stretch finisher one day at a time. To get the whole new version, switch programs or rebuild your plan.')}
+    <div class="grid2">
+      <button class="btn btn-primary" data-action="addFinishersAll">Add stretch finishers</button>
+      <button class="btn btn-ghost" data-action="${planBuilt() ? 'buildPlan' : 'programs'}">${planBuilt() ? 'Rebuild my plan' : 'See the programs'}</button>
+    </div>
+    <details class="table-toggle"><summary>New in 2.5</summary><div class="stack-sm">
     ${item('sparkle', 'Build my plan', 'Plan → Build my plan: tell Dugout your position, build, lifting experience, goal, season, training days and time, and it builds a week of gym and home workouts made for you.')}
     ${item('dumbbell', 'Presets and your own workouts', 'Plan → Presets & custom: ready-made workouts for every position, speed, bat speed, travel, game day and recovery — or make one to order in seconds. Start it now, save it, or put it on a day.')}
     ${item('edit', 'Easier plan changes', 'Edit day now has quick changes (one less or more set, shorter or longer rests), swapping two days and saving a day to My workouts. The Coach can build you a workout too.')}
+    </div></details>
     <details class="table-toggle"><summary>New in 2.4</summary><div class="stack-sm">
     ${item('coach', 'Coach', 'A new Coach tab: chat with an AI coach that knows your plan, workouts, food, check-ins, goals and baseball logs. Ask what to eat, how hard to train, why a lift stalled or how to fix your swing — it can log food, fill your shopping list or change today\'s workout with one tap. Needs your own Anthropic API key (Settings → Claude AI).')}
     </div></details>
@@ -6769,7 +7154,7 @@ async function lockApp(message) {
   panJob = null; panFound = null;
   if (coachJob) coachJob.ac.abort();                 // and a Coach reply
   coachJob = null;
-  buildDraft = null; quickDraft = null; shownWo = null;  // and a half-built plan or workout
+  buildDraft = null; quickDraft = null; shownWo = null; blockDraft = null;  // and a half-built plan or workout
   Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null, swingOpen: null, coach: null, coachDraft: '' });
   render();
   if (message) toast(message);
