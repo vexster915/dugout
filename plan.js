@@ -174,7 +174,13 @@ const VIDEOS = {
   "Carioca": "https://www.youtube.com/watch?v=CMeuCmzKf84", // StrengthRunning — Carioca Running Form Drill Demonstration
   "Easy cardio (bike or jog)": "https://www.youtube.com/watch?v=Mh5oNMDCucQ", // The Movement System — How to Train with Heart Rate Zones
   "Hill sprints": "https://www.youtube.com/watch?v=-lMeXFoWSOQ", // Trainwright Performance — Hill Sprints for Developing Acceleration
-  "Shuffle-to-sprint": "https://www.youtube.com/watch?v=Vu-2wL-dt7Q" // Simple Speed Coach — Lateral Shuffle to Sprint
+  "Shuffle-to-sprint": "https://www.youtube.com/watch?v=Vu-2wL-dt7Q", // Simple Speed Coach — Lateral Shuffle to Sprint
+
+  // Throwing program (added in 2.6)
+  "Long toss: extension": "https://www.youtube.com/watch?v=T5bQXpGpjYs", // Jaeger Sports — Long Toss Demonstration (Stretching Out & Pulling Down)
+  "Long toss: pull-downs": "https://www.youtube.com/watch?v=P8-9V0utUko", // RobbyRow12 — Robby Rowland's 400ft Long Toss with Pull Downs
+  "Max-intent crow-hop throws": "https://www.youtube.com/watch?v=I82azUpnqeE", // Summers Method — Throw Harder From the Outfield
+  "Recovery catch": "https://www.youtube.com/watch?v=bDEXVfchUGg" // ARM Pitching Development — Arm Cooldown and Recovery Drills For Baseball Throwers
 };
 
 // The first time an exercise is written out below, it's remembered so like() can reuse its cues anywhere after.
@@ -225,6 +231,12 @@ const CATALOG = [
   ex("L-drill (3-cone)", 4, "1", 90, "time", "Cones in an L, 5 yards apart: sprint, touch, back, around the middle cone and weave the corner. Stay low on every turn. Log your time."),
   ex("Carioca", 2, "20 yd each way", 30, "check", "Hips turn side to side as the back leg crosses in front, then behind. Quick feet, shoulders facing sideways."),
 
+  /* ----- Throwing (position players: throw harder) ----- */
+  ex("Long toss: extension", 1, "out to 150 ft", 0, "check", "Back up a few steps every couple of throws, with an arc on the ball and a long, loose arm, until you reach your max comfortable distance. Hold it for 4–6 throws."),
+  ex("Long toss: pull-downs", 1, "10 throws", 0, "check", "Walk back in a few steps after each throw, throwing harder and on a line as you get closer. Aim chest-high to your partner."),
+  ex("Max-intent crow-hop throws", 1, "8 throws", 0, "check", "Crow hop and throw as hard as you can on a line to a partner or net 60–90 ft away. Full rest (about a minute) between throws. Stop if your arm feels off."),
+  ex("Recovery catch", 1, "25 easy throws", 0, "check", "Easy catch at 60–90 ft, about 50% effort with good mechanics. Your arm should feel better when you finish."),
+
   /* ----- Conditioning: baseball cardio ----- */
   ex("Repeat 30-yard sprints", 2, "6 × 30 yd", 180, "check", "Baseball conditioning: a 30-yard sprint every 30 seconds, 6 in a row, then 3 minutes off. Keeps you just as fast in the 7th inning."),
   ex("Tempo runs", 6, "100 yd", 45, "check", "About 70% speed — smooth and relaxed, breathing hard but in control. Walk back to the start and go again."),
@@ -251,6 +263,9 @@ const CATALOG = [
   ex("Bulgarian split squat", 3, "8/leg", 90, "weight", "Back foot on the bench, lower straight down, drive through the front foot."),
   ex("Med ball chest pass", 3, "6", 60, "reps", "Step and throw the ball into the wall as hard as you can."),
   ex("Bear crawl", 3, "15 yd", 45, "check", "Knees an inch off the floor, opposite hand and foot move together."),
+  ex("Band 90/90 external rotation", 2, "12/arm", 30, "reps", "Elbow at shoulder height, rotate up slowly, control it back."),
+  ex("Band pull-aparts", 3, "15", 30, "reps", "Straight arms, pull the band to your chest, squeeze your shoulder blades."),
+  ex("Scap push-ups", 2, "12", 30, "reps", "Arms stay straight — only your shoulder blades move."),
 
   /* ----- From the earlier starting week (still in Build my plan, the presets and the library) ----- */
   ex("Seated leg curl", 3, "10", 60, "weight", "Pull heels down and back, squeeze 1 second, take 3 seconds on the way up."),

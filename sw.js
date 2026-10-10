@@ -24,6 +24,7 @@ const FILES = [
   './drills.js',
   './block.js',
   './move.js',
+  './throw.js',
   './swing.js',
   './pantry.js',
   './ai.js',

@@ -850,6 +850,32 @@ const EXERCISE_INFO = {
     mistakes: ["Shrugging up to your ears", "Rushing the breaths"],
     easier: "Knees wider", harder: "Rest your hands on a low bench", swap: ["Lat stretch on rack", "Cat-cow + deep breathing"]
   },
+  /* ---------- Throwing program (added in 2.6) ---------- */
+  "Long toss: extension": {
+    muscles: "Shoulder, upper back, whole throwing chain", why: "Stretching your throws out with an arc builds arm strength and a long, loose arm path — the base of a stronger throw from anywhere on the field.",
+    steps: ["Finish catch play first; your arm should be warm and loose.", "Back up a few steps every 2–3 throws, putting an arc on the ball.", "Keep a long, relaxed arm and use your legs — crow hop or shuffle into every throw.", "Stop at your max comfortable distance (the ball still gets there with good form) and hold it for 4–6 throws."],
+    mistakes: ["Muscling throws at a distance you can't reach yet", "Going farther every session — add distance over weeks", "Long tossing with a sore arm"],
+    easier: "Stop 30 feet short of your max", harder: "Add 10–15 feet only when your max feels easy", swap: ["Recovery catch"]
+  },
+  "Long toss: pull-downs": {
+    muscles: "Shoulder, core, legs", why: "Coming back in and throwing on a line with more intent turns the arm strength from long toss into a harder, flatter throw.",
+    steps: ["Start from your long toss distance.", "Walk in a few steps after each throw.", "Throw on a line, chest-high, a little harder each time as you get closer.", "Finish around 60 feet with your hardest, most accurate throws."],
+    mistakes: ["Throwing harder with only your arm instead of your legs and hips", "Missing your partner — accuracy still counts"],
+    easier: "Fewer throws, less intent", harder: "A crow hop into each throw", swap: ["Max-intent crow-hop throws"]
+  },
+  "Max-intent crow-hop throws": {
+    muscles: "Legs, hips, core, shoulder", why: "You throw as hard as you practice throwing. A few all-out throws with full rest teach your body to produce velocity — the same throw as cutting down a runner.",
+    steps: ["Warm up fully: catch play and some long toss first.", "Set up 60–90 feet from a partner or a big net.", "Crow hop and throw as hard as you can on a line, with your whole body.", "Rest about a minute between throws. Use a radar if you have one."],
+    mistakes: ["Doing them on a sore or tired arm", "Too many — quality goes down and risk goes up", "Skipping the warm-up"],
+    easier: "Fewer throws at 90% effort", harder: "A couple more throws, never more than about 12", swap: ["Long toss: pull-downs"]
+  },
+  "Recovery catch": {
+    muscles: "Shoulder, arm", why: "Easy throwing the day after a hard day moves blood through the arm and keeps your throwing motion smooth.",
+    steps: ["Start at 30–45 feet with easy throws.", "Move out to 60–90 feet.", "Stay at about 50% effort with good mechanics.", "Stop after about 25 throws — you should feel looser, not tired."],
+    mistakes: ["Turning it into a hard session", "Throwing through pain"],
+    easier: "Shorter distance", harder: "Add some easy footwork (crow hop or shuffle) into each throw", swap: ["Long toss: extension"]
+  },
+
   /* ---------- Conditioning and agility for the mobility plan (added in 2.6) ---------- */
   "Hill sprints": {
     muscles: "Glutes, calves, hip flexors", why: "The hill forces a good forward lean and powerful push-off — acceleration work that's kind to your hamstrings.",
@@ -933,6 +959,7 @@ const EXERCISE_GROUPS = [
   ["Core & rotation", ["Pallof press", "Hanging knee raises", "Bear crawl", "Suitcase carry", "Cable woodchop (high to low)", "Landmine rotations", "Ab wheel rollouts", "Plank shoulder taps", "Dead bugs", "Russian twists (backpack)",
     "Superman hold", "Side plank hip dips", "Hollow body hold", "Copenhagen plank", "Copenhagen plank (couch)"]],
   ["Speed & agility", ["A-skips & B-skips", "Carioca", "Wall drives", "Falling starts", "Flying sprints", "Hill sprints", "Base-running turns", "Shuffle-to-sprint", "L-drill (3-cone)", "Agility ladder drills", "Pro agility shuttle (5-10-5)", "5-10-5 shuttle", "Sled push", "Lateral skater bounds", "Base-stealing starts (crossover)", "Crossover sprint starts", "Drop-step sprints", "Line hops", "Lateral shuffles"]],
+  ["Throwing (throw harder)", ["Long toss: extension", "Long toss: pull-downs", "Max-intent crow-hop throws", "Recovery catch"]],
   ["Conditioning (cardio)", ["Repeat 30-yard sprints", "Tempo runs", "Bike intervals", "Jump rope", "Easy cardio (bike or jog)"]],
   ["Mobility (moving)", ["Inchworms", "90/90 hip switches", "World's greatest stretch", "Hip CARs", "Shoulder CARs", "Cossack squats", "Hip airplanes", "Banded lateral walks", "Thoracic open books", "Thread the needle",
     "Band pass-throughs", "Knee-to-wall ankle mobility", "Cat-cow + deep breathing"]],

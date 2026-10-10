@@ -252,6 +252,8 @@ const DEFAULT_SETTINGS = {
   bats: 'R',              // which side you hit from (Swing lab)
   pantry: null,           // Diet → Pantry: the food in your kitchen, shopping list and Claude's ideas (see section 8b)
   athlete: null,          // Build my plan answers: { pos, build, exp, goal, season, days, minutes, homeEquip, seed, built } (section 7b)
+  throw: null,            // the throwing program: your answers (throw.js) + { start: Monday of week 1 } (section 7e)
+  combo: null,            // the complete player plan (all three, long term): { start, cycle } (section 7f)
   move: null,             // the mobility plan: your answers (move.js) + { start: Monday of week 1 } (section 7d)
   block: null,            // the 12-week plan: your answers (block.js) + { start: Monday of week 1, week: the week in your plan } (section 7c)
   aiKey: ''               // your own Anthropic API key (optional; never put in backups)
@@ -557,17 +559,20 @@ function renderToday() {
   if (S.active) return renderWorkout();
   const now = new Date();
   const di = dayIdx(now);
-  const doneToday = S.workouts.find(w => w.date === ymd(now) && w.mode === S.settings.mode && !isMoveWorkout(w));
+  const doneToday = S.workouts.find(w => w.date === ymd(now) && w.mode === S.settings.mode && !isSideWorkout(w));
   return `<div class="page">
     <div class="page-head"><div>
       <div class="eyebrow">${fmtDate(now, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
       <h1 class="page-title">Today</h1>
     </div></div>
     ${modeToggle()}
+    ${comboCard()}
     ${blockCard()}
+    ${todayOrderCard()}
     ${installBanner()}
     ${backupBanner()}
     ${weekReview()}
+    ${throwCard()}
     ${todayCard(dayPlan(di), di, doneToday)}
     ${moveCard()}
     ${checkinCard()}
@@ -769,7 +774,7 @@ function weekCard() {
   let count = 0;
   const cells = DAYS_SHORT.map((d, i) => {
     const key = ymd(addDays(start, i));
-    const done = S.workouts.some(w => w.date === key && w.mode === mode && !isMoveWorkout(w));
+    const done = S.workouts.some(w => w.date === key && w.mode === mode && !isSideWorkout(w));
     if (done) count++;
     const rest = dayPlan(i).type === 'rest';
     return `<div class="wd ${done ? 'done' : ''} ${i === today ? 'today' : ''} ${rest ? 'rest' : ''}" aria-label="${DAYS[i]}${done ? ', done' : ''}">
@@ -1275,6 +1280,7 @@ async function endWorkout(keep) {
     // Forgot to tap Finish? End the workout a minute after your last checked set instead of now.
     if (a.lastAt && a.finishedAt - a.lastAt > 3 * 3600000) a.finishedAt = a.lastAt + 60000;
     prs = findPRs(a);
+    if (a.src === 'throw') logThrowSession(a);           // into the throwing log (arm feel on the summary)
     S.workouts.unshift(a);
     await save(() => DB.put('workouts', a));
   }
@@ -1321,6 +1327,7 @@ function showSummary(w, prs) {
       <div class="tile"><div class="tile-label">Volume</div><div class="tile-value">${vol ? `${fmtK(vol)} <small>${S.settings.unit}</small>` : '–'}</div></div>
     </div>
     ${prs.length ? `<div class="card stack-sm"><div class="card-title row">${icon('trophy')} New personal records</div>${prs.map(p => `<div class="small text-2">${esc(p)}</div>`).join('')}</div>` : ''}
+    ${throwFeelBlock(w)}
     ${effortBlock(w)}
     <p class="text-2 small">Saved to your history on the Progress tab.</p>
     <button class="btn btn-ghost btn-block" data-action="shareWorkout" data-id="${w.id}" data-external>${icon('share', 'sm')} Share this workout</button>
@@ -1719,6 +1726,8 @@ function renderPlan() {
       <button class="btn btn-ghost" data-action="buildPlan">${icon('sparkle', 'sm')} Build my plan</button>
       <button class="btn btn-ghost" data-action="workouts">${icon('dumbbell', 'sm')} Presets &amp; custom</button>
     </div>
+    ${comboOn() ? comboCard() : `<button class="banner as-btn goal-nudge" data-action="combo">${icon('sparkle')}<span class="grow"><b>Complete player plan: lift, throw, move.</b> The 12-week plan, mobility and a throwing program together, year-round — none cut down for the others.</span>${icon('right', 'sm')}</button>`}
+    ${throwOn() ? `<button class="banner as-btn goal-nudge" data-action="throwPlan">${icon('baseball')}<span class="grow"><b>Throwing program${throwWeekNow() >= 1 ? ` · week ${THROW.cycleWeek(throwWeekNow())}` : ' starts Monday'}</b> · throw harder from the field</span>${icon('right', 'sm')}</button>` : `<button class="banner as-btn goal-nudge" data-action="throwPlan">${icon('baseball')}<span class="grow"><b>Throwing program: throw harder.</b> Long toss, pull-downs and max-intent throws for position players — not pitching.</span>${icon('right', 'sm')}</button>`}
     ${moveOn() ? `<button class="banner as-btn goal-nudge" data-action="move">${icon('timer')}<span class="grow"><b>Mobility plan${moveWeekNow() >= 1 ? ` · week ${MOVE.waveWeek(moveWeekNow())}` : ' starts Monday'}</b> · agility, sprints, stretching, conditioning</span>${icon('right', 'sm')}</button>` : `<button class="banner as-btn goal-nudge" data-action="move">${icon('timer')}<span class="grow"><b>Mobility plan: agility, sprints, stretching &amp; conditioning.</b> Runs next to your lifting${blockOn() ? ' and fits around your 12 weeks' : ''}.</span>${icon('right', 'sm')}</button>`}
     ${blockOn() ? blockCard() : `<button class="banner as-btn goal-nudge" data-action="block">${icon('flame')}<span class="grow"><b>12-week plan: muscle, power &amp; bat speed.</b> Add 5–15 lb, hit harder and move better — built from your size, position and numbers.</span>${icon('right', 'sm')}</button>`}
     <div class="days">${chips}</div>
@@ -1790,6 +1799,16 @@ actions.programs = () => openSheet('Programs', `<div class="stack">
     <div class="card-title">${icon('refresh', 'sm')} Stretch finishers</div>
     <p class="text-2 small">Keep your plan and your edits — just add 1–2 stretches you hold to the end of every training day that doesn't have them. Or add one day at a time in Plan → Edit day.</p>
     <button class="btn btn-ghost btn-block" data-action="addFinishersAll">Add to my plan</button>
+  </div>
+  <div class="card stack-sm program ${comboOn() ? 'current' : ''}">
+    <div class="spread"><div class="card-title">${icon('sparkle', 'sm')} Complete player plan</div><span class="badge ${comboOn() ? 'accent' : ''}">${comboOn() ? `Cycle ${S.settings.combo.cycle}` : 'All three, long term'}</span></div>
+    <p class="text-2 small">The 12-week plan, the mobility plan and the throwing program together, from one set of questions — each keeps its full sessions, and a new cycle starts every 12 weeks.</p>
+    <button class="btn ${comboOn() ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="combo">${comboOn() ? 'Open it' : 'Analyze me and build it'}</button>
+  </div>
+  <div class="card stack-sm program ${throwOn() ? 'current' : ''}">
+    <div class="spread"><div class="card-title">${icon('baseball', 'sm')} Throwing program</div><span class="badge ${throwOn() ? 'accent' : ''}">${throwOn() ? 'On' : 'Runs alongside'}</span></div>
+    <p class="text-2 small">Throw harder from the outfield and infield (not pitching): ramp-up, long toss, pull-downs, max-intent and position throws in 12-week cycles, with arm care every session.</p>
+    <button class="btn btn-ghost btn-block" data-action="throwPlan">${throwOn() ? 'Open the throwing program' : 'Set it up'}</button>
   </div>
   <div class="card stack-sm program ${moveOn() ? 'current' : ''}">
     <div class="spread"><div class="card-title">${icon('timer', 'sm')} Mobility plan</div><span class="badge ${moveOn() ? 'accent' : ''}">${moveOn() ? 'On' : 'Runs alongside'}</span></div>
@@ -2301,12 +2320,11 @@ function blockDefaults() {
 let blockDraft = null;     // answers being looked at (before you start, or when you change them)
 actions.block = () => { blockDraft = null; if (blockOn()) blockHome(); else blockForm(); };
 actions.blockForm = () => blockForm();
-function blockForm() {
-  const a = blockDraft || blockDefaults(), kg = kgUnits();
-  const numIn = (name, label, v, ph = '') => `<label class="field"><span>${label}</span><input name="${name}" inputmode="decimal" value="${v == null ? '' : esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
-  openSheet('12-week plan', `<form class="form" novalidate data-submit="blockAnalyze">
-    <p class="text-2 small">Add muscle, power and bat speed in 12 weeks. Answer everything you can — Dugout uses each answer to work out what's realistic for you, what to eat and which workouts fit you best.</p>
-    <div class="section-title">You</div>
+const numIn = (name, label, v, ph = '') => `<label class="field"><span>${label}</span><input name="${name}" inputmode="decimal" value="${v == null ? '' : esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
+// The 12-week questions (also the first part of the combined plan's form).
+function blockFields(a) {
+  const kg = kgUnits();
+  return `    <div class="section-title">You</div>
     <div class="field"><span>Position</span>${pickRows('pos', BUILDER.POSITIONS, a.pos)}</div>
     <div class="form-grid">
       <div class="field"><span>Bats</span>${choice('bats', [['R', 'Right'], ['L', 'Left'], ['S', 'Switch']], a.bats)}</div>
@@ -2338,33 +2356,43 @@ function blockForm() {
     <p class="hint">${a.faults.length ? `Your latest Swing lab priorities (${esc(a.faults.map(swFaultName).join(', ').toLowerCase())}) pick the first drills.` : 'Tip: film a swing in Baseball → Swing lab first, and the hitting days start with drills for what it finds.'}</p>
     <div class="section-title">Your numbers now <small class="muted">optional</small></div>
     <div class="form-grid">${BLOCK_TESTS.map(([k, l]) => numIn(`t_${k}`, l, a.tests[k], '–')).join('')}</div>
-    <p class="hint">Filled in from your best Baseball tests. They decide what gets extra work, and week 12 shows how much you gained.</p>
+    <p class="hint">Filled in from your best Baseball tests. They decide what gets extra work, and week 12 shows how much you gained.</p>`;
+}
+function blockForm() {
+  const a = blockDraft || blockDefaults();
+  openSheet('12-week plan', `<form class="form" novalidate data-submit="blockAnalyze">
+    <p class="text-2 small">Add muscle, power and bat speed in 12 weeks. Answer everything you can — Dugout uses each answer to work out what's realistic for you, what to eat and which workouts fit you best.</p>
+    ${blockFields(a)}
     <button class="btn btn-primary btn-xl" type="submit">${icon('sparkle', 'sm')} Analyze me</button>
   </form>`);
 }
-submits.blockAnalyze = f => {
-  const d = formData(f), days = DAYS.map((_, i) => i).filter(i => d[`day_${i}`]), kg = kgUnits();
-  if (days.length < 3 || days.length > 5) { toast('Pick 3, 4 or 5 lifting days'); return; }
+// Form answers → 12-week answers, or a message saying what's missing.
+function parseBlock(d) {
+  const days = DAYS.map((_, i) => i).filter(i => d[`day_${i}`]), kg = kgUnits();
+  if (days.length < 3 || days.length > 5) return 'Pick 3, 4 or 5 lifting days';
   const age = num(d.age), weight = num(d.weight), heightIn = kg ? num(d.cm) / 2.54 : (num(d.ft) || 0) * 12 + (num(d.inch) || 0);
-  if (!(age >= 12 && age <= 25)) { toast('Enter your age (12–25)'); return; }
-  if (!(heightIn >= 54 && heightIn <= 84)) { toast(kg ? 'Enter your height in cm' : 'Enter your height in feet and inches'); return; }
+  if (!(age >= 12 && age <= 25)) return 'Enter your age (12–25)';
+  if (!(heightIn >= 54 && heightIn <= 84)) return kg ? 'Enter your height in cm' : 'Enter your height in feet and inches';
   const lb = weight != null ? toLb(weight) : null;
-  if (!(lb >= 80 && lb <= 330)) { toast(`Enter your weight in ${S.settings.unit}`); return; }
+  if (!(lb >= 80 && lb <= 330)) return `Enter your weight in ${S.settings.unit}`;
   const tests = Object.fromEntries(BLOCK_TESTS.map(([k]) => [k, num(d[`t_${k}`])]));
   const old = blockDraft || S.settings.block || {};
-  blockDraft = BLOCK.answersOf({ ...old, pos: d.pos, bats: d.bats, throws: d.throws, age, sex: d.sex, heightIn: Math.round(heightIn * 10) / 10, weightLb: Math.round(lb * 10) / 10,
+  return BLOCK.answersOf({ ...old, pos: d.pos, bats: d.bats, throws: d.throws, age, sex: d.sex, heightIn: Math.round(heightIn * 10) / 10, weightLb: Math.round(lb * 10) / 10,
     gain: Number(d.gain), exp: d.exp, season: d.season, days, minutes: Number(d.minutes), where: d.where, homeEquip: d.homeEquip, medball: !!d.medball,
     sore: BLOCK.SORE.map(([k]) => k).filter(k => d[`sore_${k}`]), hits: d.hits !== 'no', setup: d.setup, tests, faults: latestSwingFaults() });
+}
+submits.blockAnalyze = f => {
+  const a = parseBlock(formData(f));
+  if (typeof a === 'string') { toast(a); return; }
+  blockDraft = a;
   blockReport(blockDraft);
 };
 
 // The analysis: what's realistic, what to eat, how the 12 weeks go — and Start.
-function blockReport(a, { started = false } = {}) {
-  const an = BLOCK.analyze(a), tile = (label, v, sub) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${v}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
-  const sec = (title, ic, list) => `<div class="card stack-sm"><div class="card-title row">${icon(ic, 'sm')} ${title}</div><ul class="steps">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
-  const monday = ymd(weekStart()), next = ymd(addDays(weekStart(), 7)), late = dayIdx() >= 3;
-  openSheet(started ? 'Your analysis' : 'Your 12-week analysis', `<div class="stack">
-    <div class="small muted">${esc(an.position)} · ${esc(BLOCK.fmtHeight(an.a.heightIn))} · ${wText(an.a.weightLb)} · age ${an.a.age} · ${esc(BUILDER.label(BUILDER.EXPERIENCE, an.a.exp).toLowerCase())}</div>
+const reportSec = (title, ic, list) => `<div class="card stack-sm"><div class="card-title row">${icon(ic, 'sm')} ${title}</div><ul class="steps">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+function blockAnalysisHtml(a) {
+  const an = BLOCK.analyze(a), tile = (label, v, sub) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value">${v}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`, sec = reportSec;
+  return `    <div class="small muted">${esc(an.position)} · ${esc(BLOCK.fmtHeight(an.a.heightIn))} · ${wText(an.a.weightLb)} · age ${an.a.age} · ${esc(BUILDER.label(BUILDER.EXPERIENCE, an.a.exp).toLowerCase())}</div>
     <div class="tiles two">
       ${tile('12-week target', `+${fmt(fromLb(an.target), 1)}<small> ${S.settings.unit}</small>`, `${wText(an.a.weightLb)} → ${wText(an.weights[12])}`)}
       ${tile('Realistic range', `${fmt(fromLb(an.range[0]), 0)}–${fmt(fromLb(an.range[1]), 0)}<small> ${S.settings.unit}</small>`, `about ${fmt(fromLb(an.pace), 2)} ${S.settings.unit} a week`)}
@@ -2383,7 +2411,13 @@ function blockReport(a, { started = false } = {}) {
       <div class="small text-2">Weeks 4 and 8 are lighter so you recover and grow. Week 12 is a test week.</div>
       <button class="btn btn-ghost btn-block" data-action="blockWeeks">${icon('plan', 'sm')} See every week's workouts</button></div>
     <details class="table-toggle"><summary>Weight targets week by week</summary><table class="table"><thead><tr><th>Week</th><th>Target</th></tr></thead>
-      <tbody>${an.weights.map((w, k) => `<tr><td>${k ? `End of week ${k}` : 'Start'}</td><td>${wText(w)}</td></tr>`).join('')}</tbody></table></details>
+      <tbody>${an.weights.map((w, k) => `<tr><td>${k ? `End of week ${k}` : 'Start'}</td><td>${wText(w)}</td></tr>`).join('')}</tbody></table></details>`;
+}
+function blockReport(a, { started = false } = {}) {
+  const an = BLOCK.analyze(a);
+  const monday = ymd(weekStart()), next = ymd(addDays(weekStart(), 7)), late = dayIdx() >= 3;
+  openSheet(started ? 'Your analysis' : 'Your 12-week analysis', `<div class="stack">
+    ${blockAnalysisHtml(a)}
     ${started ? `<button class="btn btn-ghost btn-block" data-action="blockChange">${icon('edit', 'sm')} Change my answers</button>`
       : blockOn() ? `<button class="btn btn-primary btn-xl" data-action="blockApply">${icon('check')} Use my new answers</button>
       <button class="btn btn-ghost btn-block" data-action="blockForm">${icon('edit', 'sm')} Change them again</button>
@@ -2418,18 +2452,7 @@ submits.blockStart = async f => {
   if (!a) return;
   const start = /^\d{4}-\d{2}-\d{2}$/.test(d.start) ? d.start : ymd(weekStart());
   if (!(await confirmBox('Start the 12 weeks?', `Your ${MODES[a.where].label.toLowerCase()} plan becomes week 1 of the plan${start > ymd() ? ` on ${fmtDate(parseYmd(start), { weekday: 'long', month: 'short', day: 'numeric' })}` : ''}. Your current plan is saved — end early any time to get it back. Workout history stays.`, { ok: 'Start' }))) { blockReport(a); return; }
-  const an = BLOCK.analyze(a);
-  if (!blockOn() || !S.plan.before) S.plan.before = clone({ gym: S.plan.gym, home: S.plan.home });
-  S.settings.block = { ...a, start, week: 0 };
-  S.settings.mode = a.where;
-  S.settings.bats = a.bats === 'L' ? 'L' : 'R';
-  if (d.goals) {
-    const kg = kgUnits(), w = Math.round(fromLb(a.weightLb) * 10) / 10, inch = Math.round(a.heightIn);
-    Object.assign(S.settings, { calGoal: an.cal, proteinGoal: an.pro, carbGoal: an.carb, fatGoal: an.fat, waterGoal: an.water, goalsSet: true,
-      profile: { ...(S.settings.profile || {}), sex: a.sex, age: a.age, weight: w, ft: Math.floor(inch / 12), inch: inch % 12, cm: Math.round(a.heightIn * 2.54), goal: 'gain', activity: S.settings.profile && S.settings.profile.activity || 1.725 } });
-    if (latestWeight() == null || Math.abs(latestWeight() - w) > 0.05) putLog({ id: uid(), kind: 'weight', date: ymd(), w, at: Date.now() });
-    if (!kg) S.settings.profile.cm = Math.round(a.heightIn * 2.54);
-  }
+  startBlock(a, start, !!d.goals);
   blockDraft = null;
   installBlockWeek(true);
   saveSettings(); savePlan();
@@ -2437,6 +2460,21 @@ submits.blockStart = async f => {
   closeSheet(); render({ keepScroll: false });
   toast(start > ymd() ? 'Your 12 weeks start Monday — week 1 is in your plan' : 'Week 1 is in your plan — let\'s go');
 };
+// Turn the 12-week plan on (your old plan is kept to come back to), and set your nutrition goals if you said so.
+function startBlock(a, start, goals) {
+  const an = BLOCK.analyze(a);
+  if (!blockOn() || !S.plan.before) S.plan.before = clone({ gym: S.plan.gym, home: S.plan.home });
+  S.settings.block = { ...a, start, week: 0 };
+  S.settings.mode = a.where;
+  S.settings.bats = a.bats === 'L' ? 'L' : 'R';
+  if (goals) {
+    const kg = kgUnits(), w = Math.round(fromLb(a.weightLb) * 10) / 10, inch = Math.round(a.heightIn);
+    Object.assign(S.settings, { calGoal: an.cal, proteinGoal: an.pro, carbGoal: an.carb, fatGoal: an.fat, waterGoal: an.water, goalsSet: true,
+      profile: { ...(S.settings.profile || {}), sex: a.sex, age: a.age, weight: w, ft: Math.floor(inch / 12), inch: inch % 12, cm: Math.round(a.heightIn * 2.54), goal: 'gain', activity: S.settings.profile && S.settings.profile.activity || 1.725 } });
+    if (latestWeight() == null || Math.abs(latestWeight() - w) > 0.05) putLog({ id: uid(), kind: 'weight', date: ymd(), w, at: Date.now() });
+    if (!kg) S.settings.profile.cm = Math.round(a.heightIn * 2.54);
+  }
+}
 
 // Put this week's workouts into the plan (once per week, so your edits during the week stay).
 function installBlockWeek(force = false) {
@@ -2453,6 +2491,11 @@ function installBlockWeek(force = false) {
 }
 function checkBlockWeek() {
   if (S.locked || !blockOn()) return;
+  if (S.settings.combo && comboNextCycle()) {      // the complete plan keeps going: next 12-week cycle
+    installBlockWeek(true);
+    toast(`Cycle ${S.settings.combo.cycle} of your complete plan — week 1 is in your plan`);
+    return;
+  }
   const was = S.settings.block.week;
   if (installBlockWeek() && was) toast(`Week ${S.settings.block.week} of your 12-week plan is in your Plan tab`);
 }
@@ -2520,7 +2563,7 @@ actions.blockEnd = async () => {
   if (!(await confirmBox(st.done ? 'Close the 12-week plan?' : 'End the 12 weeks early?', S.plan.before ? 'Your plan from before the 12 weeks comes back. Workout history stays.' : 'Your plan stays as it is now. Workout history stays.', { ok: st.done ? 'Close it' : 'End it', danger: !st.done }))) return;
   if (S.plan.before) { S.plan.gym = S.plan.before.gym; S.plan.home = S.plan.before.home; }
   delete S.plan.before;
-  S.settings.block = null; blockDraft = null;
+  S.settings.block = null; S.settings.combo = null; blockDraft = null;
   saveSettings(); savePlan(); closeSheet(); render();
   toast('12-week plan ended');
 };
@@ -2560,31 +2603,44 @@ function moveWeek() {
 const isMoveWorkout = w => w.src === 'move';
 
 actions.move = () => (moveOn() ? moveHome() : moveForm());
+// The mobility questions. In the combined plan (p = 'mv_') the shared ones (position, age, season, days) come from the
+// 12-week questions instead.
+function moveFields(m, p = '') {
+  const combo = !!p;
+  return `${combo ? '' : `<div class="field"><span>Position</span>${pickRows('pos', BUILDER.POSITIONS, m.pos)}</div>
+    <label class="field"><span>Age</span><input name="age" inputmode="numeric" value="${esc(m.age)}" autocomplete="off"></label>`}
+    <div class="field"><span>What matters most?</span>${pickRows(`${p}focus`, MOVE.FOCUS, m.focus)}</div>
+    <div class="field"><span>Mobility sessions a week</span>${optGrid(`${p}sessions`, [3, 4, 5, 6].map(n => [n, String(n)]), m.sessions)}</div>
+    <div class="field"><span>Time for each</span>${optGrid(`${p}minutes`, [[20, '20 min'], [30, '30 min'], [45, '45 min']], m.minutes)}</div>
+    <div class="field"><span>Where you'll do them</span>${pickRows(`${p}where`, MOVE.WHERE, m.where)}</div>
+    <label class="check-line"><input type="checkbox" name="${p}hill" value="1" ${m.hill ? 'checked' : ''}> <span>There's a hill nearby for hill sprints</span></label>
+    ${combo ? '' : `<div class="field"><span>Part of the season</span>${optGrid('season', BUILDER.SEASONS, m.season)}</div>
+    <div class="field"><span>Days</span>${optGrid('day', DAYS_SHORT.map((d, i) => [i, d]), m.days, { multi: true, cls: 'days' })}
+      <small>${blockOn() ? 'While your 12-week plan is on, Dugout picks the days for you: sprints and agility only when your legs are fresh, stretching on leg days, nothing on its rest day.' : 'Pick as many days as sessions — hard sessions get spread apart.'}</small></div>`}
+    <div class="field"><span>Sore spots for running and stretching</span>${optGrid(`${p}sore`, MOVE.SORE, m.sore, { multi: true, cls: 'wrap3' })}</div>`;
+}
 function moveForm() {
   const m = MOVE.answersOf({ pos: (S.settings.block || S.settings.athlete || {}).pos, age: (S.settings.profile || {}).age, ...(S.settings.move || {}) });
   openSheet('Mobility plan', `<form class="form" novalidate data-submit="moveStart">
     <p class="text-2 small">Agility, sprinting, stretching and baseball conditioning — the cardio side of being a better ballplayer. It runs in 8-week waves next to your lifting${blockOn() ? ' and fits around your 12-week plan without changing any of it' : ''}.</p>
-    <div class="field"><span>Position</span>${pickRows('pos', BUILDER.POSITIONS, m.pos)}</div>
-    <label class="field"><span>Age</span><input name="age" inputmode="numeric" value="${esc(m.age)}" autocomplete="off"></label>
-    <div class="field"><span>What matters most?</span>${pickRows('focus', MOVE.FOCUS, m.focus)}</div>
-    <div class="field"><span>Sessions a week</span>${optGrid('sessions', [3, 4, 5, 6].map(n => [n, String(n)]), m.sessions)}</div>
-    <div class="field"><span>Time for each</span>${optGrid('minutes', [[20, '20 min'], [30, '30 min'], [45, '45 min']], m.minutes)}</div>
-    <div class="field"><span>Where you'll do them</span>${pickRows('where', MOVE.WHERE, m.where)}</div>
-    <label class="check-line"><input type="checkbox" name="hill" value="1" ${m.hill ? 'checked' : ''}> <span>There's a hill nearby for hill sprints</span></label>
-    <div class="field"><span>Part of the season</span>${optGrid('season', BUILDER.SEASONS, m.season)}</div>
-    <div class="field"><span>Days</span>${optGrid('day', DAYS_SHORT.map((d, i) => [i, d]), m.days, { multi: true, cls: 'days' })}
-      <small>${blockOn() ? 'While your 12-week plan is on, Dugout picks the days for you: sprints and agility only when your legs are fresh, stretching on leg days, nothing on its rest day.' : 'Pick as many days as sessions — hard sessions get spread apart.'}</small></div>
-    <div class="field"><span>Sore spots to work around</span>${optGrid('sore', MOVE.SORE, m.sore, { multi: true, cls: 'wrap3' })}</div>
+    ${moveFields(m)}
     ${moveOn() ? '' : `<div class="field"><span>Start</span>${optGrid('start', [[ymd(weekStart()), 'This week'], [ymd(addDays(weekStart(), 7)), 'Next Monday']], dayIdx() >= 4 ? ymd(addDays(weekStart(), 7)) : ymd(weekStart()))}</div>`}
     <button class="btn btn-primary btn-xl" type="submit">${icon(moveOn() ? 'check' : 'play')} ${moveOn() ? 'Save changes' : 'Start the mobility plan'}</button>
   </form>`);
 }
+// Form answers → mobility answers (or a message). shared: { pos, age, season } in the combined plan.
+function parseMove(d, p = '', shared = null) {
+  const sessions = Number(d[`${p}sessions`]), days = DAYS.map((_, i) => i).filter(i => d[`day_${i}`]), was = S.settings.move || {};
+  if (!shared && !blockOn() && days.length !== sessions) return `Pick ${sessions} days — one for each session`;
+  return MOVE.answersOf({ ...was, pos: shared ? shared.pos : d.pos, age: shared ? shared.age : num(d.age), season: shared ? shared.season : d.season,
+    focus: d[`${p}focus`], sessions, minutes: Number(d[`${p}minutes`]), where: d[`${p}where`], hill: !!d[`${p}hill`],
+    days: !shared && days.length === sessions ? days : was.days, sore: MOVE.SORE.map(([k]) => k).filter(k => d[`${p}sore_${k}`]) });
+}
 submits.moveStart = f => {
-  const d = formData(f), sessions = Number(d.sessions), days = DAYS.map((_, i) => i).filter(i => d[`day_${i}`]);
-  if (!blockOn() && days.length !== sessions) { toast(`Pick ${sessions} days — one for each session`); return; }
+  const d = formData(f), m = parseMove(d);
+  if (typeof m === 'string') { toast(m); return; }
   const was = S.settings.move;
-  S.settings.move = { ...MOVE.answersOf({ ...(was || {}), pos: d.pos, age: num(d.age), focus: d.focus, sessions, minutes: Number(d.minutes), where: d.where, hill: !!d.hill, season: d.season,
-    days: days.length === sessions ? days : (was || {}).days, sore: MOVE.SORE.map(([k]) => k).filter(k => d[`sore_${k}`]) }), start: was ? was.start : (/^\d{4}-\d{2}-\d{2}$/.test(d.start) ? d.start : ymd(weekStart())) };
+  S.settings.move = { ...m, start: was ? was.start : (/^\d{4}-\d{2}-\d{2}$/.test(d.start) ? d.start : ymd(weekStart())) };
   saveSettings(); render();
   moveHome();
   toast(was ? 'Mobility plan updated' : 'Mobility plan started');
@@ -2615,7 +2671,7 @@ function moveHome() {
 actions.moveChange = () => moveForm();
 actions.moveEnd = async () => {
   if (!(await confirmBox('End the mobility plan?', 'Its sessions stop showing on Today. Your plans and workout history stay as they are.', { ok: 'End it', danger: true }))) { moveHome(); return; }
-  S.settings.move = null; saveSettings(); render(); toast('Mobility plan ended');
+  S.settings.move = null; S.settings.combo = null; saveSettings(); render(); toast('Mobility plan ended');
 };
 actions.movePreview = el => {
   const d = Number(el.dataset.d), s = moveWeek().days[d];
@@ -2655,6 +2711,330 @@ function moveCard() {
       <button class="btn btn-ghost" data-action="move">${icon('plan', 'sm')} The week</button>
     </div>
   </section>`;
+}
+
+/* ============================== 7e. THROWING PROGRAM (throw.js) ============================== */
+// Throw harder from the field (not pitching), in 12-week cycles that keep going. Saved as settings.throw (your answers +
+// the Monday it started). Like the mobility plan, its sessions show on Today next to your plan and never change it.
+// Every session goes into the throwing log, and how your arm feels decides what you throw next.
+
+const throwOn = () => !!(S.settings.throw && S.settings.throw.start);
+const throwWeekNow = () => (throwOn() ? THROW.weekOn(S.settings.throw.start, ymd()) : 0);
+const longestThrow = since => Math.max(0, ...logsOf('throw').filter(l => !since || l.date >= since).map(l => l.dist || 0));
+// From the second cycle on, long toss starts from the longest throw you logged (if it's farther).
+function throwAnswers() {
+  const t = S.settings.throw;
+  return throwWeekNow() > THROW.WEEKS ? { ...t, maxDist: Math.max(t.maxDist, longestThrow(t.start)) } : t;
+}
+const isSideWorkout = w => w.src === 'move' || w.src === 'throw';
+
+// This week's extra sessions (mobility and throwing), fitted around your plan. Order: the 12-week plan's days → the
+// mobility plan → throwing. Each one only fills days and leaves out what's already there — nothing gets cut or changed.
+function sideWeekFor({ block, move, thr, planDays, bw, mw, tw }) {
+  const along = !!block && bw >= 1 && bw <= BLOCK.WEEKS, roles = along ? BLOCK.roles(block, bw) : null;
+  const mv = move ? { ...MOVE.week(move, Math.max(1, mw), along ? { roles, blockDays: planDays } : { blockDays: planDays }), along } : null;
+  const skipDays = planDays.map((d, i) => [...d.exercises.map(e => e.name), ...(mv && mv.days[i] ? mv.days[i].exercises.map(e => e.name) : [])]);
+  const th = thr ? THROW.week(thr, Math.max(1, tw), { ...(along ? { roles, moveDays: mv ? mv.days.map(x => x && x.kind) : null } : {}), skipDays }) : null;
+  return { along, roles, planDays, mv, th };
+}
+const sideWeek = () => {
+  const bw = blockOn() ? blockWeekNow() : 0, along = bw >= 1 && bw <= BLOCK.WEEKS;
+  return sideWeekFor({ block: blockOn() ? S.settings.block : null, move: moveOn() ? S.settings.move : null, thr: throwOn() ? throwAnswers() : null,
+    planDays: S.plan[along ? S.settings.block.where : S.settings.mode], bw, mw: moveWeekNow(), tw: throwWeekNow() });
+};
+
+// How your arm is: pain in the last 3 days → no throwing; sore yesterday or today → recovery catch only.
+function armToday() {
+  const l = logsOf('throw').filter(x => x.date >= ymd(addDays(new Date(), -3))).pop();
+  if (!l) return 'ok';
+  if (l.feel === 1) return 'pain';
+  if (l.feel === 2 && l.date >= ymd(addDays(new Date(), -1))) return 'sore';
+  return 'ok';
+}
+function throwToday() {
+  if (!throwOn() || throwWeekNow() < 1) return null;
+  const s = sideWeek().th.days[dayIdx()];
+  if (!s) return null;
+  const arm = armToday();
+  if (arm === 'pain') return { ...s, blocked: true };
+  if (arm === 'sore' && s.kind !== 'recov') return { ...THROW.session(throwAnswers(), throwWeekNow(), 'recov'), swapped: s.title };
+  return s;
+}
+
+actions.throwPlan = () => (throwOn() ? throwHome() : throwForm());
+function throwDefaults() {
+  const b = S.settings.block || {}, p = S.settings.profile || {};
+  return THROW.answersOf({ pos: b.pos || (S.settings.athlete || {}).pos, throws: b.throws, age: b.age || p.age, season: b.season,
+    velo: bestTest('throwvelo'), maxDist: longestThrow() || null, ...(S.settings.throw || {}) });
+}
+// The throwing questions. In the combined plan (p = 'th_') position, age, throwing arm and season come from the 12-week ones.
+function throwFields(t, p = '') {
+  const combo = !!p;
+  return `${combo ? '' : `<div class="field"><span>Position</span>${pickRows('pos', BUILDER.POSITIONS, t.pos)}</div>
+    <div class="form-grid">${numIn('age', 'Age', t.age)}<div class="field"><span>Throws</span>${choice('throws', [['R', 'Right'], ['L', 'Left']], t.throws)}</div></div>`}
+    <div class="form-grid">
+      ${numIn(`${p}velo`, 'Throwing velo (mph)', t.velo, 'optional')}
+      ${numIn(`${p}maxDist`, 'Comfortable long toss (ft)', t.maxDist, String(THROW.defaultDist(t)))}
+    </div>
+    <div class="field"><span>Throwing days a week</span>${optGrid(`${p}sessions`, [[3, '3'], [4, '4']], t.sessions)}</div>
+    ${combo || blockOn() ? '' : `<div class="field"><span>Days</span>${optGrid('day', DAYS_SHORT.map((d, i) => [i, d]), t.days, { multi: true, cls: 'days' })}<small>Hard throwing days get spread apart.</small></div>`}
+    <div class="field"><span>Someone to throw with?</span>${choice(`${p}partner`, [['yes', 'Yes'], ['no', 'No — a net or wall']], t.partner ? 'yes' : 'no')}</div>
+    <div class="field"><span>How much have you been throwing?</span>${pickRows(`${p}layoff`, THROW.LAYOFF, t.layoff)}</div>
+    ${combo ? '' : `<div class="field"><span>Part of the season</span>${optGrid('season', BUILDER.SEASONS, t.season)}</div>`}
+    <div class="field"><span>Does your arm hurt when you throw right now?</span>${choice(`${p}pain`, [['no', 'No'], ['yes', 'Yes']], 'no')}</div>`;
+}
+function parseThrow(d, p = '', shared = null) {
+  if (d[`${p}pain`] === 'yes') return 'Arm pain first: see an athletic trainer or doctor before starting a throwing program.';
+  const sessions = Number(d[`${p}sessions`]), days = DAYS.map((_, i) => i).filter(i => d[`day_${i}`]), was = S.settings.throw || {};
+  if (!shared && !blockOn() && days.length !== sessions) return `Pick ${sessions} throwing days`;
+  return THROW.answersOf({ ...was, pos: shared ? shared.pos : d.pos, age: shared ? shared.age : num(d.age), throws: shared ? shared.throws : d.throws, season: shared ? shared.season : d.season,
+    velo: num(d[`${p}velo`]), maxDist: num(d[`${p}maxDist`]), sessions, days: !shared && days.length === sessions ? days : was.days,
+    partner: d[`${p}partner`] !== 'no', layoff: d[`${p}layoff`] });
+}
+function throwForm() {
+  const t = throwDefaults();
+  openSheet('Throwing program', `<form class="form" novalidate data-submit="throwStart">
+    <p class="text-2 small">Throw harder from the outfield, the infield or behind the plate — not a pitching program. 12-week cycles of a ramp-up, long toss, pull-downs, max-intent throws and position throws, with arm care before and after every session. No weighted balls.</p>
+    ${throwFields(t)}
+    ${throwOn() ? '' : `<div class="field"><span>Start</span>${optGrid('start', [[ymd(weekStart()), 'This week'], [ymd(addDays(weekStart(), 7)), 'Next Monday']], dayIdx() >= 4 ? ymd(addDays(weekStart(), 7)) : ymd(weekStart()))}</div>`}
+    <button class="btn btn-primary btn-xl" type="submit">${icon(throwOn() ? 'check' : 'play')} ${throwOn() ? 'Save changes' : 'Start throwing'}</button>
+  </form>`);
+}
+submits.throwStart = f => {
+  const d = formData(f), t = parseThrow(d);
+  if (typeof t === 'string') { toast(t); return; }
+  const was = S.settings.throw;
+  S.settings.throw = { ...t, start: was ? was.start : (/^\d{4}-\d{2}-\d{2}$/.test(d.start) ? d.start : ymd(weekStart())) };
+  saveSettings(); render();
+  throwHome();
+  toast(was ? 'Throwing program updated' : 'Throwing program started');
+};
+
+function throwHome() {
+  const t = throwAnswers(), w = throwWeekNow(), sw = sideWeek(), th = sw.th, today = dayIdx(), arm = armToday();
+  const from = ymd(weekStart()), wk = logsOf('throw').filter(l => l.date >= from), velo = TEST_BY_ID.throwvelo;
+  const vStart = t.velo, vBest = bestOf(velo, testLogs('throwvelo').filter(l => l.date >= S.settings.throw.start));
+  openSheet('Throwing program', `<div class="stack">
+    <div class="card stack-sm">
+      <div class="card-title">${w >= 1 ? `Week ${th.week} of 12${th.cycle > 1 ? ` · cycle ${th.cycle}` : ''} · ${esc(th.phase)}` : `Starts ${fmtDate(parseYmd(S.settings.throw.start), { weekday: 'long', month: 'short', day: 'numeric' })}`}</div>
+      <p class="small text-2">Long toss this week: out to about ${th.distance} ft. ${wk.length ? `${fmt(sum(wk, l => l.count || 0))} throws logged this week.` : ''}</p>
+      ${arm !== 'ok' ? `<div class="banner warn">${icon('info')}<div>${arm === 'pain' ? 'You logged arm pain — no throwing until it\'s gone. Tell your coach or athletic trainer.' : 'Arm sore — today is easy recovery catch only.'}</div></div>` : ''}
+    </div>
+    <div class="tiles two">
+      <div class="tile"><div class="tile-label">Throwing velo</div><div class="tile-value">${vStart ? `${fmt(vStart)}` : '–'}<small> → ${vBest ? fmt(vBest.v, 1) : '?'} mph</small></div><div class="hint">start → best since</div></div>
+      <div class="tile"><div class="tile-label">Longest throw</div><div class="tile-value">${fmt(t.maxDist)}<small> → ${fmt(Math.max(longestThrow(S.settings.throw.start), 0)) || '–'} ft</small></div><div class="hint">comfortable → logged</div></div>
+    </div>
+    <div class="stack-sm">${th.days.map((s, d) => `<div class="wk-day ${d === today ? 'light' : ''}" style="display:block">
+      <div class="spread"><b>${DAYS[d]}${d === today ? ' · today' : ''}</b>${s ? `<button class="btn btn-sm btn-ghost" data-action="throwPreview" data-d="${d}">${icon('play', 'sm')} ${esc(s.title.replace('Throwing: ', ''))} · ${s.throws} throws</button>` : '<span class="small muted">No throwing</span>'}</div>
+      ${sw.planDays[d] && sw.planDays[d].type !== 'rest' ? `<div class="small muted">Plan: ${esc(sw.planDays[d].title.replace(/^Wk \d+ · /, ''))}${sw.mv && sw.mv.days[d] ? ` · Mobility: ${esc(sw.mv.days[d].title)}` : ''}</div>` : sw.mv && sw.mv.days[d] ? `<div class="small muted">Mobility: ${esc(sw.mv.days[d].title)}</div>` : ''}
+    </div>`).join('')}</div>
+    <details class="table-toggle"><summary>How this program works</summary><ul class="steps">${THROW.notes(t).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>
+    <div class="grid2">
+      <button class="btn btn-ghost" data-action="logTest" data-id="throwvelo">${icon('timer', 'sm')} Log velo</button>
+      <button class="btn btn-ghost" data-action="throwChange">${icon('edit', 'sm')} Change answers</button>
+    </div>
+    <button class="btn btn-danger btn-block" data-action="throwEnd">${icon('x', 'sm')} End the throwing program</button>
+    <p class="hint">On days you throw, throw first (after your warm-up), then lift, then mobility. On days you pitch or play a game, skip the throwing session.</p>
+  </div>`);
+}
+actions.throwChange = () => throwForm();
+actions.throwEnd = async () => {
+  if (!(await confirmBox('End the throwing program?', 'Its sessions stop showing on Today. Your throwing log, plans and history stay.', { ok: 'End it', danger: true }))) { throwHome(); return; }
+  S.settings.throw = null; if (S.settings.combo) S.settings.combo = null;
+  saveSettings(); render(); toast('Throwing program ended');
+};
+actions.throwPreview = el => {
+  const d = Number(el.dataset.d), s = d === dayIdx() ? throwToday() : sideWeek().th.days[d];
+  if (!s) return;
+  openSheet(`${DAYS[d]} · ${s.title}`, `<div class="stack">
+    ${s.swapped ? `<div class="banner warn">${icon('info')}<div>Your arm is sore, so ${esc(s.swapped.toLowerCase())} became easy recovery catch.</div></div>` : ''}
+    ${s.blocked ? `<div class="banner warn">${icon('info')}<div>You logged arm pain in the last few days — no throwing until it's gone. Tell your coach or athletic trainer.</div></div>` : ''}
+    <p class="text-2 small">${esc(s.focus)}</p>
+    <div class="preview-list">${s.exercises.map(e => `<div><span>${esc(e.name)}</span><span>${e.sets > 1 ? `${e.sets} × ` : ''}${esc(e.reps)}</span></div>`).join('')}</div>
+    <p class="small muted">About ${s.throws} throws${s.far ? `, out to ${s.far} ft` : ''} — goes into your throwing log when you finish.</p>
+    ${d === dayIdx() && !s.blocked ? `<button class="btn btn-primary btn-xl" data-action="throwStartToday" ${S.active ? 'disabled' : ''}>${icon('play')} ${S.active ? 'Workout in progress' : 'Start it now'}</button>` : ''}
+    <button class="btn btn-ghost btn-block" data-action="throwPlan">Back to the week</button>
+  </div>`);
+};
+const THROW_LOG_TYPE = { ramp: 'catch', recov: 'catch', long: 'longtoss', test: 'longtoss', intent: 'position', pos: 'position' };
+actions.throwStartToday = () => {
+  const s = throwToday();
+  if (!s || s.blocked || S.active) return;
+  const mode = S.settings.block ? S.settings.block.where : S.settings.mode;
+  closeSheet();
+  S.active = { id: uid(), mode, dayIndex: dayIdx(), title: s.title, type: 'agility', intensity: 'heavy', src: 'throw', throws: s.throws, far: s.far, throwType: THROW_LOG_TYPE[s.kind] || 'catch',
+    date: ymd(), startedAt: Date.now(), finishedAt: null,
+    exercises: s.exercises.map(e => ({ planId: null, name: e.name, reps: String(e.reps), rest: e.rest ?? 0, track: TRACKS[e.track] ? e.track : 'check', cues: e.cues || '', video: e.video || defaultVideo(e.name),
+      sets: makeSets(e.sets, e.track, lastSetsFor(e.name, mode)) })) };
+  S.openEx = null; S.tab = 'today';
+  saveActive(); render({ keepScroll: false }); unlockAudio(); keepAwake(true);
+};
+// A finished throwing session goes into the throwing log (throws counted from the sets you checked off).
+function logThrowSession(a) {
+  const all = setsDone(a) + sum(a.exercises, e => e.sets.filter(s => !s.done).length), part = all ? setsDone(a) / all : 1;
+  const count = Math.max(1, Math.round((a.throws || 0) * part));
+  const l = putLog({ id: uid(), kind: 'throw', date: a.date, type: a.throwType || 'catch', count, dist: a.far || null, feel: 4, note: a.title.replace('Throwing: ', ''), at: Date.now() });
+  a.throwLog = l.id;
+  return l;
+}
+actions.throwFeel = el => {
+  const l = S.logs.find(x => x.id === el.dataset.id), v = Number(el.dataset.v);
+  if (!l || !(v >= 1 && v <= 5)) return;
+  putLog({ ...l, feel: v });
+  $$('.feel-btn', el.closest('.field')).forEach(b => b.classList.toggle('on', b === el));
+  if (v === 1) toast('Pain means no throwing until it\'s gone — tell your coach or athletic trainer');
+  else if (v === 2) toast('Sore arm: next throwing day is easy recovery catch');
+};
+function throwFeelBlock(w) {
+  const l = w.throwLog && S.logs.find(x => x.id === w.throwLog);
+  if (!l) return '';
+  return `<div class="field"><span>How does your arm feel? <small>${fmt(l.count)} throws logged${l.dist ? `, out to ${l.dist} ft` : ''}</small></span>
+    <div class="chips">${[5, 4, 3, 2, 1].map(v => `<button class="chip feel-btn ${l.feel === v ? 'on' : ''}" data-action="throwFeel" data-id="${l.id}" data-v="${v}">${FEEL[v]}</button>`).join('')}</div></div>`;
+}
+// Today: today's throwing session.
+function throwCard() {
+  if (!throwOn()) return '';
+  if (throwWeekNow() < 1) return `<button class="banner as-btn goal-nudge" data-action="throwPlan">${icon('baseball')}<span class="grow"><b>Throwing program starts Monday</b></span>${icon('right', 'sm')}</button>`;
+  const s = throwToday(), done = S.workouts.some(w => w.date === ymd() && w.src === 'throw');
+  if (!s) return `<button class="banner as-btn goal-nudge" data-action="throwPlan">${icon('baseball')}<span class="grow"><b>Throwing program</b> · no throwing today — rest the arm</span>${icon('right', 'sm')}</button>`;
+  return `<section class="card stack-sm">
+    <div class="spread"><span class="badge accent">${icon('baseball')} Throwing · week ${THROW.cycleWeek(throwWeekNow())}</span>${done ? `<span class="badge good">${icon('check')} Done</span>` : ''}</div>
+    <div class="card-title">${esc(s.title.replace('Throwing: ', ''))}</div>
+    ${s.blocked ? `<div class="banner warn">${icon('info')}<div>Arm pain logged — no throwing today. Tell your coach or athletic trainer.</div></div>`
+      : `<div class="small muted">About ${s.throws} throws${s.far ? `, out to ${s.far} ft` : ''}${s.swapped ? ' · swapped to recovery catch (sore arm)' : ''}</div>`}
+    <div class="grid2">
+      <button class="btn ${done || s.blocked ? 'btn-ghost' : 'btn-primary'}" data-action="throwStartToday" ${S.active || s.blocked ? 'disabled' : ''}>${icon('play', 'sm')} ${done ? 'Again' : 'Start'}</button>
+      <button class="btn btn-ghost" data-action="throwPlan">${icon('plan', 'sm')} The week</button>
+    </div>
+  </section>`;
+}
+// Today: when there's more than one session, what to do first.
+function todayOrderCard() {
+  const di = dayIdx(), lift = dayPlan(di), th = throwToday(), mv = moveOn() && moveWeekNow() >= 1 ? moveWeek().days[di] : null;
+  const items = [];
+  if (th && !th.blocked) items.push(['Throwing', th.title.replace('Throwing: ', ''), 'right after your warm-up, while your arm and body are fresh']);
+  if (lift && lift.type !== 'rest' && lift.exercises.length) items.push(['Lift / plan', lift.title.replace(/^Wk \d+ · /, ''), items.length ? 'skip the warm-up you already did' : '']);
+  if (mv) items.push(['Mobility', mv.title, items.length ? 'right after, or later in the day' : '']);
+  if (items.length < 2) return '';
+  return `<section class="card stack-sm"><div class="card-title row">${icon('clock', 'sm')} Today's order</div>
+    <ol class="steps">${items.map(([k, t, why]) => `<li><b>${esc(k)}:</b> ${esc(t)}${why ? ` <span class="muted">— ${esc(why)}</span>` : ''}</li>`).join('')}</ol>
+    <p class="hint">Each plan keeps its full session — this is just the best order.${items.length === 3 ? ' A long day: split it morning and afternoon if you can, and eat between.' : ''}</p></section>`;
+}
+
+/* ============================== 7f. COMBINED PLAN (12 weeks + mobility + throwing, long term) ============================== */
+// One set of questions starts all three on the same Monday. Each keeps its full sessions — none is trimmed for another;
+// they're fitted day by day (sideWeekFor). Every 12 weeks a new cycle starts by itself with your new weight, test numbers
+// and swing scan, so it keeps going year-round. Saved as settings.combo: { start, cycle }.
+
+const comboOn = () => !!(S.settings.combo && blockOn() && moveOn() && throwOn());
+let comboDraft = null;   // { a: 12-week answers, m: mobility answers, t: throwing answers }
+actions.combo = () => { comboDraft = null; if (comboOn()) comboHome(); else comboForm(); };
+actions.comboForm = () => comboForm();
+function comboForm() {
+  const a = comboDraft ? comboDraft.a : blockDefaults(), m = comboDraft ? comboDraft.m : MOVE.answersOf(S.settings.move || {}), t = comboDraft ? comboDraft.t : throwDefaults();
+  openSheet('Complete player plan', `<form class="form" novalidate data-submit="comboAnalyze">
+    <p class="text-2 small">All three plans at once, for the long run: muscle and power (the 12-week plan), mobility, speed and conditioning, and a throwing program. Each keeps its full sessions — Dugout fits them together day by day, and every 12 weeks a new cycle starts from where you are.</p>
+    ${blockFields(a)}
+    <div class="section-title">Mobility, speed &amp; conditioning</div>
+    ${moveFields(m, 'mv_')}
+    <div class="section-title">Throwing</div>
+    ${throwFields(t, 'th_')}
+    <button class="btn btn-primary btn-xl" type="submit">${icon('sparkle', 'sm')} Analyze me</button>
+  </form>`);
+}
+submits.comboAnalyze = f => {
+  const d = formData(f), a = parseBlock(d);
+  if (typeof a === 'string') { toast(a); return; }
+  const shared = { pos: a.pos, age: a.age, season: a.season, throws: a.throws };
+  const m = parseMove(d, 'mv_', shared), t = parseThrow(d, 'th_', shared);
+  for (const x of [m, t]) if (typeof x === 'string') { toast(x); return; }
+  comboDraft = { a, m, t };
+  comboReport();
+};
+// Week by week, all plans side by side.
+function weekTableHtml(sw, { today = -1 } = {}) {
+  return `<div class="stack-sm">${sw.planDays.map((p, d) => {
+    const rows = [p.type !== 'rest' && p.exercises.length ? [p.type === 'strength' ? 'Lift' : p.type === 'mobility' ? 'Stretch' : 'Train', p.title.replace(/^Wk \d+ · /, '')] : p.type === 'rest' ? ['Rest', p.title.replace(/^Wk \d+ · /, '')] : null,
+      sw.th && sw.th.days[d] ? ['Throw', sw.th.days[d].title.replace('Throwing: ', '')] : null, sw.mv && sw.mv.days[d] ? ['Mobility', sw.mv.days[d].title] : null].filter(Boolean);
+    return `<div class="wk-day ${d === today ? 'light' : ''}" style="display:block"><b>${DAYS[d]}${d === today ? ' · today' : ''}</b>
+      ${rows.map(([k, t]) => `<div class="small"><span class="muted">${k}:</span> ${esc(t)}</div>`).join('')}</div>`;
+  }).join('')}</div>`;
+}
+function comboReport() {
+  const { a, m, t } = comboDraft, monday = ymd(weekStart()), next = ymd(addDays(weekStart(), 7)), late = dayIdx() >= 3, an = BLOCK.analyze(a);
+  const sw = sideWeekFor({ block: a, move: m, thr: t, planDays: BLOCK.week(a, 1, { age: a.age }).days, bw: 1, mw: 1, tw: 1 });
+  openSheet('Your complete plan', `<div class="stack">
+    ${blockAnalysisHtml(a)}
+    ${reportSec('Throwing', 'baseball', THROW.notes(t))}
+    ${reportSec('Mobility, speed & conditioning', 'timer', [`${m.sessions} sessions a week of ${m.minutes} minutes (${MOVE.WHERE.find(([k]) => k === m.where)[1].toLowerCase()}), focus: ${BUILDER.label(MOVE.FOCUS, m.focus).toLowerCase()}. 8-week waves: Base, Build, Sharpen.`,
+      'Sprints, agility and conditioning only on days your legs are fresh; flexibility and recovery on leg days; nothing on the rest day.'])}
+    ${reportSec('How it fits together', 'plan', ['None of the three is cut down for the others — each keeps its full sessions. Dugout only decides the days and the order.',
+      'Hard throwing goes on upper-body or hitting days and never two days in a row; sprinting never lands on a leg day; one full rest day a week.',
+      'On busy days: throw first (after your warm-up), then lift, then mobility — or split it morning and afternoon.',
+      'Every 12 weeks the next cycle starts by itself: new weight and test numbers, your latest swing scan, longer long toss, different exercises — year-round.'])}
+    <div class="card stack-sm"><div class="card-title row">${icon('plan', 'sm')} Week 1, all together</div>${weekTableHtml(sw)}</div>
+    <form class="form" novalidate data-submit="comboStart">
+      <div class="field"><span>Start</span>${optGrid('start', [[monday, late ? 'This week (already started)' : 'This week'], [next, `Next Monday (${fmtDate(parseYmd(next), { month: 'short', day: 'numeric' })})`]], late ? next : monday)}</div>
+      <label class="check-line"><input type="checkbox" name="goals" value="1" checked> <span>Set my nutrition goals to ${fmt(an.cal)} cal and ${an.pro} g protein</span></label>
+      <button class="btn btn-primary btn-xl" type="submit">${icon('play')} Start the complete plan</button>
+      <button class="btn btn-ghost btn-block" type="button" data-action="comboForm">${icon('edit', 'sm')} Change my answers</button>
+      <p class="hint">Your current plan is saved and comes back if you end it. Workout history is never touched.</p>
+    </form>
+  </div>`);
+}
+submits.comboStart = async f => {
+  const dr = comboDraft, d = formData(f);
+  if (!dr) return;
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(d.start) ? d.start : ymd(weekStart());
+  if (!(await confirmBox('Start the complete plan?', `The 12-week plan, mobility plan and throwing program all start ${start > ymd() ? `on ${fmtDate(parseYmd(start), { weekday: 'long', month: 'short', day: 'numeric' })}` : 'this week'}. Your current plan is saved. Workout history stays.`, { ok: 'Start' }))) { comboReport(); return; }
+  startBlock(dr.a, start, !!d.goals);
+  S.settings.move = { ...dr.m, start };
+  S.settings.throw = { ...dr.t, start };
+  S.settings.combo = { start, cycle: 1 };
+  comboDraft = null;
+  installBlockWeek(true);
+  saveSettings(); savePlan();
+  S.tab = 'today'; closeSheet(); render({ keepScroll: false });
+  toast(start > ymd() ? 'Your complete plan starts Monday' : 'Your complete plan is on — check Today for the order');
+};
+// Long term: when the 12 weeks are up, the next cycle starts on its own (new weight, tests, swing scan; longer long toss).
+function comboNextCycle() {
+  const c = S.settings.combo, b = S.settings.block;
+  if (!c || !b || BLOCK.weekOn(b.start, ymd()) <= BLOCK.WEEKS) return false;
+  const start = ymd(addDays(parseYmd(b.start), 7 * BLOCK.WEEKS * Math.floor((BLOCK.weekOn(b.start, ymd()) - 1) / BLOCK.WEEKS)));
+  const lw = latestWeight();
+  S.settings.block = { ...BLOCK.answersOf({ ...b, weightLb: lw != null ? toLb(lw) : b.weightLb, tests: Object.fromEntries(BLOCK_TESTS.map(([k]) => [k, bestTest(k)])), faults: latestSwingFaults(), seed: (b.seed || 0) + 1 }), start, week: 0 };
+  S.settings.throw = { ...S.settings.throw, maxDist: Math.max(S.settings.throw.maxDist, longestThrow(S.settings.throw.start)), velo: bestTest('throwvelo') || S.settings.throw.velo, start, cycle: (S.settings.throw.cycle || 1) + 1 };
+  S.settings.combo = { ...c, cycle: (c.cycle || 1) + 1 };
+  return true;
+}
+function comboHome() {
+  const c = S.settings.combo, sw = sideWeek(), w = blockWeekNow();
+  openSheet('Complete player plan', `<div class="stack">
+    <div class="card stack-sm"><div class="card-title">${w >= 1 ? `Cycle ${c.cycle} · week ${Math.min(w, 12)} of 12` : `Starts ${fmtDate(parseYmd(S.settings.block.start), { weekday: 'long', month: 'short', day: 'numeric' })}`}</div>
+      <p class="small text-2">Every plan keeps its full sessions. Next cycle starts by itself after week 12.</p></div>
+    <div class="grid2">
+      <button class="btn btn-ghost" data-action="block">${icon('flame', 'sm')} 12 weeks</button>
+      <button class="btn btn-ghost" data-action="move">${icon('timer', 'sm')} Mobility</button>
+    </div>
+    <button class="btn btn-ghost btn-block" data-action="throwPlan">${icon('baseball', 'sm')} Throwing</button>
+    <div class="card stack-sm"><div class="card-title row">${icon('plan', 'sm')} This week, all together</div>${weekTableHtml(sw, { today: dayIdx() })}</div>
+    <button class="btn btn-danger btn-block" data-action="comboEnd">${icon('x', 'sm')} End the complete plan</button>
+    <p class="hint">Ending stops all three and brings back your plan from before. Workout history, the throwing log and tests stay.</p>
+  </div>`);
+}
+actions.comboEnd = async () => {
+  if (!(await confirmBox('End the complete plan?', 'The 12-week plan, mobility plan and throwing program all stop, and your plan from before comes back. History stays.', { ok: 'End all three', danger: true }))) { comboHome(); return; }
+  if (S.plan.before) { S.plan.gym = S.plan.before.gym; S.plan.home = S.plan.before.home; }
+  delete S.plan.before;
+  Object.assign(S.settings, { block: null, move: null, throw: null, combo: null });
+  saveSettings(); savePlan(); closeSheet(); render();
+  toast('Complete plan ended');
+};
+function comboCard() {
+  if (!comboOn()) return '';
+  const w = blockWeekNow();
+  return `<button class="banner as-btn goal-nudge" data-action="combo">${icon('sparkle')}<span class="grow"><b>Complete player plan</b> · ${w >= 1 ? `cycle ${S.settings.combo.cycle}, week ${Math.min(w, 12)}` : 'starts Monday'} — lift, throw, move</span>${icon('right', 'sm')}</button>`;
 }
 
 /* ============================== 8. DIET TAB ============================== */
@@ -4243,6 +4623,8 @@ function coachGuideText() {
     '- Every lifting day starts with jumps or med ball throws while fresh and ends with 1–2 stretches they hold. Power goal: 3–4 sets of each explosive exercise and, after a few months of lifting, a jump right after the first heavy leg lift. Mobility & flexibility goal: a mobility drill after every warm-up, both finisher stretches and a mobility day.',
     '- Then the least important exercises come off until each workout fits the time they have.');
   L.push('', '# 12-week plan (Plan → 12-week plan)', 'Add muscle (5–15 lb asked; Dugout caps it at a realistic range for frame, experience, age and season), power, bat speed, speed and flexibility in 12 weeks. Intake: position, bats/throws, age, sex, height, weight, gain target, experience, season, 3–5 lifting days, 45–75 min, gym or home (+ med ball), sore spots (shoulder, elbow, lower back, knees), hitting setup (tee / partner / cage), current tests and Swing lab priorities. Analysis: BMI and frame, realistic gain range and weekly pace, calories (Mifflin × training + a surplus) and macros, weekly weight targets, power/speed gaps vs strong high-school marks. Phases: Build (weeks 1–4, sets of 8–12), Strength (5–8, sets of 5–8 plus a jump after the heavy leg lift), Power (9–12, sets of 4–6, more sprinting and game-speed hitting); weeks 4 and 8 lighter, week 12 a test week. Every lift: a mobility drill, a jump and a rotational med ball throw first, two stretches you hold last. Off days: hitting (drills for the phase and their Swing lab priorities) with mobility and, from week 5, sprints; one rest day with an optional 10-minute stretch. Each week its workouts go into their plan; ending early brings back their old plan. The dashboard (tap the 12-week card) shows the week, weight vs. target, tests start → now.');
+  L.push('', '# Throwing program (Plan → Throwing program)', 'For position players to throw harder (not pitching). 12-week cycles that repeat: ramp-up (1–3 weeks by layoff: catch play to 60/90/120 ft), Build to week 6 (long toss twice a week: extension with an arc to their comfortable max, then pull-downs on a line; position throws; recovery catch; week 6 lighter), Intent weeks 7–11 (one max-intent crow-hop day of 8–12 throws, long toss, position throws, recovery catch), test week 12 (velo and longest throw). Long toss distance grows ~4% a week to ~15% past their max; each new cycle starts from the longest logged throw. No weighted balls. Arm care before and after every session. Each session goes into the throwing log; arm feel after it drives the next one: sore → recovery catch only, pain → no throwing. Alongside other plans: hard throwing on upper-body or hitting days, never two hard days in a row, nothing on the rest day; throw first, then lift, then mobility.');
+  L.push('', '# Complete player plan (Plan → Complete player plan)', 'One intake starts the 12-week plan, the mobility plan and the throwing program on the same Monday. None is trimmed for another — Dugout only picks days and the order. Every 12 weeks the next cycle starts by itself with new weight, tests, swing scan and long-toss distance (year-round). Today shows the order for busy days.');
   L.push('', '# Mobility plan (Plan → Mobility plan)', 'Agility, sprinting, stretching and baseball conditioning in 8-week waves (Base weeks 1–3, Build 4–6, Sharpen 7–8), 3–6 sessions of 20–45 min: Speed & Acceleration, Agility & Quickness, Baseball Conditioning (repeat 30-yard sprints, tempo runs, bike or jump-rope intervals), Flexibility & Mobility, Recovery (easy cardio + mobility). Its sessions show on Today next to the planned workout and never change the weekly plan or the 12-week plan; with the 12-week plan on, hard sessions go only on hitting or upper-body days and nothing on its rest day, and no exercise appears twice in a day.');
   L.push('', '# Presets (Plan → Presets & custom; id: name — category, where, about minutes)', ...BUILDER.PRESETS.map(p => `- ${p.id}: ${p.name} — ${p.cat}, ${p.where === 'any' ? 'gym or home' : p.where}, ~${BUILDER.presetMinutes(p.id)} min${p.pos.length ? `, for ${p.pos.join('/')}` : ''}. ${p.about} (${p.list.map(([n, st, r]) => `${n} ${st}×${r}`).join('; ')})`));
   L.push('', `# Make me a workout (Plan → Presets & custom): pick up to 3 of ${BUILDER.FOCUS.map(x => x[1].toLowerCase()).join(', ')}; 15–60 minutes; gym or home. It fits their Build my plan answers.`);
@@ -4277,6 +4659,8 @@ function coachContext() {
   L.push(`Training: ${planBuilt() ? `their own plan from Build my plan (${program().name.toLowerCase()} season)` : `${program().name} program`}, ${MODES[st.mode].label.toLowerCase()} plan, workout time ${clockTime(st.workoutTime)}.`);
   L.push(st.athlete ? `Training profile (Build my plan answers): ${BUILDER.summary(BUILDER.profileOf(st.athlete))}, training ${st.athlete.days.map(i => DAYS_SHORT[i]).join('/')}, home equipment: ${BUILDER.label(BUILDER.HOME_EQUIP, st.athlete.homeEquip).toLowerCase()}.`
     : 'Training profile: not set up (position, build, experience and goal are unknown unless they tell you — Plan → Build my plan).');
+  if (comboOn()) L.push(`Complete player plan on (cycle ${S.settings.combo.cycle}): the 12-week plan, mobility plan and throwing program together; each keeps its full sessions and the next 12-week cycle starts by itself.`);
+  if (throwOn()) { const tw = throwWeekNow(), tt = throwToday(); L.push(`Throwing program (position-player arm strength, not pitching): ${tw >= 1 ? `week ${THROW.cycleWeek(tw)} of 12 (${THROW.phaseOf(throwAnswers(), THROW.cycleWeek(tw))})` : `starts ${S.settings.throw.start}`}, ${S.settings.throw.sessions} throwing days, long toss out to about ${THROW.distance(throwAnswers(), THROW.cycleWeek(Math.max(1, tw)))} ft, partner: ${S.settings.throw.partner ? 'yes' : 'no'}${tt ? `; today: ${tt.blocked ? 'no throwing (arm pain logged)' : tt.title}${tt.swapped ? ' (swapped to recovery catch — sore arm)' : ''}` : ''}.`); }
   if (moveOn()) { const mw = moveWeekNow(); L.push(`Mobility plan (agility, sprints, stretching, conditioning; runs next to their plan): ${mw >= 1 ? `week ${MOVE.waveWeek(mw)} of 8` : `starts ${S.settings.move.start}`}, ${S.settings.move.sessions} sessions a week of ${S.settings.move.minutes} min, focus ${S.settings.move.focus}, at ${S.settings.move.where}${mw >= 1 ? `. This week: ${moveWeek().days.map((x, d) => (x ? `${DAYS_SHORT[d]} ${x.title}` : '')).filter(Boolean).join(', ')}` : ''}.`); }
   if (blockOn()) { const st = blockStatus(); L.push(`12-week plan: ${st.done ? 'finished' : st.notYet ? `starts ${st.b.start}` : `week ${st.w} of 12 (${st.phase.name}${st.kind !== 'normal' ? `, ${st.kind === 'deload' ? 'lighter week' : 'test week'}` : ''})`}; started at ${wText(st.an.a.weightLb)}, target ${wText(st.an.weights[12])} (+${fmt(fromLb(st.an.target), 1)} ${S.settings.unit}); target today ${wText(st.expect)}${st.cur != null ? `, latest weigh-in ${wText(st.cur)}${st.pace ? ` (${st.pace === 'on' ? 'on pace' : st.pace})` : ''}` : ''}; ${st.an.cal} cal and ${st.an.pro} g protein a day; ${st.b.days.length} lifting days, ${st.b.minutes} min, ${st.b.where}.`); }
   if (savedWorkouts().length) L.push(`My workouts (saved): ${savedWorkouts().slice(0, 15).map(w => `${w.title} (${MODES[w.where].label.toLowerCase()}, ${plural(w.exercises.length, 'exercise')})`).join('; ')}.`);
@@ -6476,6 +6860,8 @@ function renderSettings() {
     <div class="set-list">
       <button class="set-item as-btn" data-action="buildPlan"><div class="grow"><div>Build my plan</div><div class="hint">${st.athlete ? esc(BUILDER.summary(BUILDER.profileOf(st.athlete))) : 'A week made for your position, build, experience and goal'}</div></div>${icon('sparkle')}</button>
       <button class="set-item as-btn" data-action="block"><div class="grow"><div>12-week plan</div><div class="hint">${blockOn() ? `Week ${clamp(blockWeekNow(), 1, 12)} of 12 — muscle, power and bat speed` : 'Add muscle, power and bat speed — analyzed for you'}</div></div>${icon('flame')}</button>
+      <button class="set-item as-btn" data-action="combo"><div class="grow"><div>Complete player plan</div><div class="hint">${comboOn() ? `Cycle ${S.settings.combo.cycle} — lift, throw, move` : '12 weeks + mobility + throwing, year-round'}</div></div>${icon('sparkle')}</button>
+      <button class="set-item as-btn" data-action="throwPlan"><div class="grow"><div>Throwing program</div><div class="hint">${throwOn() ? `${S.settings.throw.sessions} throwing days a week` : 'Throw harder from the field — not pitching'}</div></div>${icon('baseball')}</button>
       <button class="set-item as-btn" data-action="move"><div class="grow"><div>Mobility plan</div><div class="hint">${moveOn() ? `${S.settings.move.sessions} sessions a week — agility, sprints, stretching, conditioning` : 'Agility, sprints, stretching and conditioning — runs alongside'}</div></div>${icon('timer')}</button>
       <button class="set-item as-btn" data-action="programs"><div class="grow"><div>Program: ${esc(planBuilt() ? 'My plan (built for you)' : program().name)}</div><div class="hint">Your own plan, or the off-season, power & speed, pre-season and in-season plans</div></div>${icon('plan')}</button>
       <button class="set-item as-btn" data-action="workouts"><div class="grow"><div>Presets &amp; my workouts</div><div class="hint">${BUILDER.PRESETS.length} ready-made workouts${savedWorkouts().length ? ` · ${plural(savedWorkouts().length, 'saved workout')}` : ''}</div></div>${icon('dumbbell')}</button>
@@ -6816,6 +7202,13 @@ const HELP = [
     'Every lift starts with a mobility drill, a jump and a rotational med ball throw, and ends with stretches. Off days are hitting sessions with drills for your Swing lab priorities, mobility and sprints.',
     'Each Monday that week\'s workouts go into your plan. Tap the 12-week card on Today or Plan to see where you are, whether your weight is on pace, and your test numbers start → now.',
     'Weigh in 2–3 mornings a week. Behind for 2 weeks? Add about 250 calories a day. End early any time and your old plan comes back.']],
+  ['Throwing program', ['Plan → Throwing program: throw harder from the outfield, infield or behind the plate — not a pitching program. Tell it your position, your comfortable long-toss distance, how much you\'ve been throwing and whether you have a partner.',
+    'Each 12-week cycle: a ramp-up, then long toss (out with an arc, back in on a line), position throws and easy recovery catch, then a few max-intent throws a week, then a test week. Each new cycle starts from your longest logged throw.',
+    'Every session goes into your throwing log. Tell it how your arm feels when you finish: sore turns the next throwing day into easy catch; pain means no throwing until it\'s gone — see an athletic trainer.',
+    'No weighted balls — for high-school arms the injury risk isn\'t worth it. On days you pitch or play a game, skip the throwing session.']],
+  ['Complete player plan', ['Plan → Complete player plan: one set of questions starts the 12-week plan, the mobility plan and the throwing program together. Each keeps its full sessions — Dugout just picks the days and the order.',
+    'On busy days Today shows the order: throw first (after your warm-up), then lift, then mobility — or split the day.',
+    'It\'s long term: after week 12 the next cycle starts by itself with your new weight, test numbers, swing scan and long-toss distance.']],
   ['Mobility plan', ['Plan → Mobility plan: agility, sprinting, stretching and baseball conditioning in 8-week waves, 3–6 sessions a week. Tell it where you train (a field, a gym or a driveway) and what matters most.',
     'Its session for the day shows on Today under your planned workout — start it from there. It never changes your weekly plan or the 12-week plan.',
     'With the 12-week plan on, it picks the days: sprints, agility and conditioning only when your legs are fresh, stretching and recovery on leg days, nothing on the rest day, and never the same exercise twice in a day.',
@@ -6910,6 +7303,8 @@ function cleanSettings(st) {
   out.pantry = cleanPantry(out.pantry);
   out.athlete = isObj(out.athlete) ? { ...BUILDER.profileOf(out.athlete), built: !!out.athlete.built } : null;
   if (out.athlete && out.athlete.pos === 'none') out.athlete = null;
+  out.throw = isObj(out.throw) && /^\d{4}-\d{2}-\d{2}$/.test(out.throw.start || '') ? { ...THROW.answersOf(out.throw), start: out.throw.start } : null;
+  out.combo = isObj(out.combo) && /^\d{4}-\d{2}-\d{2}$/.test(out.combo.start || '') ? { start: out.combo.start, cycle: Math.max(1, Number(out.combo.cycle) || 1) } : null;
   out.move = isObj(out.move) && /^\d{4}-\d{2}-\d{2}$/.test(out.move.start || '') ? { ...MOVE.answersOf(out.move), start: out.move.start } : null;
   out.block = isObj(out.block) && /^\d{4}-\d{2}-\d{2}$/.test(out.block.start || '') ? { ...BLOCK.answersOf(out.block), start: out.block.start, week: Number(out.block.week) || 0 } : null;
   return out;
@@ -7182,6 +7577,8 @@ function whatsNew() {
     ${item('flame', 'More explosive', 'Every starting lift now opens with jumps or med ball throws while you\'re fresh. New: pogo hops, squat jumps, seated box jumps, hurdle hops, depth jumps, trap bar jumps, rotational shot puts, step-behind throws, backward tosses, wall drives, falling starts and flying sprints — each with a form video. Plus a Power & speed block program, explosive presets and a rotational med ball throw test.')}
     ${item('refresh', 'Flexibility everywhere', 'Every training day ends with 1–2 stretches you hold, the mobility day is now a full Flexibility & Mobility day, and there are 13 new mobility drills and stretches, a Stretching option in Make me a workout and five flexibility presets (including a 10-minute daily stretch). The timer for "45 sec/side" holds now does both sides.')}
     ${item('sparkle', '12-week plan: muscle, power & bat speed', 'Plan → 12-week plan: tell Dugout your position, size, experience, schedule and numbers, get an analysis (what\'s realistic, what to eat, weekly weight targets) and 12 weeks of lifting, hitting, speed and flexibility built from it — with a dashboard to keep you on pace.')}
+    ${item('baseball', 'Throwing program', 'Plan → Throwing program: throw harder from the field (not pitching) — ramp-up, long toss, pull-downs, max-intent and position throws in 12-week cycles, with arm care every session and your arm feel deciding the next day.')}
+    ${item('sparkle', 'Complete player plan', 'Plan → Complete player plan: the 12-week plan, mobility and throwing together, year-round — each keeps its full sessions, and Today shows the order on busy days.')}
     ${item('timer', 'Mobility plan', 'Plan → Mobility plan: agility, sprints, stretching and baseball conditioning in 8-week waves. It shows on Today next to your workout and fits around the 12-week plan without changing it.')}
     ${item('plan', 'Keep your plan, add the new stuff', 'Your plan wasn\'t changed. Tap below to add stretch finishers to it, or use Plan → Edit day → Explosive start / Stretch finisher one day at a time. To get the whole new version, switch programs or rebuild your plan.')}
     <div class="grid2">
@@ -7298,7 +7695,7 @@ async function lockApp(message) {
   panJob = null; panFound = null;
   if (coachJob) coachJob.ac.abort();                 // and a Coach reply
   coachJob = null;
-  buildDraft = null; quickDraft = null; shownWo = null; blockDraft = null;  // and a half-built plan or workout
+  buildDraft = null; quickDraft = null; shownWo = null; blockDraft = null; comboDraft = null;  // and a half-built plan or workout
   Object.assign(S, { locked: true, settings: { ...DEFAULT_SETTINGS }, plan: null, active: null, workouts: [], meals: [], foods: [], logs: [], openEx: null, swingOpen: null, coach: null, coachDraft: '' });
   render();
   if (message) toast(message);

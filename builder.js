@@ -116,6 +116,7 @@ const BUILDER = (() => {
     ['Base-running turns', 'speed', 'bw', 1, 'I O C'], ['Shuffle-to-sprint', 'agility', 'bw', 1, 'lat I C'], ['L-drill (3-cone)', 'agility', 'bw', 1, 'I C'], ['Carioca', 'drill', 'bw', 1, 'lat'],
     // Mobility plan only (move.js) — slots the built days never use: a hill, and long easy cardio
     ['Hill sprints', 'hill', 'bw', 2, 'O'], ['Easy cardio (bike or jog)', 'aero', 'bw', 1, 'low'],
+    ['Long toss: extension', 'throw', 'bw', 1], ['Long toss: pull-downs', 'throw', 'bw', 1], ['Max-intent crow-hop throws', 'throw', 'bw', 2], ['Recovery catch', 'throw', 'bw', 1],   // throwing program only (throw.js)
     ['Repeat 30-yard sprints', 'cond', 'bw', 2], ['Tempo runs', 'cond', 'bw', 1, 'low'], ['Bike intervals', 'cond', 'gym', 1, 'low'], ['Jump rope', 'cond', 'bw', 1, 'low'],
     ['Bear crawl', 'cond', 'bw', 1],
 

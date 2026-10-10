@@ -38,7 +38,7 @@
 
   <noscript><p style="padding:24px;color:#fff">Please turn on JavaScript to use Dugout.</p></noscript>
 
-  <!-- Order matters: the data files (plan, meals, foods, exercises, drills, pantry), builder.js (which reads plan.js and exercises.js), block.js (which reads builder.js and drills.js), move.js and
+  <!-- Order matters: the data files (plan, meals, foods, exercises, drills, pantry), builder.js (which reads plan.js and exercises.js), block.js (which reads builder.js and drills.js), move.js, throw.js and
        db.js must load before app.js, and ai.js (the Claude connection) before scan.js and coach.js.
        ?v= is the app version. On every release set it (here and on styles.css) to the same number as
        APP_VERSION in app.js and VERSION in sw.js, so phones load the new files instead of old copies. -->
@@ -50,6 +50,7 @@
   <script src="drills.js?v=2.6.0" defer></script>
   <script src="block.js?v=2.6.0" defer></script>
   <script src="move.js?v=2.6.0" defer></script>
+  <script src="throw.js?v=2.6.0" defer></script>
   <script src="swing.js?v=2.6.0" defer></script>
   <script src="pantry.js?v=2.6.0" defer></script>
   <script src="ai.js?v=2.6.0" defer></script>

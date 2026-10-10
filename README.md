@@ -37,6 +37,18 @@ unless you turn on the optional Claude features with your own Anthropic API key 
   your Swing lab priorities, mobility and sprints. Each week goes into your plan automatically, and a dashboard shows your
   weight against the target and your numbers start → now. Once a week the first hitting day starts with a **Swing lab check**:
   film one swing, and the problems it finds pick the first drills on the next week's hitting days
+- **Throwing program** (Plan → Throwing program): throw harder from the outfield, infield or behind the plate — not a pitching
+  program. 12-week cycles that keep going: a ramp-up (1–3 weeks depending on how long you've been off), long toss with an arc
+  out to your comfortable max and pull-downs back in on a line, position throws (crow hops and do-or-die balls, throws across the
+  diamond, catcher transfers), easy recovery catch, max-intent crow-hop throws from week 7, and a test week. Long toss grows
+  about 4% a week, and each new cycle starts from your longest logged throw. No weighted balls; arm care before and after every
+  session. Each session goes into the throwing log, and how your arm feels decides the next one (sore → recovery catch, pain →
+  no throwing)
+- **Complete player plan** (Plan → Complete player plan): one set of questions starts the 12-week plan, the mobility plan and
+  the throwing program on the same Monday. None is cut down for another — each keeps its full sessions; Dugout only picks the
+  days (hard throwing on upper-body or hitting days and never two in a row, sprints only on fresh legs, one full rest day) and
+  shows the order on busy days (throw, then lift, then mobility). It's long term: after week 12 the next cycle starts by itself
+  with your new weight, test numbers, swing scan and long-toss distance
 - **Mobility plan** (Plan → Mobility plan): agility, sprinting, stretching and baseball conditioning in 8-week waves (Base,
   Build, Sharpen), 3–6 sessions of 20–45 minutes — speed & acceleration, agility & quickness (with your position's footwork),
   baseball conditioning (repeat 30-yard sprints, tempo runs, bike or jump-rope intervals), flexibility, and recovery cardio —
@@ -52,7 +64,7 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 - **Light / Moderate / Heavy** switch on the Today screen: pick how hard to go each day. Moderate trims the sets and
   starts weights at about 90% of last time; Light swaps in an easy recovery workout (mobility, arm care, core — every
   exercise has a form video) that you can edit in Plan → Light workout
-- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 148 exercises, plus a searchable exercise library
+- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 152 exercises, plus a searchable exercise library
 - Next-weight suggestions, warm-up sets, plate calculator, exercise swaps, effort rating and notes
 - Daily readiness check-in (sleep, energy, soreness)
 
@@ -121,6 +133,7 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 | `foods.js` | Built-in food list |
 | `drills.js` | Baseball drills for every position and the swing problems they fix |
 | `block.js` | The 12-week plan: the questions, the analysis and every week's workouts |
+| `throw.js` | The throwing program: its cycles, sessions and how they fit around your other plans |
 | `move.js` | The mobility plan: its sessions and how they fit around your other plans |
 | `swing.js` | Swing lab: runs the body tracking on your video and measures the swing |
 | `pantry.js` | Pantry: the food catalog (names and brands), what each recipe needs, quick plates and the matching |
