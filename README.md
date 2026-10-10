@@ -72,6 +72,9 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 - Food log with a built-in list of 169 common foods, favorites, servings, calories, protein, carbs and fat
 - Goal calculator for calories, protein, carbs, fat and water
 - Daily meal plan sized to your goals (training, rest and game days) and 45 athlete recipes
+- Recommended ingredients: the staples that make the meals, grouped by aisle, with what to buy and how long each keeps —
+  for your meal plan this week, the best 25 (they make 26 of the recipes) or every recipe; one tap adds what you're
+  missing to the Pantry shopping list
 - **Pantry — what can I make?** Take photos of your pantry, fridge and freezer (or tap in what you have) and see the
   recipes you can make right now, quick plates (a protein + a carb + a fruit or veggie you have, with calories and
   protein), what you're one ingredient away from, and a shopping list. Photos are read on the phone: OCR

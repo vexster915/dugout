@@ -283,6 +283,85 @@ const PANTRY_PLATES = [
     'Fruit or veggies plus a protein or healthy fat keeps you full between meals.']
 ].map(([name, meals, slots, how]) => ({ name, meals, slots, how }));
 
+// Recommended ingredients (Diet → Meals → Ingredients to keep stocked): what to buy for each one, and how long it keeps.
+// Keyed by item or group id (the ids RECIPE_NEEDS uses).
+const PANTRY_PICKS = {
+  /* proteins */
+  eggs: ['Large eggs, 18-count — the cheapest good protein there is.', 'Fridge 3–5 weeks'],
+  'egg-whites': ['Liquid egg whites in a carton — extra protein with almost no fat.', 'Fridge 7 days once open'],
+  chicken: ['Boneless skinless breasts or thighs in a family pack — or a rotisserie chicken for zero cooking.', 'Fridge 2 days raw · freeze in meal-size bags'],
+  'ground-meat': ['93% lean ground turkey or beef — buy the 3-lb pack and freeze it in 1-lb bags.', 'Fridge 2 days raw · freezer 3 months'],
+  'deli-meat': ['Low-sodium deli turkey or ham — sliced, from the deli counter or a tub.', 'Fridge 5 days once open'],
+  tuna: ['Chunk light tuna in water, cans or pouches — the pouches need no can opener for the bag.', 'Pantry 2+ years'],
+  salmon: ['Frozen salmon fillets (individually wrapped) — cheaper than fresh and just as good.', 'Freezer 3 months · thaw overnight in the fridge'],
+  steak: ['Sirloin or flank steak — lean and cheaper than ribeye.', 'Fridge 3 days · freezer 6 months'],
+  shrimp: ['Frozen cooked or raw peeled shrimp, tail-off — thaws in 10 minutes under cold water.', 'Freezer 6 months'],
+  'protein-powder': ['Whey or whey isolate (plant protein if dairy bothers you) with a third-party seal like NSF Certified for Sport or Informed Sport.', 'Pantry — use within a year'],
+  'choc-milk': ['Low-fat chocolate milk (ultra-filtered like Fairlife has about double the protein).', 'Fridge 7 days once open'],
+  'cottage-cheese': ['2% cottage cheese — about 25 g protein a cup.', 'Fridge 7 days once open'],
+  edamame: ['Frozen shelled edamame — microwave in the bag.', 'Freezer 8 months'],
+  hummus: ['Plain or roasted-garlic hummus, a big tub.', 'Fridge 7 days once open'],
+  chickpeas: ['Canned chickpeas (garbanzo beans), rinsed.', 'Pantry 2+ years'],
+  /* dairy */
+  milk: ['2% or whole milk (Fairlife if you want more protein; Lactaid if milk bothers you).', 'Fridge about 7 days once open'],
+  yogurt: ['Plain Greek yogurt, the 32-oz tub — 2% tastes better than nonfat and still has 20+ g protein a cup.', 'Fridge 1–2 weeks'],
+  cheese: ['A bag of shredded cheddar or Mexican blend covers almost every recipe; string cheese for snacks.', 'Fridge 3–4 weeks · shredded freezes well'],
+  parmesan: ['Grated parmesan — a little goes a long way.', 'Fridge 2+ months'],
+  'cream-cheese': ['Regular or light cream cheese, the brick or a tub.', 'Fridge 10 days once open'],
+  /* grains */
+  oats: ['Old-fashioned rolled oats, the big canister — they work for oatmeal, overnight oats, pancakes and shakes.', 'Pantry 1 year'],
+  rice: ['White or jasmine rice in a bag, plus microwave rice pouches for busy days.', 'Pantry 1+ year dry · fridge 4 days cooked'],
+  pasta: ['Penne or rotini — or protein pasta (Barilla Protein+) for extra protein.', 'Pantry 1–2 years'],
+  bread: ['Whole-wheat sandwich bread (Dave\'s Killer or similar).', 'Counter 5–7 days · freezer 3 months'],
+  bagels: ['Plain or whole-wheat bagels — freeze half the bag and toast from frozen.', 'Counter 4 days · freezer 3 months'],
+  tortilla: ['Large (10-inch) flour tortillas for burritos and wraps.', 'Fridge 3 weeks · freezer 6 months'],
+  'english-muffins': ['Whole-wheat English muffins.', 'Counter 5 days · freezer 3 months'],
+  buns: ['Whole-wheat hamburger buns.', 'Counter 5 days · freezer 3 months'],
+  pita: ['Whole-wheat pita or naan.', 'Counter 5 days · freezer 3 months'],
+  granola: ['A granola with less than 10 g sugar per serving.', 'Pantry 2 months once open'],
+  cereal: ['A whole-grain cereal (Cheerios, Mini-Wheats, Raisin Bran) — also good dry as a snack.', 'Pantry 2 months once open'],
+  crackers: ['Whole-grain crackers like Triscuits or Wheat Thins.', 'Pantry 1–2 months once open'],
+  pretzels: ['Pretzel twists or rods — salty carbs for hot game days.', 'Pantry 1–2 months'],
+  'rice-cakes': ['Plain or lightly salted rice cakes.', 'Pantry 1 month once open'],
+  potato: ['A 5-lb bag of russet or Yukon gold potatoes, and sweet potatoes for variety.', 'Cool dark spot 3–5 weeks (not the fridge)'],
+  /* fruit & veg */
+  bananas: ['Bananas — buy some green and some yellow so they don\'t all ripen at once. Freeze overripe ones for shakes.', 'Counter 5–7 days · freezer 3 months peeled'],
+  berries: ['Frozen mixed berries — cheaper than fresh, last for months, perfect for shakes and oats.', 'Freezer 8 months'],
+  apples: ['Crunchy apples (Honeycrisp, Gala, Fuji).', 'Fridge 4–6 weeks'],
+  'dried-fruit': ['Raisins or dried cranberries.', 'Pantry 6 months'],
+  applesauce: ['Unsweetened applesauce pouches — easy to throw in a bat bag.', 'Pantry 1 year'],
+  pineapple: ['Canned pineapple chunks in juice, or frozen chunks.', 'Pantry 1+ year'],
+  'orange-juice': ['100% orange juice (not "drink" or "cocktail").', 'Fridge 7–10 days once open'],
+  broccoli: ['Frozen broccoli florets — steam them in the microwave bag.', 'Freezer 8 months'],
+  'bell-peppers': ['Fresh bell peppers, or a bag of frozen pepper strips for fajitas.', 'Fridge 1–2 weeks'],
+  greens: ['A tub of baby spinach — wilt it into eggs and pasta or use it as salad.', 'Fridge 5–7 days'],
+  spinach: ['Baby spinach in a tub.', 'Fridge 5–7 days'],
+  tomatoes: ['Grape or cherry tomatoes (they last longer than big ones).', 'Counter or fridge 1 week'],
+  onions: ['Yellow onions.', 'Cool dark spot 1–2 months'],
+  avocados: ['Avocados — buy them hard and let them ripen on the counter.', 'Counter 3–5 days to ripen'],
+  /* cans, jars & sauces */
+  beans: ['Canned black or pinto beans — rinse them to cut the salt.', 'Pantry 2+ years'],
+  'nut-butter': ['Peanut butter with just peanuts and salt (natural) — or any you\'ll eat. 2 tbsp is about 190 calories.', 'Pantry 3 months once open'],
+  jam: ['Strawberry or grape jam or jelly.', 'Fridge 6 months once open'],
+  honey: ['A squeeze bottle of honey — fast carbs for before games.', 'Pantry forever'],
+  'soy-sauce': ['Low-sodium soy sauce.', 'Pantry or fridge 1+ year'],
+  marinara: ['A jar of marinara or pasta sauce.', 'Pantry 1+ year · fridge 7 days once open'],
+  'crushed-tomatoes': ['Canned crushed tomatoes (28 oz).', 'Pantry 1+ year'],
+  pesto: ['A jar of basil pesto.', 'Fridge 7–10 days once open'],
+  alfredo: ['A jar of Alfredo sauce (or make it with milk and parmesan).', 'Fridge 5–7 days once open'],
+  salsa: ['A jar of mild or medium salsa.', 'Fridge 2 weeks once open'],
+  mustard: ['Yellow or honey mustard — almost no calories.', 'Fridge 1 year once open'],
+  /* spices */
+  'chili-powder': ['Chili powder.', 'Pantry 2 years'],
+  'curry-powder': ['Curry powder.', 'Pantry 2 years'],
+  'taco-seasoning': ['Taco seasoning packets — or make it with chili powder, cumin and garlic powder.', 'Pantry 2 years'],
+  'garlic-powder': ['Garlic powder — goes in almost everything.', 'Pantry 2 years'],
+  cinnamon: ['Ground cinnamon for oats and pancakes.', 'Pantry 2 years'],
+  /* snacks */
+  nuts: ['Unsalted or lightly salted peanuts, almonds or a mix — buy the big bag.', 'Pantry 3 months'],
+  'chia-seeds': ['Chia seeds — a spoonful thickens overnight oats and adds fiber.', 'Pantry 1+ year']
+};
+
 /* ---------------------------- Matching (used by the Pantry screen) ---------------------------- */
 const PANTRY = (() => {
   const GROUP_NAMES = { cheese: 'Cheese', yogurt: 'Yogurt', milk: 'Milk', chicken: 'Chicken', 'ground-meat': 'Ground turkey or beef',
@@ -371,5 +450,37 @@ const PANTRY = (() => {
     const score = it => { const n = it.name.toLowerCase(); if (n.startsWith(t)) return 3; if (n.includes(t)) return 2; return it.words.some(w => w.startsWith(t)) ? 1 : 0; };
     return PANTRY_ITEMS.map(it => [it, score(it)]).filter(([, s2]) => s2 > 0).sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name)).slice(0, limit).map(([it]) => it);
   }
-  return { rank, plates, match, findInText, search, has: (ids, id) => has(withBasics(ids), id), nameOf, needName, members };
+  // Recommended ingredients for a set of recipes. Picks one at a time — each time the one that gets the most recipes
+  // closest to ready (a recipe one item away counts more than one three items away) — so the first picks are the most
+  // useful. limit: stop at this many; without one, go until every recipe can be made. weight: { recipeId: n } to count
+  // some recipes more (meals you'll eat more often). Returns the picks in order with the recipes each is used in, and
+  // the recipes they make.
+  const shelfOf = id => (PANTRY_BY_ID[id] || PANTRY_BY_ID[(members[id] || [])[0]] || { cat: 'other' }).cat;
+  function staples(recipes, { limit = 0, weight = {} } = {}) {
+    const list = recipes.filter(r => RECIPE_NEEDS[r.id]), kit = new Set(), order = [];
+    while (!limit || kit.size < limit) {
+      const score = {};
+      for (const r of list) {
+        const miss = RECIPE_NEEDS[r.id].need.filter(n => !hasNeed(kit, n));
+        if (!miss.length) continue;
+        const w = (weight[r.id] || 1) / Math.pow(miss.length, 1.5);
+        miss.forEach(n => [].concat(n).forEach((x, _, all) => { score[x] = (score[x] || 0) + w / all.length; }));
+      }
+      const best = Object.entries(score).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+      if (!best) break;
+      kit.add(best[0]); order.push(best[0]);
+    }
+    const makes = list.filter(r => RECIPE_NEEDS[r.id].need.every(n => hasNeed(kit, n)));
+    const usedBy = id => list.filter(r => RECIPE_NEEDS[r.id].need.some(n => [].concat(n).some(x => x === id || (members[x] || []).includes(id)))).map(r => r.id);
+    return { items: order.map((id, i) => ({ id, rank: i + 1, name: nameOf(id), cat: shelfOf(id), recipes: usedBy(id), pick: PANTRY_PICKS[id] || null })), makes: makes.map(r => r.id) };
+  }
+  // Nice-to-haves that show up in a lot of these recipes (sauces, spices, toppings), most used first.
+  function extras(recipes, skip, max = 10) {
+    const n = {};
+    recipes.forEach(r => (RECIPE_NEEDS[r.id] || { nice: [] }).nice.forEach(x => [].concat(x).forEach(y => { if (!skip.has(y)) n[y] = (n[y] || 0) + 1; })));
+    const inGroup = y => { const g = (PANTRY_BY_ID[y] || {}).group; return g && (skip.has(g) || n[g]); };   // spinach when "lettuce or spinach" is there
+    return Object.entries(n).filter(([y, c]) => c >= 2 && !inGroup(y)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max)
+      .map(([id, c]) => ({ id, name: nameOf(id), cat: shelfOf(id), count: c, pick: PANTRY_PICKS[id] || null }));
+  }
+  return { rank, plates, match, findInText, search, has: (ids, id) => has(withBasics(ids), id), nameOf, needName, members, staples, extras };
 })();
