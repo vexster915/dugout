@@ -1179,7 +1179,9 @@ actions.removeSet = el => {
 actions.workTimer = el => {
   if (!S.active) return;
   unlockAudio();
-  const sec = +el.dataset.sec, name = S.active.exercises[+el.dataset.i].name;
+  const ex = S.active.exercises[+el.dataset.i], sec = +el.dataset.sec;
+  if (!ex || !(sec > 0)) return;
+  const name = ex.name;
   if (el.dataset.sides === '2') startTimer(sec, `Work · ${name} · side 1`, [[5, 'Switch sides'], [sec, `Work · ${name} · side 2`]]);
   else startTimer(sec, `Work · ${name}`);
 };
@@ -1822,7 +1824,8 @@ actions.programs = () => openSheet('Programs', `<div class="stack">
 actions.useProgram = async el => {
   const k = el.dataset.k, p = PROGRAMS[k];
   if (!p) return;
-  if (!(await confirmBox(`Switch to ${p.name}?`, 'Your gym and home weekly plans will be replaced with this program. Workout history is kept.', { ok: 'Switch' }))) return;
+  if (!(await confirmBox(`Switch to ${p.name}?`, `Your gym and home weekly plans will be replaced with this program. Workout history is kept.${blockClash()}`, { ok: 'Switch' }))) return;
+  dropBlock();
   S.plan = { ...buildPlan(p.plan), light: S.plan.light, saved: savedWorkouts() };      // your Light workout and saved workouts stay
   S.settings.program = k;
   if (S.settings.athlete) S.settings.athlete.built = false;
@@ -1943,7 +1946,8 @@ changes.copyDayFrom = async el => {
 };
 actions.resetDay = async () => {
   const mode = S.settings.mode, di = S.planDay;
-  if (!(await confirmBox('Reset this day?', `${dayName(di)} (${MODES[mode].label}) goes back to the exercises and videos ${planBuilt() ? 'of the plan you built' : 'it started with'}. Your workout history is kept.`, { ok: 'Reset', danger: true }))) return;
+  const inBlock = blockOn() && di !== LIGHT && mode === S.settings.block.where && blockWeekNow() >= 1 && blockWeekNow() <= BLOCK.WEEKS;
+  if (!(await confirmBox('Reset this day?', `${dayName(di)} (${MODES[mode].label}) goes back to the exercises and videos ${inBlock ? 'of this week of your 12-week plan' : planBuilt() ? 'of the plan you built' : 'it started with'}. Your workout history is kept.`, { ok: 'Reset', danger: true }))) return;
   const fresh = startingPlan();
   setDayPlan(di, di === LIGHT ? fresh.light[mode] : fresh[mode][di], mode);
   savePlan(); render(); toast('Day reset');
@@ -1972,7 +1976,19 @@ function builtPlan(a) {
   return { gym: w.gym.map(asPlanDay), home: w.home.map(asPlanDay), light: { gym: asPlanDay(w.light.gym), home: asPlanDay(w.light.home) } };
 }
 // What "reset" goes back to: the plan you built, or the starting program.
-const startingPlan = () => (planBuilt() ? builtPlan(S.settings.athlete) : buildPlan(program().plan));
+// While the 12-week plan is on, its plan (gym or home) starts as this week of the 12 weeks.
+function startingPlan() {
+  const p = planBuilt() ? builtPlan(S.settings.athlete) : buildPlan(program().plan), b = S.settings.block, w = blockWeekNow();
+  if (blockOn() && w >= 1 && w <= BLOCK.WEEKS) p[b.where] = BLOCK.week(b, w, { age: athleteAge() }).days.map(asPlanDay);
+  return p;
+}
+// Switching programs or using a built plan replaces your weekly plans, so it ends the 12-week plan (next Monday's week
+// would overwrite the new plan). Mobility and throwing keep going on their own.
+const blockClash = () => (blockOn() ? ` This ends your 12-week plan${comboOn() ? ' and the complete plan — mobility and throwing keep going on their own' : ''}.` : '');
+function dropBlock() {
+  if (!blockOn()) return;
+  S.settings.block = null; S.settings.combo = null; blockDraft = null;
+}
 
 // Radio or checkbox buttons in a grid (cls: "wrap2", "wrap3" or "days").
 const optGrid = (name, opts, cur, { multi = false, cls = '' } = {}) => `<div class="choice ${cls}">${opts.map(([v, l]) => {
@@ -2037,7 +2053,8 @@ actions.buildMix = () => { if (!buildDraft) return; buildDraft.a = { ...buildDra
 actions.applyBuild = async () => {
   const draft = buildDraft;
   if (!draft) return;
-  if (!(await confirmBox('Use this plan?', 'Your gym and home weekly plans will be replaced with the plan you built. Workout history and saved workouts are kept.', { ok: 'Use it' }))) { showBuild(); return; }
+  if (!(await confirmBox('Use this plan?', `Your gym and home weekly plans will be replaced with the plan you built. Workout history and saved workouts are kept.${blockClash()}`, { ok: 'Use it' }))) { showBuild(); return; }
+  dropBlock();
   const p = builtPlan(draft.a);
   S.plan = { gym: p.gym, home: p.home, light: draft.light ? p.light : S.plan.light, saved: savedWorkouts() };
   S.settings.athlete = { ...draft.a, built: true };
@@ -2292,7 +2309,11 @@ const cleanSaved = list => (Array.isArray(list) ? list : []).filter(w => isObj(w
 // Dugout puts that week's workouts into your Gym or Home plan; your plan from before is kept in plan.before and comes
 // back if you end the 12 weeks early.
 
-const blockOn = () => !!(S.settings.block && S.settings.block.start);
+// The plan files (block.js, move.js, throw.js). If one didn't load (an interrupted update), its plan is just off until
+// the next reload — your answers stay saved and nothing else breaks.
+const HAS = { block: typeof BLOCK !== 'undefined', move: typeof MOVE !== 'undefined', throw: typeof THROW !== 'undefined' };
+const needsReload = k => { if (HAS[k]) return false; toast('Part of Dugout didn\'t finish updating — close and reopen the app'); return true; };
+const blockOn = () => !!(HAS.block && S.settings.block && S.settings.block.start);
 const blockWeekNow = () => (blockOn() ? BLOCK.weekOn(S.settings.block.start, ymd()) : 0);
 const kgUnits = () => S.settings.unit === 'kg';
 const toLb = v => (kgUnits() ? v / LB : v), fromLb = v => (kgUnits() ? v * LB : v);
@@ -2314,7 +2335,7 @@ function blockDefaults() {
 }
 
 let blockDraft = null;     // answers being looked at (before you start, or when you change them)
-actions.block = () => { blockDraft = null; if (blockOn()) blockHome(); else blockForm(); };
+actions.block = () => { if (needsReload('block')) return; blockDraft = null; if (blockOn()) blockHome(); else blockForm(); };
 actions.blockForm = () => blockForm();
 const numIn = (name, label, v, ph = '') => `<label class="field"><span>${label}</span><input name="${name}" inputmode="decimal" value="${v == null ? '' : esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
 // The 12-week questions (also the first part of the combined plan's form).
@@ -2459,7 +2480,7 @@ submits.blockStart = async f => {
 // Turn the 12-week plan on (your old plan is kept to come back to), and set your nutrition goals if you said so.
 function startBlock(a, start, goals) {
   const an = BLOCK.analyze(a);
-  if (!blockOn() || !S.plan.before) S.plan.before = clone({ gym: S.plan.gym, home: S.plan.home });
+  if (!S.plan.before) S.plan.before = clone({ gym: S.plan.gym, home: S.plan.home });   // kept through "Start another 12 weeks" too
   S.settings.block = { ...a, start, week: 0 };
   S.settings.mode = a.where;
   S.settings.bats = a.bats === 'L' ? 'L' : 'R';
@@ -2487,7 +2508,7 @@ function installBlockWeek(force = false) {
 }
 function checkBlockWeek() {
   if (S.locked || !blockOn()) return;
-  if (S.settings.combo && comboNextCycle()) {      // the complete plan keeps going: next 12-week cycle
+  if (comboOn() && comboNextCycle()) {      // the complete plan keeps going: next 12-week cycle
     installBlockWeek(true);
     toast(`Cycle ${S.settings.combo.cycle} of your complete plan — week 1 is in your plan`);
     return;
@@ -2589,7 +2610,7 @@ function blockCard() {
 // from there — so it can run at the same time as the 12-week plan without changing anything in it. While the 12-week plan
 // is on, it schedules around that week (move.js) and leaves out anything already in that day's 12-week workout.
 
-const moveOn = () => !!(S.settings.move && S.settings.move.start);
+const moveOn = () => !!(HAS.move && S.settings.move && S.settings.move.start);
 const moveWeekNow = () => (moveOn() ? MOVE.weekOn(S.settings.move.start, ymd()) : 0);
 // This week's sessions, fitted around the 12-week plan when it's on (the same Monday–Sunday week).
 function moveWeek() {
@@ -2599,7 +2620,7 @@ function moveWeek() {
 }
 const isMoveWorkout = w => w.src === 'move';
 
-actions.move = () => (moveOn() ? moveHome() : moveForm());
+actions.move = () => (needsReload('move') ? null : moveOn() ? moveHome() : moveForm());
 // The mobility questions. In the combined plan (p = 'mv_') the shared ones (position, age, season, days) come from the
 // 12-week questions instead.
 function moveFields(m, p = '') {
@@ -2702,7 +2723,7 @@ function moveCard() {
   return `<section class="card stack-sm">
     <div class="spread"><span class="badge accent">${icon('timer')} Mobility plan · week ${MOVE.waveWeek(now)}</span>${done ? `<span class="badge good">${icon('check')} Done</span>` : ''}</div>
     <div class="card-title">${esc(s.title)}</div>
-    <div class="small muted">${s.exercises.length} exercises · ~${estMinutes(s)} min${blockOn() && S.plan[S.settings.block.where][dayIdx()].type !== 'rest' ? ' · after your 12-week workout, or later in the day' : ''}</div>
+    <div class="small muted">${s.exercises.length} exercises · ~${estMinutes(s)} min${blockOn() && (S.plan[S.settings.block.where][dayIdx()] || {}).type !== 'rest' ? ' · after your 12-week workout, or later in the day' : ''}</div>
     <div class="grid2">
       <button class="btn ${done ? 'btn-ghost' : 'btn-primary'}" data-action="moveStartToday" ${S.active ? 'disabled' : ''}>${icon('play', 'sm')} ${done ? 'Again' : 'Start'}</button>
       <button class="btn btn-ghost" data-action="move">${icon('plan', 'sm')} The week</button>
@@ -2715,7 +2736,7 @@ function moveCard() {
 // the Monday it started). Like the mobility plan, its sessions show on Today next to your plan and never change it.
 // Every session goes into the throwing log, and how your arm feels decides what you throw next.
 
-const throwOn = () => !!(S.settings.throw && S.settings.throw.start);
+const throwOn = () => !!(HAS.throw && S.settings.throw && S.settings.throw.start);
 const throwWeekNow = () => (throwOn() ? THROW.weekOn(S.settings.throw.start, ymd()) : 0);
 const longestThrow = since => Math.max(0, ...logsOf('throw').filter(l => !since || l.date >= since).map(l => l.dist || 0));
 // From the second cycle on, long toss starts from the longest throw you logged (if it's farther).
@@ -2758,7 +2779,7 @@ function throwToday() {
   return s;
 }
 
-actions.throwPlan = () => (throwOn() ? throwHome() : throwForm());
+actions.throwPlan = () => (needsReload('throw') ? null : throwOn() ? throwHome() : throwForm());
 function throwDefaults() {
   const b = S.settings.block || {}, p = S.settings.profile || {};
   return THROW.answersOf({ pos: b.pos || (S.settings.athlete || {}).pos, throws: b.throws, age: b.age || p.age, season: b.season,
@@ -2925,7 +2946,7 @@ function todayOrderCard() {
 
 const comboOn = () => !!(S.settings.combo && blockOn() && moveOn() && throwOn());
 let comboDraft = null;   // { a: 12-week answers, m: mobility answers, t: throwing answers }
-actions.combo = () => { comboDraft = null; if (comboOn()) comboHome(); else comboForm(); };
+actions.combo = () => { if (needsReload('block') || needsReload('move') || needsReload('throw')) return; comboDraft = null; if (comboOn()) comboHome(); else comboForm(); };
 actions.comboForm = () => comboForm();
 function comboForm() {
   const a = comboDraft ? comboDraft.a : blockDefaults(), m = comboDraft ? comboDraft.m : MOVE.answersOf(S.settings.move || {}), t = comboDraft ? comboDraft.t : throwDefaults();
@@ -7147,7 +7168,8 @@ async function confirmRestore(data) {
 
 actions.resetPlan = async el => {
   const mode = el.dataset.mode, label = MODES[mode].label;
-  if (!(await confirmBox(`Reset ${label} plan?`, `All 7 ${label.toLowerCase()} days and the ${label.toLowerCase()} Light workout go back to ${planBuilt() ? 'the plan you built' : 'the starting plan'}, replacing your edits and video links. Workout history and saved workouts are kept.`, { ok: 'Reset', danger: true }))) return;
+  const inBlock = blockOn() && mode === S.settings.block.where && blockWeekNow() >= 1 && blockWeekNow() <= BLOCK.WEEKS;
+  if (!(await confirmBox(`Reset ${label} plan?`, `All 7 ${label.toLowerCase()} days and the ${label.toLowerCase()} Light workout go back to ${inBlock ? 'this week of your 12-week plan' : planBuilt() ? 'the plan you built' : 'the starting plan'}, replacing your edits and video links. Workout history and saved workouts are kept.`, { ok: 'Reset', danger: true }))) return;
   const fresh = startingPlan();
   S.plan[mode] = fresh[mode];
   S.plan.light[mode] = fresh.light[mode];
@@ -7312,10 +7334,12 @@ function cleanSettings(st) {
   out.pantry = cleanPantry(out.pantry);
   out.athlete = isObj(out.athlete) ? { ...BUILDER.profileOf(out.athlete), built: !!out.athlete.built } : null;
   if (out.athlete && out.athlete.pos === 'none') out.athlete = null;
-  out.throw = isObj(out.throw) && /^\d{4}-\d{2}-\d{2}$/.test(out.throw.start || '') ? { ...THROW.answersOf(out.throw), start: out.throw.start } : null;
-  out.combo = isObj(out.combo) && /^\d{4}-\d{2}-\d{2}$/.test(out.combo.start || '') ? { start: out.combo.start, cycle: Math.max(1, Number(out.combo.cycle) || 1) } : null;
-  out.move = isObj(out.move) && /^\d{4}-\d{2}-\d{2}$/.test(out.move.start || '') ? { ...MOVE.answersOf(out.move), start: out.move.start } : null;
-  out.block = isObj(out.block) && /^\d{4}-\d{2}-\d{2}$/.test(out.block.start || '') ? { ...BLOCK.answersOf(out.block), start: out.block.start, week: Number(out.block.week) || 0 } : null;
+  // The plans (2.6). If a plan's file didn't load, its saved answers are kept as they are (it's off until it loads).
+  const dated = x => isObj(x) && /^\d{4}-\d{2}-\d{2}$/.test(x.start || '');
+  out.throw = !dated(out.throw) ? null : !HAS.throw ? out.throw : { ...THROW.answersOf(out.throw), start: out.throw.start };
+  out.combo = dated(out.combo) ? { start: out.combo.start, cycle: Math.max(1, Number(out.combo.cycle) || 1) } : null;
+  out.move = !dated(out.move) ? null : !HAS.move ? out.move : { ...MOVE.answersOf(out.move), start: out.move.start };
+  out.block = !dated(out.block) ? null : !HAS.block ? out.block : { ...BLOCK.answersOf(out.block), start: out.block.start, week: Number(out.block.week) || 0 };
   return out;
 }
 function cleanExerciseData(e) {
