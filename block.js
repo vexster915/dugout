@@ -13,7 +13,9 @@
                  speed and game-speed hitting. Weeks 4 and 8 are lighter so you recover and grow; week 12 is a test week.
                  Every lift starts with a mobility drill, a jump and a rotational med ball throw while you're fresh, and
                  ends with stretches you hold. Off days are hitting sessions (drills picked for the phase and your Swing
-                 lab priorities) with mobility and sprints; the rest day has an optional 10-minute stretch.
+                 lab priorities) with mobility and sprints; the rest day has an optional 10-minute stretch. Once a week
+                 the first hitting day starts with a Swing lab check: film a swing, and what it finds picks the drills
+                 for the next week.
    3. Each week  the same exercises all phase long so the weights can climb (Dugout suggests the next weight), with
                  sets and reps that change week to week.
 
@@ -226,19 +228,26 @@ const BLOCK = (() => {
   const HIT = {
     1: ['tee-zones', 'two-tee', 'inside-out-tee', 'stride-freeze', 'head-still', 'hip-turn', 'hold-finish', 'fence-drill', 'stride-line', 'front-block', 'high-low-tee', 'shadow-swings'],
     2: ['overload-underload', 'step-back', 'front-toss', 'hip-turn', 'one-hand', 'side-toss', 'high-low-tee', 'tee-zones', 'two-tee'],
-    3: ['rapid-fire', 'call-location', 'live-timing', 'two-color', 'front-toss', 'overload-underload', 'high-low-tee', 'tee-zones']
+    3: ['rapid-fire', 'call-location', 'live-timing', 'two-color', 'front-toss', 'overload-underload', 'high-low-tee', 'tee-zones', 'step-back', 'two-tee', 'one-hand', 'stride-line', 'hold-finish']
   };
   function drillsFor(a, ph, i) {
     if (typeof DRILL_BY_ID === 'undefined') return [];
     const can = d => d && d.pos.includes('hitting') && (d.who === 'solo' || a.setup !== 'tee') && (d.id !== 'live-timing' || a.setup === 'cage') && d.id !== 'bunting';
-    const fix = ph < 3 ? DRILLS.filter(d => can(d) && d.fixes.some(f => a.faults.includes(f))).map(d => d.id) : [];
-    const list = [...new Set([...fix.slice(0, 3), ...HIT[ph]])].map(id => DRILL_BY_ID[id]).filter(can);
+    // Drills for your latest swing scan's priorities come first (3 in phases 1–2, 1 in phase 3 — the rest is game speed).
+    const fix = DRILLS.filter(d => can(d) && d.fixes.some(f => a.faults.includes(f)))
+      .sort((x, y) => a.faults.findIndex(f => x.fixes.includes(f)) - a.faults.findIndex(f => y.fixes.includes(f))).map(d => d.id);
+    const list = [...new Set([...fix.slice(0, ph < 3 ? 3 : 1), ...HIT[ph]])].map(id => DRILL_BY_ID[id]).filter(can);
     // Each hitting day of the week gets 3 different drills (rotating through the list); bat-speed swings stay in phase 2.
     const out = [];
     for (let k = 0; out.length < 3 && k < list.length; k++) out.push(list[(i * 3 + k) % list.length]);
     if (ph === 2 && !out.some(d => d.id === 'overload-underload') && DRILL_BY_ID['overload-underload']) out[out.length - 1] = DRILL_BY_ID['overload-underload'];
     return [...new Set(out)].map(d => ({ name: d.n, sets: 1, reps: d.dose, rest: 0, track: 'check', cues: d.cues.join(' · '), drill: d.id }));
   }
+
+  // The weekly swing scan (Baseball → Swing lab).
+  const SWING_CHECK = 'Swing lab check';
+  const swingCheck = () => ({ name: SWING_CHECK, sets: 1, reps: '1 swing, filmed', rest: 0, track: 'check', special: 'swing',
+    cues: 'After you warm up: film one game-speed swing from the side (whole body in the frame, phone still) and analyze it in Baseball → Swing lab. Its top priorities become the first drills on next week\'s hitting days.' });
 
   function trim(list, minutes) {
     const over = () => BUILDER.minutes(list.map(o => o.e)) > minutes + 5;
@@ -270,6 +279,7 @@ const BLOCK = (() => {
         const picked = BUILDER.choose(slotsFor(k, a, ph), { where: a.where, profile: prof, age: age || a.age, seed: seed + 50 + hi, used, avoid, allow });
         const body = picked.filter(o => !o.fin).map(o => dose(o, a, w, an)), fin = picked.filter(o => o.fin).map(o => dose(o, a, w, an));
         const drills = a.hits ? drillsFor(a, ph, hi) : [];
+        if (a.hits && hi === 0) drills.unshift(swingCheck());   // once a week: film a swing — its priorities pick next week's drills
         days.push({ title: `Wk ${w} · ${TITLES[k]}`, type: 'agility',
           focus: a.hits ? `${P.hit} Loosen up first, then quality swings — every one with a purpose. ${run ? 'Sprints after the swings, with full rest.' : ''}`.trim() : 'Arm care, mobility and a few fast sprints. Easy on the arm if you threw hard yesterday.',
           exercises: [...body.slice(0, 2), ...drills, ...body.slice(2), ...fin] });
@@ -280,11 +290,24 @@ const BLOCK = (() => {
     }
     return { week: w, phase: P, kind, days };
   }
+  // What each day of a week is, for plans that run alongside this one (move.js): low, up, fb (full body), pow, hit,
+  // hitrun (hitting + sprints), arm (arm care + sprints) or rest.
+  function roles(answers, w) {
+    const a = answersOf(answers), ph = phaseOf(w), lifts = LIFTS[a.days.length], free = [0, 1, 2, 3, 4, 5, 6].filter(d => !a.days.includes(d));
+    const restDay = free.includes(6) ? 6 : free[free.length - 1], hitDays = free.filter(d => d !== restDay).slice(0, 3);
+    return Array.from({ length: 7 }, (_, d) => {
+      const li = a.days.indexOf(d), hi = hitDays.indexOf(d);
+      if (li >= 0) { const k = lifts[li]; return k.startsWith('low') ? 'low' : k.startsWith('up') ? 'up' : k === 'pow' ? 'pow' : 'fb'; }
+      if (hi >= 0) return !a.hits ? 'arm' : ph >= 2 && hi === 0 ? 'hitrun' : 'hit';
+      return 'rest';
+    });
+  }
+
   const weekOn = (start, date) => {          // start: Monday "YYYY-MM-DD" of week 1 → week number for a date (0 = not started)
     const p = s => { const [y, m, d] = String(s).split('-').map(Number); return Date.UTC(y, m - 1, d); };
     const days = Math.floor((p(date) - p(start)) / 86400000);
     return days < 0 ? 0 : Math.floor(days / 7) + 1;
   };
 
-  return { WEEKS, PHASES, SORE, SETUP, GAINS, MARKS, answersOf, analyze, week, weekOn, phaseOf, kindOf, fmtHeight };
+  return { WEEKS, PHASES, SWING_CHECK, roles, SORE, SETUP, GAINS, MARKS, answersOf, analyze, week, weekOn, phaseOf, kindOf, fmtHeight };
 })();

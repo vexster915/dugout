@@ -850,6 +850,67 @@ const EXERCISE_INFO = {
     mistakes: ["Shrugging up to your ears", "Rushing the breaths"],
     easier: "Knees wider", harder: "Rest your hands on a low bench", swap: ["Lat stretch on rack", "Cat-cow + deep breathing"]
   },
+  /* ---------- Conditioning and agility for the mobility plan (added in 2.6) ---------- */
+  "Hill sprints": {
+    muscles: "Glutes, calves, hip flexors", why: "The hill forces a good forward lean and powerful push-off — acceleration work that's kind to your hamstrings.",
+    steps: ["Find a moderate hill with 15–20 yards of slope.", "Start in a staggered stance and lean into the hill.", "Sprint hard for about 10 seconds, driving your knees and arms.", "Walk back down slowly and rest fully."],
+    mistakes: ["A hill so steep you can't run fast", "Short rests that turn it into conditioning"],
+    easier: "Fewer reps or a gentler slope", harder: "Longer hill (12–15 seconds)", swap: ["Falling starts", "Sled push"]
+  },
+  "Base-running turns": {
+    muscles: "Legs, hips", why: "Taking a good turn at first is free speed — it's how singles become doubles.",
+    steps: ["Start in the batter's box (or at a cone) after a dry swing.", "Sprint out and bow out a step about two-thirds of the way to first.", "Hit the inside corner of the bag with either foot, leaning in.", "Drive straight to second, then walk back."],
+    mistakes: ["Rounding wide in a big banana", "Slowing down to touch the bag", "Watching the ball instead of running"],
+    easier: "Home to first with a turn, no sprint to second", harder: "First to third, or score from second", swap: ["Base-stealing starts (crossover)", "Crossover sprint starts"]
+  },
+  "Shuffle-to-sprint": {
+    muscles: "Glutes, adductors, legs", why: "Read, shuffle, then go — the first move to a ball hit to your side or a steal break.",
+    steps: ["Start in an athletic stance.", "Take two quick shuffles to one side, staying low.", "Open your hips and sprint 10 yards.", "Walk back and go the other way."],
+    mistakes: ["Standing up tall out of the shuffle", "Crossing your feet in the shuffle", "A slow, rounded turn into the sprint"],
+    easier: "Walk the footwork first", harder: "React to a partner's point", swap: ["Lateral shuffles", "Crossover sprint starts"]
+  },
+  "L-drill (3-cone)": {
+    muscles: "Legs, hips, ankles", why: "Tight turns both ways — the same body control as rounding a base or chasing a ball in the gap.",
+    steps: ["Set 3 cones in an L, 5 yards apart.", "Sprint to the second cone and back to the start.", "Sprint back to the second cone, go around it to the third, and weave back around the second.", "Sprint home through the start. Time it."],
+    mistakes: ["Rounding the turns wide", "Standing up tall around the cones"],
+    easier: "Half speed to learn the route", harder: "Start the other way, or react to a signal", swap: ["Pro agility shuttle (5-10-5)", "5-10-5 shuttle"]
+  },
+  "Carioca": {
+    muscles: "Hips, adductors, core", why: "Loosens the hips and trains quick side-to-side feet — a staple of any baseball warm-up.",
+    steps: ["Stand sideways with your feet shoulder-width.", "Cross your back leg in front, then step the front foot out.", "Cross the back leg behind, then step out again.", "Let your hips turn while your shoulders stay facing sideways."],
+    mistakes: ["Turning the shoulders with the hips", "Slow, heavy feet"],
+    easier: "Walk it slowly", harder: "Faster, with a high knee on the front cross", swap: ["Lateral shuffles", "Agility ladder drills"]
+  },
+  "Repeat 30-yard sprints": {
+    muscles: "Whole body, heart and lungs", why: "Baseball is short bursts with rest. This trains you to sprint just as fast on the last one as the first.",
+    steps: ["Mark 30 yards.", "Sprint 30 yards, walk back, and start the next sprint 30 seconds after the last one started.", "Do 6 in a row — that's one set.", "Rest 3 minutes between sets."],
+    mistakes: ["Jogging the sprints to get through them", "Skipping the warm-up"],
+    easier: "4 sprints a set, or 45 seconds between them", harder: "A third set", swap: ["Bike intervals", "Tempo runs"]
+  },
+  "Tempo runs": {
+    muscles: "Legs, heart and lungs", why: "Builds an aerobic base without the pounding of long jogs — you recover faster between sprints and games.",
+    steps: ["Mark 100 yards (a foul line to center field is about right).", "Run it at about 70% — smooth, relaxed and tall.", "Walk back to the start.", "Repeat for all your reps."],
+    mistakes: ["Running them as all-out sprints", "Long, slow jogging instead"],
+    easier: "Fewer reps, or 60 yards", harder: "More reps or shorter walks", swap: ["Bike intervals", "Easy cardio (bike or jog)"]
+  },
+  "Bike intervals": {
+    muscles: "Legs, heart and lungs", why: "Hard bursts with easy recovery on a bike — conditioning with zero impact on your joints.",
+    steps: ["Warm up on the bike for 3–5 minutes.", "Pedal hard for 20 seconds.", "Pedal easy for 70 seconds.", "Repeat for every round, then cool down."],
+    mistakes: ["Going easy on the hard parts", "Not slowing down enough on the easy parts"],
+    easier: "6 rounds", harder: "10 rounds or 30 seconds hard", swap: ["Jump rope", "Tempo runs"]
+  },
+  "Jump rope": {
+    muscles: "Calves, ankles, heart and lungs", why: "Quick, light feet and ankle spring plus cardio — anywhere you have a rope and a bit of space.",
+    steps: ["Hold the handles at hip height, elbows close to your sides.", "Turn the rope with your wrists, not your arms.", "Hop just high enough to clear it, landing on the balls of your feet.", "Mix two-foot bounces, alternating feet and side-to-side hops."],
+    mistakes: ["Jumping too high", "Big arm circles", "Landing on your heels"],
+    easier: "Shorter rounds", harder: "Double-unders or high knees", swap: ["Line hops", "Pogo hops"]
+  },
+  "Easy cardio (bike or jog)": {
+    muscles: "Heart and lungs", why: "Easy, steady cardio builds the base that speeds up recovery between sprints, innings and back-to-back games.",
+    steps: ["Bike, jog, swim or walk briskly.", "Keep it easy enough to talk in full sentences the whole time.", "Go for the full time without stopping.", "Finish with a few minutes of stretching."],
+    mistakes: ["Turning it into a hard workout", "Running long distances hard — that can cost speed"],
+    easier: "15 minutes", harder: "30–40 minutes, still easy", swap: ["Tempo runs", "Bike intervals"]
+  },
   "Supine spinal twist": {
     muscles: "Lower back, glutes, chest", why: "Relaxes the trunk after all the rotation in hitting and throwing.",
     steps: ["Lie on your back with your arms out to the sides.", "Pull one knee up and across your body.", "Let it drop toward the floor while both shoulders stay down.", "Look the other way and breathe, then switch."],
@@ -871,7 +932,8 @@ const EXERCISE_GROUPS = [
   ["Arms & grip", ["Hammer curls", "Incline dumbbell curls", "Backpack curls", "Cable triceps pushdown", "Wrist curls + reverse wrist curls", "Towel wringing", "Farmer's carry"]],
   ["Core & rotation", ["Pallof press", "Hanging knee raises", "Bear crawl", "Suitcase carry", "Cable woodchop (high to low)", "Landmine rotations", "Ab wheel rollouts", "Plank shoulder taps", "Dead bugs", "Russian twists (backpack)",
     "Superman hold", "Side plank hip dips", "Hollow body hold", "Copenhagen plank", "Copenhagen plank (couch)"]],
-  ["Speed & agility", ["A-skips & B-skips", "Wall drives", "Falling starts", "Flying sprints", "Agility ladder drills", "Pro agility shuttle (5-10-5)", "5-10-5 shuttle", "Sled push", "Lateral skater bounds", "Base-stealing starts (crossover)", "Crossover sprint starts", "Drop-step sprints", "Line hops", "Lateral shuffles"]],
+  ["Speed & agility", ["A-skips & B-skips", "Carioca", "Wall drives", "Falling starts", "Flying sprints", "Hill sprints", "Base-running turns", "Shuffle-to-sprint", "L-drill (3-cone)", "Agility ladder drills", "Pro agility shuttle (5-10-5)", "5-10-5 shuttle", "Sled push", "Lateral skater bounds", "Base-stealing starts (crossover)", "Crossover sprint starts", "Drop-step sprints", "Line hops", "Lateral shuffles"]],
+  ["Conditioning (cardio)", ["Repeat 30-yard sprints", "Tempo runs", "Bike intervals", "Jump rope", "Easy cardio (bike or jog)"]],
   ["Mobility (moving)", ["Inchworms", "90/90 hip switches", "World's greatest stretch", "Hip CARs", "Shoulder CARs", "Cossack squats", "Hip airplanes", "Banded lateral walks", "Thoracic open books", "Thread the needle",
     "Band pass-throughs", "Knee-to-wall ankle mobility", "Cat-cow + deep breathing"]],
   ["Stretching (holds) & recovery", ["Couch stretch (hip flexors)", "Half-kneeling hip flexor stretch", "Pigeon stretch", "Frog stretch", "Deep squat hold", "Band hamstring stretch", "Towel hamstring stretch", "Calf stretch (wall)",

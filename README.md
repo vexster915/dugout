@@ -35,7 +35,14 @@ unless you turn on the optional Claude features with your own Anthropic API key 
   sets of 4–6, more sprinting and game-speed hitting), with lighter weeks 4 and 8 and a test week 12. Every lift starts with a
   mobility drill, a jump and a rotational med ball throw and ends with stretches; off days are hitting sessions with drills for
   your Swing lab priorities, mobility and sprints. Each week goes into your plan automatically, and a dashboard shows your
-  weight against the target and your numbers start → now
+  weight against the target and your numbers start → now. Once a week the first hitting day starts with a **Swing lab check**:
+  film one swing, and the problems it finds pick the first drills on the next week's hitting days
+- **Mobility plan** (Plan → Mobility plan): agility, sprinting, stretching and baseball conditioning in 8-week waves (Base,
+  Build, Sharpen), 3–6 sessions of 20–45 minutes — speed & acceleration, agility & quickness (with your position's footwork),
+  baseball conditioning (repeat 30-yard sprints, tempo runs, bike or jump-rope intervals), flexibility, and recovery cardio —
+  for a field, a gym or a driveway. Its sessions show on Today next to your planned workout and never change your plan. With
+  the 12-week plan on, it schedules around it: sprints, agility and conditioning only on days your legs are fresh, stretching
+  and recovery on leg days, nothing on the 12-week rest day, and never the same exercise twice in a day
 - **Presets & custom workouts**: 25 ready-made workouts (pitcher arm care, catcher legs & hips, infield first step,
   outfield speed, bat speed, explosive legs, rotational throws, explosive at home, lower/upper strength, a 20-minute workout,
   a hotel-room workout, a game-day primer, post-game recovery, five flexibility sessions…), **Make me a workout** (pick up to
@@ -45,7 +52,7 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 - **Light / Moderate / Heavy** switch on the Today screen: pick how hard to go each day. Moderate trims the sets and
   starts weights at about 90% of last time; Light swaps in an easy recovery workout (mobility, arm care, core — every
   exercise has a form video) that you can edit in Plan → Light workout
-- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 138 exercises, plus a searchable exercise library
+- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 148 exercises, plus a searchable exercise library
 - Next-weight suggestions, warm-up sets, plate calculator, exercise swaps, effort rating and notes
 - Daily readiness check-in (sleep, energy, soreness)
 
@@ -114,6 +121,7 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 | `foods.js` | Built-in food list |
 | `drills.js` | Baseball drills for every position and the swing problems they fix |
 | `block.js` | The 12-week plan: the questions, the analysis and every week's workouts |
+| `move.js` | The mobility plan: its sessions and how they fit around your other plans |
 | `swing.js` | Swing lab: runs the body tracking on your video and measures the swing |
 | `pantry.js` | Pantry: the food catalog (names and brands), what each recipe needs, quick plates and the matching |
 | `scan.js` | Pantry: reads your kitchen photos — on the phone, or with Claude if you added an API key |

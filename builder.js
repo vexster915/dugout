@@ -113,6 +113,10 @@ const BUILDER = (() => {
     ['Base-stealing starts (crossover)', 'speed', 'bw', 1], ['Sled push', 'speed', 'gym', 1, 'low'],
     ['Pro agility shuttle (5-10-5)', 'agility', 'gym', 1, 'I C'], ['5-10-5 shuttle', 'agility', 'bw', 1, 'I C'], ['Agility ladder drills', 'agility', 'gym', 1, 'I'],
     ['Lateral shuffles', 'agility', 'bw', 1, 'lat I C'],
+    ['Base-running turns', 'speed', 'bw', 1, 'I O C'], ['Shuffle-to-sprint', 'agility', 'bw', 1, 'lat I C'], ['L-drill (3-cone)', 'agility', 'bw', 1, 'I C'], ['Carioca', 'drill', 'bw', 1, 'lat'],
+    // Mobility plan only (move.js) — slots the built days never use: a hill, and long easy cardio
+    ['Hill sprints', 'hill', 'bw', 2, 'O'], ['Easy cardio (bike or jog)', 'aero', 'bw', 1, 'low'],
+    ['Repeat 30-yard sprints', 'cond', 'bw', 2], ['Tempo runs', 'cond', 'bw', 1, 'low'], ['Bike intervals', 'cond', 'gym', 1, 'low'], ['Jump rope', 'cond', 'bw', 1, 'low'],
     ['Bear crawl', 'cond', 'bw', 1],
 
     // Mobility: moving drills, and stretches you hold ("hold" — the ones that finish a workout)

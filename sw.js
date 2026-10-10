@@ -23,6 +23,7 @@ const FILES = [
   './builder.js',
   './drills.js',
   './block.js',
+  './move.js',
   './swing.js',
   './pantry.js',
   './ai.js',

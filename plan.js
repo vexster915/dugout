@@ -162,7 +162,19 @@ const VIDEOS = {
   "Calf stretch (wall)": "https://www.youtube.com/watch?v=tUA4MO1kXV8", // The Running PTs — Wall calf stretch for calf pain
   "Half-kneeling hip flexor stretch": "https://www.youtube.com/watch?v=gqoPYLUgP48", // [P]rehab — Step-by-step Guide to the Half Kneeling Hip Flexor Stretch
   "Child's pose lat stretch": "https://www.youtube.com/watch?v=2pkLUbN34GI", // Functional Bodybuilding — Childs Pose with Lat Stretch
-  "Supine spinal twist": "https://www.youtube.com/watch?v=mNdJti7ZwKI" // Vive Health — Supine Spinal Twist for Spine Mobility
+  "Supine spinal twist": "https://www.youtube.com/watch?v=mNdJti7ZwKI", // Vive Health — Supine Spinal Twist for Spine Mobility
+
+  // Conditioning and agility for the mobility plan (added in 2.6)
+  "Tempo runs": "https://www.youtube.com/watch?v=TpmzpMui9do", // Will Ratelle — Tempo Runs For Team Sport Athletes
+  "Bike intervals": "https://www.youtube.com/watch?v=PHReR7tC_tw", // Live Lean TV — How To Do An Assault Air Bike Sprint
+  "Jump rope": "https://www.youtube.com/watch?v=vEJ7XbbAMAg", // Dayan Kole — Jump Rope Like a Pro in 2 Minutes
+  "Base-running turns": "https://www.youtube.com/watch?v=g4EpLm1XzXg", // Baseball Canada — Rounding 1st Base
+  "Repeat 30-yard sprints": "https://www.youtube.com/watch?v=Gs9eKZANYik", // overtimeathletes — Speed Training for Baseball
+  "L-drill (3-cone)": "https://www.youtube.com/watch?v=_KtUvR2zcNU", // Simple Speed Coach — L Drill - 3 Cone Drill Technique
+  "Carioca": "https://www.youtube.com/watch?v=CMeuCmzKf84", // StrengthRunning — Carioca Running Form Drill Demonstration
+  "Easy cardio (bike or jog)": "https://www.youtube.com/watch?v=Mh5oNMDCucQ", // The Movement System — How to Train with Heart Rate Zones
+  "Hill sprints": "https://www.youtube.com/watch?v=-lMeXFoWSOQ", // Trainwright Performance — Hill Sprints for Developing Acceleration
+  "Shuffle-to-sprint": "https://www.youtube.com/watch?v=Vu-2wL-dt7Q" // Simple Speed Coach — Lateral Shuffle to Sprint
 };
 
 // The first time an exercise is written out below, it's remembered so like() can reuse its cues anywhere after.
@@ -207,6 +219,18 @@ const CATALOG = [
   ex("Wall drives", 3, "5/leg", 45, "check", "Hands on a wall, body leaning about 45° in a straight line. Drive one knee up and punch that foot back down under your hip. Quick, sharp switches — the first-step position."),
   ex("Falling starts", 4, "10 yd", 60, "check", "Stand tall, lean forward until you have to step, then sprint 10 yards. Push the ground back behind you — don't reach out in front."),
   ex("Flying sprints", 3, "10 yd fly", 120, "check", "Build up over 20 yards, then sprint 10 yards at top speed — tall, relaxed, fast arms. Walk back and rest fully; this is pure speed."),
+  ex("Hill sprints", 6, "10 sec", 90, "check", "A moderate hill. Lean into it, drive your knees and arms, then walk down slowly. Acceleration that's easy on the hamstrings."),
+  ex("Base-running turns", 5, "home to 2nd", 90, "check", "Sprint out of the box, bow out a step before first, hit the inside corner of the bag and drive straight to second. Walk back."),
+  ex("Shuffle-to-sprint", 5, "5 yd + 10 yd", 60, "check", "Two quick shuffles one way, then open your hips and sprint 10 yards — like reacting to a ball hit to your side. Alternate sides."),
+  ex("L-drill (3-cone)", 4, "1", 90, "time", "Cones in an L, 5 yards apart: sprint, touch, back, around the middle cone and weave the corner. Stay low on every turn. Log your time."),
+  ex("Carioca", 2, "20 yd each way", 30, "check", "Hips turn side to side as the back leg crosses in front, then behind. Quick feet, shoulders facing sideways."),
+
+  /* ----- Conditioning: baseball cardio ----- */
+  ex("Repeat 30-yard sprints", 2, "6 × 30 yd", 180, "check", "Baseball conditioning: a 30-yard sprint every 30 seconds, 6 in a row, then 3 minutes off. Keeps you just as fast in the 7th inning."),
+  ex("Tempo runs", 6, "100 yd", 45, "check", "About 70% speed — smooth and relaxed, breathing hard but in control. Walk back to the start and go again."),
+  ex("Bike intervals", 8, "20 sec", 70, "check", "20 seconds hard on a bike (air bike or spin bike), then 70 seconds of easy pedaling. Builds the engine that recovers you between sprints."),
+  ex("Jump rope", 5, "1 min", 30, "check", "Light and quick on the balls of your feet, wrists turn the rope. Mix two-foot bounces, alternating feet and side to side."),
+  ex("Easy cardio (bike or jog)", 1, "20 min", 0, "check", "Easy enough to talk the whole time. Builds the aerobic base that helps you recover between sprints, innings and games."),
 
   /* ----- Mobility drills and stretches ----- */
   ex("Inchworms", 2, "6", 20, "check", "Hinge down, walk your hands out to a push-up position, then walk your feet up to your hands with your legs as straight as you can. Slow and controlled."),
@@ -226,6 +250,7 @@ const CATALOG = [
   /* ----- Library exercises used in the programs ----- */
   ex("Bulgarian split squat", 3, "8/leg", 90, "weight", "Back foot on the bench, lower straight down, drive through the front foot."),
   ex("Med ball chest pass", 3, "6", 60, "reps", "Step and throw the ball into the wall as hard as you can."),
+  ex("Bear crawl", 3, "15 yd", 45, "check", "Knees an inch off the floor, opposite hand and foot move together."),
 
   /* ----- From the earlier starting week (still in Build my plan, the presets and the library) ----- */
   ex("Seated leg curl", 3, "10", 60, "weight", "Pull heels down and back, squeeze 1 second, take 3 seconds on the way up."),
