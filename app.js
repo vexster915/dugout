@@ -566,13 +566,12 @@ function renderToday() {
       <h1 class="page-title">Today</h1>
     </div></div>
     ${modeToggle()}
-    ${comboCard()}
     ${blockCard()}
     ${todayOrderCard()}
     ${installBanner()}
     ${backupBanner()}
     ${weekReview()}
-    ${throwCard()}
+    ${throwSessionCard()}
     ${todayCard(dayPlan(di), di, doneToday)}
     ${moveCard()}
     ${checkinCard()}
@@ -1726,10 +1725,7 @@ function renderPlan() {
       <button class="btn btn-ghost" data-action="buildPlan">${icon('sparkle', 'sm')} Build my plan</button>
       <button class="btn btn-ghost" data-action="workouts">${icon('dumbbell', 'sm')} Presets &amp; custom</button>
     </div>
-    ${comboOn() ? comboCard() : `<button class="banner as-btn goal-nudge" data-action="combo">${icon('sparkle')}<span class="grow"><b>Complete player plan: lift, throw, move.</b> The 12-week plan, mobility and a throwing program together, year-round — none cut down for the others.</span>${icon('right', 'sm')}</button>`}
-    ${throwOn() ? `<button class="banner as-btn goal-nudge" data-action="throwPlan">${icon('baseball')}<span class="grow"><b>Throwing program${throwWeekNow() >= 1 ? ` · week ${THROW.cycleWeek(throwWeekNow())}` : ' starts Monday'}</b> · throw harder from the field</span>${icon('right', 'sm')}</button>` : `<button class="banner as-btn goal-nudge" data-action="throwPlan">${icon('baseball')}<span class="grow"><b>Throwing program: throw harder.</b> Long toss, pull-downs and max-intent throws for position players — not pitching.</span>${icon('right', 'sm')}</button>`}
-    ${moveOn() ? `<button class="banner as-btn goal-nudge" data-action="move">${icon('timer')}<span class="grow"><b>Mobility plan${moveWeekNow() >= 1 ? ` · week ${MOVE.waveWeek(moveWeekNow())}` : ' starts Monday'}</b> · agility, sprints, stretching, conditioning</span>${icon('right', 'sm')}</button>` : `<button class="banner as-btn goal-nudge" data-action="move">${icon('timer')}<span class="grow"><b>Mobility plan: agility, sprints, stretching &amp; conditioning.</b> Runs next to your lifting${blockOn() ? ' and fits around your 12 weeks' : ''}.</span>${icon('right', 'sm')}</button>`}
-    ${blockOn() ? blockCard() : `<button class="banner as-btn goal-nudge" data-action="block">${icon('flame')}<span class="grow"><b>12-week plan: muscle, power &amp; bat speed.</b> Add 5–15 lb, hit harder and move better — built from your size, position and numbers.</span>${icon('right', 'sm')}</button>`}
+    ${plansStrip()}
     <div class="days">${chips}</div>
     <div class="small muted center">${(() => { const days = planFor(mode).filter(d => d.type !== 'rest' && d.exercises.length), mins = sum(days, d => estMinutes(d));
       return `${days.length} training day${days.length === 1 ? '' : 's'} · about ${mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`} a week`; })()}</div>
@@ -2506,7 +2502,8 @@ function blockStatus() {
   const days = Math.max(0, (parseYmd(ymd()) - parseYmd(b.start)) / 86400000), expect = an.a.weightLb + an.pace * Math.min(days, 84) / 7;
   const wl = logsOf('weight').filter(l => l.date >= b.start), last = wl[wl.length - 1], cur = last ? toLb(last.w) : null;
   const diff = cur != null ? cur - expect : null, stale = !last || (parseYmd(ymd()) - parseYmd(last.date)) / 86400000 > 7;
-  const pace = diff == null || days < 10 ? null : diff < -1.5 ? 'behind' : diff > 2 ? 'ahead' : 'on';
+  // Only judge the pace from a recent weigh-in (an old one would say "eat more" when you may be right on track).
+  const pace = diff == null || days < 10 || stale ? null : diff < -1.5 ? 'behind' : diff > 2 ? 'ahead' : 'on';
   return { b, an, now, w, expect, cur, diff, pace, stale, last, done: now > BLOCK.WEEKS, notYet: now < 1, phase: BLOCK.PHASES[BLOCK.phaseOf(Math.max(1, w)) - 1], kind: BLOCK.kindOf(Math.max(1, w)) };
 }
 const paceText = st => st.pace === 'behind' ? `${wText(-st.diff)} behind — add about 250 calories a day (a shake or a PB&J) and weigh in again in a week.`
@@ -2583,7 +2580,7 @@ function blockCard() {
   if (!blockOn()) return '';
   const st = blockStatus();
   return `<button class="banner as-btn goal-nudge" data-action="block">${icon('sparkle')}<span class="grow"><b>${st.done ? '12 weeks done — see your results' : st.notYet ? '12-week plan starts Monday' : `12-week plan · week ${st.w} · ${esc(st.phase.name)}${st.kind === 'deload' ? ' (lighter)' : st.kind === 'test' ? ' (test week)' : ''}`}</b>
-    ${!st.done && !st.notYet ? `<br><span class="small">Target ${fmt(fromLb(st.expect), 1)} ${S.settings.unit}${st.cur != null ? ` · you ${fmt(fromLb(st.cur), 1)}` : ''}${st.pace === 'behind' ? ' — eat more' : st.pace === 'ahead' ? ' — a bit fast' : ''}</span>` : ''}</span>${icon('right', 'sm')}</button>`;
+    ${!st.done && !st.notYet ? `<br><span class="small">Target ${fmt(fromLb(st.expect), 1)} ${S.settings.unit}${st.stale ? ' · time to weigh in' : st.cur != null ? ` · you ${fmt(fromLb(st.cur), 1)}` : ''}${st.pace === 'behind' ? ' — eat more' : st.pace === 'ahead' ? ' — a bit fast' : ''}</span>` : ''}</span>${icon('right', 'sm')}</button>`;
 }
 
 /* ============================== 7d. MOBILITY PLAN (move.js) ============================== */
@@ -2891,8 +2888,8 @@ function throwFeelBlock(w) {
   return `<div class="field"><span>How does your arm feel? <small>${fmt(l.count)} throws logged${l.dist ? `, out to ${l.dist} ft` : ''}</small></span>
     <div class="chips">${[5, 4, 3, 2, 1].map(v => `<button class="chip feel-btn ${l.feel === v ? 'on' : ''}" data-action="throwFeel" data-id="${l.id}" data-v="${v}">${FEEL[v]}</button>`).join('')}</div></div>`;
 }
-// Today: today's throwing session.
-function throwCard() {
+// Today: today's throwing session. (throwCard() is the Baseball tab's throwing log.)
+function throwSessionCard() {
   if (!throwOn()) return '';
   if (throwWeekNow() < 1) return `<button class="banner as-btn goal-nudge" data-action="throwPlan">${icon('baseball')}<span class="grow"><b>Throwing program starts Monday</b></span>${icon('right', 'sm')}</button>`;
   const s = throwToday(), done = S.workouts.some(w => w.date === ymd() && w.src === 'throw');
@@ -2913,7 +2910,7 @@ function todayOrderCard() {
   const di = dayIdx(), lift = dayPlan(di), th = throwToday(), mv = moveOn() && moveWeekNow() >= 1 ? moveWeek().days[di] : null;
   const items = [];
   if (th && !th.blocked) items.push(['Throwing', th.title.replace('Throwing: ', ''), 'right after your warm-up, while your arm and body are fresh']);
-  if (lift && lift.type !== 'rest' && lift.exercises.length) items.push(['Lift / plan', lift.title.replace(/^Wk \d+ · /, ''), items.length ? 'skip the warm-up you already did' : '']);
+  if (lift && lift.type !== 'rest' && lift.exercises.length) items.push(['Plan', lift.title.replace(/^Wk \d+ · /, ''), items.length ? 'skip the warm-up you already did' : '']);
   if (mv) items.push(['Mobility', mv.title, items.length ? 'right after, or later in the day' : '']);
   if (items.length < 2) return '';
   return `<section class="card stack-sm"><div class="card-title row">${icon('clock', 'sm')} Today's order</div>
@@ -3031,6 +3028,18 @@ actions.comboEnd = async () => {
   saveSettings(); savePlan(); closeSheet(); render();
   toast('Complete plan ended');
 };
+// Plan tab: the plans you have on (one line each), and the others in one small card.
+function plansStrip() {
+  const line = (action, ic, text) => `<button class="banner as-btn goal-nudge plan-line" data-action="${action}">${icon(ic)}<span class="grow">${text}</span>${icon('right', 'sm')}</button>`;
+  const on = comboOn() ? [comboCard()] : [
+    blockOn() ? blockCard() : '',
+    throwOn() ? line('throwPlan', 'baseball', `<b>Throwing program</b> · ${throwWeekNow() >= 1 ? `week ${THROW.cycleWeek(throwWeekNow())}` : 'starts Monday'}`) : '',
+    moveOn() ? line('move', 'timer', `<b>Mobility plan</b> · ${moveWeekNow() >= 1 ? `week ${MOVE.waveWeek(moveWeekNow())}` : 'starts Monday'}`) : ''].filter(Boolean);
+  const off = comboOn() ? [] : [['combo', 'sparkle', 'Complete player plan', 'All three, year-round'], !blockOn() && ['block', 'flame', '12-week plan', 'Muscle, power, bat speed'],
+    !throwOn() && ['throwPlan', 'baseball', 'Throwing program', 'Throw harder'], !moveOn() && ['move', 'timer', 'Mobility plan', 'Speed, agility, stretching']].filter(Boolean);
+  return `${on.join('')}${off.length ? `<section class="card stack-sm"><div class="card-title row">${icon('sparkle', 'sm')} Plans built for you</div>
+    <div class="grid2">${off.map(([a, ic, t, sub]) => `<button class="btn btn-ghost plan-pick" data-action="${a}">${icon(ic, 'sm')}<span><b>${t}</b><small>${sub}</small></span></button>`).join('')}</div></section>` : ''}`;
+}
 function comboCard() {
   if (!comboOn()) return '';
   const w = blockWeekNow();

@@ -1013,3 +1013,8 @@ i.t-rest { background: var(--muted); }
 :root[data-theme="light"] .coach-fail { color: #c53030; }
 :root[data-theme="light"] .sw-chip.work, :root[data-theme="light"] .text-bad { color: #c53030; }
 :root[data-theme="light"] .sw-replay canvas { background: #1b2330; }
+
+/* Plan tab: plans built for you (2.6) */
+.plan-pick { flex-direction: column; align-items: flex-start; gap: 4px; height: auto; padding: 10px 12px; text-align: left; white-space: normal; }
+.plan-pick span { display: flex; flex-direction: column; gap: 2px; }
+.plan-pick small { font-weight: 500; color: var(--muted); font-size: 12px; }
