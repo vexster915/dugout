@@ -701,13 +701,255 @@ const EXERCISE_INFO = {
     steps: ["Start in a forearm plank.", "Push up onto one hand, then the other, into a high plank.", "Lower back down one forearm at a time.", "Keep your hips steady."],
     mistakes: ["Hips rocking side to side"],
     easier: "From your knees", harder: "Wider feet, faster pace", swap: ["Plank shoulder taps"]
+  },
+
+  /* ---------- Explosive power (added in 2.6; sets, reps and cues are in plan.js CATALOG) ---------- */
+  "Pogo hops": {
+    muscles: "Calves, ankles, Achilles", why: "Teaches your ankles to act like springs — the stiffness behind a quick first step and a fast sprint.",
+    steps: ["Stand tall with your feet hip-width, arms relaxed.", "Bounce off the balls of your feet with small, quick hops.", "Keep your knees almost straight — the spring comes from the ankles.", "Spend as little time on the ground as you can."],
+    mistakes: ["Landing on your heels", "Bending the knees into a squat on every hop", "Big, slow jumps instead of quick ones"],
+    easier: "Smaller hops at an easy pace", harder: "Single-leg pogos or forward-and-back pogos", swap: ["Line hops", "Single-leg calf raises"]
+  },
+  "Squat jumps": {
+    muscles: "Quads, glutes, calves", why: "Pure vertical power with no equipment — the same leg drive you use out of your stance and off the mound.",
+    steps: ["Stand with your feet about shoulder-width.", "Dip into a quarter squat as you swing your arms back.", "Swing your arms up and jump as high as you can.", "Land softly with bent knees, reset and repeat."],
+    mistakes: ["Going so deep you lose speed", "Landing stiff-legged", "Knees caving in on the landing"],
+    easier: "Mini squat jumps, landing and holding each one", harder: "Hold light dumbbells or do them continuously", swap: ["Box jumps", "Broad jumps", "Tuck jumps"]
+  },
+  "Seated box jumps": {
+    muscles: "Glutes, quads, hamstrings", why: "Starting from a seat takes away the bounce, so you build raw starting power — and the landing on the box is easy on your knees.",
+    steps: ["Sit on a bench a foot or two in front of a box, feet flat.", "Lean forward and swing your arms back.", "Swing your arms up and jump from sitting straight onto the box.", "Land softly, stand tall, step down and reset."],
+    mistakes: ["Rocking back to get momentum", "A box so high you land in a deep squat", "Jumping back down"],
+    easier: "A lower box", harder: "Hold light dumbbells or use a higher box", swap: ["Box jumps", "Squat jumps"]
+  },
+  "Depth jumps": {
+    muscles: "Calves, quads, glutes", why: "Trains your legs to absorb force and bounce it back fast — an advanced jump for athletes with a strength base.",
+    steps: ["Stand on a 12–18 inch box.", "Step off (don't jump) and land on both feet at the same time.", "As soon as you land, jump straight up as high as you can.", "Land softly and reset — quality over quantity."],
+    mistakes: ["A box too high (you sink on the landing)", "Pausing on the ground before jumping", "Doing them tired or before you have a strength base"],
+    easier: "Drop from a lower box and just stick the landing", harder: "Depth jump into a broad jump", swap: ["Box jumps", "Hurdle hops"]
+  },
+  "Hurdle hops": {
+    muscles: "Calves, quads, hip flexors", why: "Quick, bouncy two-foot jumps in a row — reactive power for acceleration and changing direction.",
+    steps: ["Set up 4–6 mini hurdles or cones about 3 feet apart.", "Hop over each with both feet, pulling your knees up.", "Bounce off the ground quickly between hurdles.", "Stay tall and swing your arms."],
+    mistakes: ["Hurdles too high to stay quick", "Landing flat-footed", "Stopping between hurdles"],
+    easier: "Lower hurdles or a pause between each", harder: "Higher hurdles or single-leg hops", swap: ["Line hops", "Pogo hops"]
+  },
+  "Trap bar jumps": {
+    muscles: "Glutes, quads, hamstrings", why: "A loaded jump that builds power in the same hip drive as your trap bar deadlift — great right after heavy sets.",
+    steps: ["Load the trap bar light — about 20–30% of your deadlift.", "Stand in the middle and grip the handles, chest up.", "Dip and jump as high as you can, holding the bar.", "Land softly with bent knees, reset and repeat."],
+    mistakes: ["Going too heavy (you barely leave the ground)", "Landing stiff", "Rounding your back"],
+    easier: "Bodyweight squat jumps", harder: "A bit more weight while keeping the jump fast", swap: ["Squat jumps", "Box jumps"]
+  },
+  "Med ball rotational shot put": {
+    muscles: "Hips, obliques, chest, shoulders", why: "Turns hip and trunk rotation into throwing force — trains the same sequence as your swing and throw without stressing the elbow.",
+    steps: ["Stand sideways to a wall, a med ball held at your back shoulder like a shot put.", "Load into your back hip.", "Drive your hips around first, then your torso, then push the ball into the wall.", "Catch it, reset and repeat; do both sides."],
+    mistakes: ["Throwing with only your arm", "A ball so heavy you can't throw it fast (use 4–8 lb)", "Spinning without loading the back hip"],
+    easier: "Lighter ball, half speed", harder: "Step-behind rotational throw", swap: ["Med ball rotational scoop toss", "Landmine rotations"]
+  },
+  "Med ball step-behind rotational throw": {
+    muscles: "Hips, obliques, legs, shoulders", why: "Adds momentum like a crow hop or a stride — one of the best power throws for hitters, pitchers and position players.",
+    steps: ["Stand sideways to a wall, ball at your back hip.", "Step your back foot behind your front foot to build momentum.", "Plant and rotate hard, hips first, and throw the ball into the wall.", "Catch, reset and repeat; do both sides."],
+    mistakes: ["Losing your posture on the step", "Arms throwing before the hips turn", "Rushing the reset"],
+    easier: "Rotational shot put from a standstill", harder: "Throw for distance outside", swap: ["Med ball rotational shot put", "Med ball rotational scoop toss"]
+  },
+  "Med ball overhead backward toss": {
+    muscles: "Glutes, hamstrings, back, shoulders", why: "Full hip extension at top speed — the same triple extension as a sprint start and a vertical jump.",
+    steps: ["Go outside or under a high ceiling with nobody behind you.", "Hold a med ball between your legs and dip into a half squat.", "Explode up through your hips and legs, arms swinging up.", "Release the ball overhead so it flies behind you as far as possible."],
+    mistakes: ["Lifting with your arms instead of your hips", "Throwing near walls, windows or people", "Rounding your back at the bottom"],
+    easier: "Lighter ball", harder: "Measure the distance and try to beat it", swap: ["Kettlebell swings", "Broad jumps"]
+  },
+  "Wall drives": {
+    muscles: "Hip flexors, glutes, calves", why: "Grooves the body angle and quick leg switch of the first three steps — where steals and jumps on the ball are won.",
+    steps: ["Put your hands on a wall and lean in at about 45°, body in a straight line.", "Drive one knee up, toes pulled up.", "Punch that foot back down under your hip as the other knee comes up.", "Hold for a second, reset, and keep each switch sharp."],
+    mistakes: ["Bending at the hips (piking)", "Standing too upright", "Slow, floaty switches"],
+    easier: "March it: one leg at a time, slowly", harder: "Two or three quick switches in a row", swap: ["A-skips & B-skips", "Falling starts"]
+  },
+  "Falling starts": {
+    muscles: "Glutes, quads, calves", why: "Teaches a low, forward lean and powerful first steps — better acceleration out of your lead-off or the batter's box.",
+    steps: ["Stand tall with your feet together.", "Lean forward from your ankles, keeping your body straight.", "When you have to step, sprint hard for 10 yards.", "Walk back and rest fully."],
+    mistakes: ["Bending at the waist instead of leaning", "Popping straight up on the first step", "Reaching your foot out in front"],
+    easier: "Half speed, focus on the first 3 steps", harder: "Start from a lead-off stance or react to a signal", swap: ["Base-stealing starts (crossover)", "Wall drives"]
+  },
+  "Flying sprints": {
+    muscles: "Hamstrings, glutes, hip flexors", why: "Top speed only improves by running at top speed — this is the safest way to get there.",
+    steps: ["Mark a 20-yard build-up zone and a 10-yard fly zone.", "Build speed smoothly through the first 20 yards.", "Hit top speed through the 10-yard fly zone — tall, relaxed, quick arms.", "Slow down gradually, walk back and rest 2–3 minutes."],
+    mistakes: ["Going all-out from the first step", "Too little rest (it turns into conditioning)", "Tensing your face and shoulders"],
+    easier: "90% speed through the fly zone", harder: "20-yard fly zone", swap: ["Drop-step sprints", "Crossover sprint starts"]
+  },
+
+  /* ---------- Mobility and stretching (added in 2.6) ---------- */
+  "Inchworms": {
+    muscles: "Hamstrings, shoulders, core", why: "A moving hamstring stretch plus shoulder and core work — a great start to any warm-up.",
+    steps: ["Stand tall, then hinge forward and put your hands on the floor.", "Walk your hands out to a push-up position.", "Walk your feet up toward your hands, legs as straight as you can.", "Stand up and repeat."],
+    mistakes: ["Rushing", "Hips sagging in the plank"],
+    easier: "Bend your knees to reach the floor", harder: "Add a push-up at the bottom", swap: ["World's greatest stretch", "Bear crawl"]
+  },
+  "Cossack squats": {
+    muscles: "Adductors, hips, quads", why: "Strength through a deep side-to-side range — exactly what fielders and catchers need.",
+    steps: ["Stand with your feet very wide, toes slightly out.", "Shift and sit into one hip, the other leg straight with its toes pointing up.", "Keep your chest tall and the heel of the bent leg down.", "Push back to center and go to the other side."],
+    mistakes: ["Heel of the working leg lifting", "Rounding your back", "Going deeper than you can control"],
+    easier: "Hold a post or go partway down", harder: "Hold a light weight at your chest", swap: ["Lateral lunges", "Frog stretch"]
+  },
+  "Deep squat hold": {
+    muscles: "Hips, ankles, groin", why: "Opens your hips and ankles together — catchers live in this position, and every athlete moves better with it.",
+    steps: ["Stand with your feet a bit wider than your hips, toes slightly out.", "Sit down as deep as you can, heels flat.", "Press your knees out with your elbows and keep your chest up.", "Breathe slowly and relax into it."],
+    mistakes: ["Heels lifting", "Holding your breath"],
+    easier: "Hold a post or put a plate under your heels", harder: "Gently rotate side to side, reaching one arm up", swap: ["Frog stretch", "90/90 hip switches"]
+  },
+  "Knee-to-wall ankle mobility": {
+    muscles: "Ankles, calves", why: "Stiff ankles cost you squat depth, a good first step and a stable landing — this fixes that.",
+    steps: ["Face a wall in a split stance with your front toes a few inches from it.", "Drive your front knee forward to touch the wall.", "Keep your heel flat on the floor.", "When it's easy, slide your foot back a little."],
+    mistakes: ["Heel lifting", "Knee caving in"],
+    easier: "Start closer to the wall", harder: "Hold the end position 3 seconds each rep", swap: ["Calf stretch (wall)", "Deep squat hold"]
+  },
+  "Hip CARs": {
+    muscles: "Hip joint, glutes, hip flexors", why: "Moves the hip through its full circle under control — keeps the rotation you need to swing and throw.",
+    steps: ["Stand tall holding something for balance.", "Lift one knee up in front of you.", "Slowly circle it out to the side and back behind you, as big as you can.", "Keep your pelvis and trunk still, then reverse the circle."],
+    mistakes: ["Twisting your body to make the circle bigger", "Going fast"],
+    easier: "Smaller circles, or on hands and knees", harder: "No hand support", swap: ["90/90 hip switches", "Hip airplanes"]
+  },
+  "Shoulder CARs": {
+    muscles: "Shoulder joint, rotator cuff, upper back", why: "Takes your shoulder through its whole range slowly — keeps a throwing shoulder moving well.",
+    steps: ["Stand tall, make a fist and brace your core.", "Raise a straight arm forward and up overhead.", "Rotate it back and down behind you in the biggest circle you can.", "Keep your body still, then reverse."],
+    mistakes: ["Arching your back or twisting", "Moving fast"],
+    easier: "Smaller circles", harder: "Slower — 20 seconds per circle", swap: ["Band pass-throughs", "Wall slides"]
+  },
+  "Thread the needle": {
+    muscles: "Upper back, shoulders", why: "Upper-back rotation for a freer swing and throw, without cranking your lower back.",
+    steps: ["Start on hands and knees.", "Reach one arm under your body toward the other side, letting your shoulder drop.", "Then rotate that arm up to the sky, following it with your eyes.", "Repeat, then switch sides."],
+    mistakes: ["Hips shifting side to side", "Rushing"],
+    easier: "Smaller range", harder: "Pause 3 breaths at each end", swap: ["Thoracic open books", "World's greatest stretch"]
+  },
+  "Band pass-throughs": {
+    muscles: "Shoulders, chest, upper back", why: "Opens the front of the shoulders and chest so your arms move freely overhead.",
+    steps: ["Hold a light band (or a broomstick) in front of you with a wide grip, arms straight.", "Slowly raise it over your head.", "Keep going until it's behind you, then come back.", "Widen your grip if it pinches."],
+    mistakes: ["Bending your elbows", "Arching your lower back to get it over"],
+    easier: "Wider grip", harder: "Narrower grip", swap: ["Shoulder CARs", "Wall slides"]
+  },
+  "Frog stretch": {
+    muscles: "Adductors (groin), hips", why: "Opens the inner thighs — key for lateral moves, catching and avoiding groin strains.",
+    steps: ["Start on hands and knees on a soft surface.", "Slide your knees out wide, ankles in line with your knees.", "Rock your hips back until you feel a stretch in your inner thighs.", "Hold and breathe."],
+    mistakes: ["Forcing it to the point of pain", "Arching your lower back"],
+    easier: "Knees less wide", harder: "Lower onto your forearms", swap: ["Cossack squats", "Deep squat hold"]
+  },
+  "Calf stretch (wall)": {
+    muscles: "Calves, Achilles", why: "Loosens calves after sprinting and jumping so your ankles keep their range.",
+    steps: ["Hands on a wall, one foot back.", "Keep the back leg straight and the heel down, and lean in.", "Hold, then bend the back knee slightly to stretch lower in the calf.", "Switch legs."],
+    mistakes: ["Heel lifting", "Back foot turned out"],
+    easier: "Smaller step back", harder: "Toes up on a step", swap: ["Knee-to-wall ankle mobility"]
+  },
+  "Half-kneeling hip flexor stretch": {
+    muscles: "Hip flexors, quads", why: "Tight hip flexors limit your stride, hip turn and sprint speed — a gentler version of the couch stretch.",
+    steps: ["Kneel on one knee (pad underneath), other foot in front.", "Tuck your hips under and squeeze the glute of the down leg.", "Shift forward a little until you feel the front of the hip stretch.", "Reach the same-side arm up and slightly over for more."],
+    mistakes: ["Arching your lower back instead of tucking", "Leaning too far forward"],
+    easier: "Smaller shift forward", harder: "Couch stretch", swap: ["Couch stretch (hip flexors)", "World's greatest stretch"]
+  },
+  "Child's pose lat stretch": {
+    muscles: "Lats, upper back", why: "Tight lats pull on the shoulder when you throw and swing — this loosens them anywhere.",
+    steps: ["Kneel and sit back toward your heels, arms reaching forward on the floor.", "Walk both hands toward one side.", "Sink your hips back until you feel the opposite side stretch.", "Breathe into it, then switch."],
+    mistakes: ["Shrugging up to your ears", "Rushing the breaths"],
+    easier: "Knees wider", harder: "Rest your hands on a low bench", swap: ["Lat stretch on rack", "Cat-cow + deep breathing"]
+  },
+  /* ---------- Throwing program (added in 2.6) ---------- */
+  "Long toss: extension": {
+    muscles: "Shoulder, upper back, whole throwing chain", why: "Stretching your throws out with an arc builds arm strength and a long, loose arm path — the base of a stronger throw from anywhere on the field.",
+    steps: ["Finish catch play first; your arm should be warm and loose.", "Back up a few steps every 2–3 throws, putting an arc on the ball.", "Keep a long, relaxed arm and use your legs — crow hop or shuffle into every throw.", "Stop at your max comfortable distance (the ball still gets there with good form) and hold it for 4–6 throws."],
+    mistakes: ["Muscling throws at a distance you can't reach yet", "Going farther every session — add distance over weeks", "Long tossing with a sore arm"],
+    easier: "Stop 30 feet short of your max", harder: "Add 10–15 feet only when your max feels easy", swap: ["Recovery catch"]
+  },
+  "Long toss: pull-downs": {
+    muscles: "Shoulder, core, legs", why: "Coming back in and throwing on a line with more intent turns the arm strength from long toss into a harder, flatter throw.",
+    steps: ["Start from your long toss distance.", "Walk in a few steps after each throw.", "Throw on a line, chest-high, a little harder each time as you get closer.", "Finish around 60 feet with your hardest, most accurate throws."],
+    mistakes: ["Throwing harder with only your arm instead of your legs and hips", "Missing your partner — accuracy still counts"],
+    easier: "Fewer throws, less intent", harder: "A crow hop into each throw", swap: ["Max-intent crow-hop throws"]
+  },
+  "Max-intent crow-hop throws": {
+    muscles: "Legs, hips, core, shoulder", why: "You throw as hard as you practice throwing. A few all-out throws with full rest teach your body to produce velocity — the same throw as cutting down a runner.",
+    steps: ["Warm up fully: catch play and some long toss first.", "Set up 60–90 feet from a partner or a big net.", "Crow hop and throw as hard as you can on a line, with your whole body.", "Rest about a minute between throws. Use a radar if you have one."],
+    mistakes: ["Doing them on a sore or tired arm", "Too many — quality goes down and risk goes up", "Skipping the warm-up"],
+    easier: "Fewer throws at 90% effort", harder: "A couple more throws, never more than about 12", swap: ["Long toss: pull-downs"]
+  },
+  "Recovery catch": {
+    muscles: "Shoulder, arm", why: "Easy throwing the day after a hard day moves blood through the arm and keeps your throwing motion smooth.",
+    steps: ["Start at 30–45 feet with easy throws.", "Move out to 60–90 feet.", "Stay at about 50% effort with good mechanics.", "Stop after about 25 throws — you should feel looser, not tired."],
+    mistakes: ["Turning it into a hard session", "Throwing through pain"],
+    easier: "Shorter distance", harder: "Add some easy footwork (crow hop or shuffle) into each throw", swap: ["Long toss: extension"]
+  },
+
+  /* ---------- Conditioning and agility for the mobility plan (added in 2.6) ---------- */
+  "Hill sprints": {
+    muscles: "Glutes, calves, hip flexors", why: "The hill forces a good forward lean and powerful push-off — acceleration work that's kind to your hamstrings.",
+    steps: ["Find a moderate hill with 15–20 yards of slope.", "Start in a staggered stance and lean into the hill.", "Sprint hard for about 10 seconds, driving your knees and arms.", "Walk back down slowly and rest fully."],
+    mistakes: ["A hill so steep you can't run fast", "Short rests that turn it into conditioning"],
+    easier: "Fewer reps or a gentler slope", harder: "Longer hill (12–15 seconds)", swap: ["Falling starts", "Sled push"]
+  },
+  "Base-running turns": {
+    muscles: "Legs, hips", why: "Taking a good turn at first is free speed — it's how singles become doubles.",
+    steps: ["Start in the batter's box (or at a cone) after a dry swing.", "Sprint out and bow out a step about two-thirds of the way to first.", "Hit the inside corner of the bag with either foot, leaning in.", "Drive straight to second, then walk back."],
+    mistakes: ["Rounding wide in a big banana", "Slowing down to touch the bag", "Watching the ball instead of running"],
+    easier: "Home to first with a turn, no sprint to second", harder: "First to third, or score from second", swap: ["Base-stealing starts (crossover)", "Crossover sprint starts"]
+  },
+  "Shuffle-to-sprint": {
+    muscles: "Glutes, adductors, legs", why: "Read, shuffle, then go — the first move to a ball hit to your side or a steal break.",
+    steps: ["Start in an athletic stance.", "Take two quick shuffles to one side, staying low.", "Open your hips and sprint 10 yards.", "Walk back and go the other way."],
+    mistakes: ["Standing up tall out of the shuffle", "Crossing your feet in the shuffle", "A slow, rounded turn into the sprint"],
+    easier: "Walk the footwork first", harder: "React to a partner's point", swap: ["Lateral shuffles", "Crossover sprint starts"]
+  },
+  "L-drill (3-cone)": {
+    muscles: "Legs, hips, ankles", why: "Tight turns both ways — the same body control as rounding a base or chasing a ball in the gap.",
+    steps: ["Set 3 cones in an L, 5 yards apart.", "Sprint to the second cone and back to the start.", "Sprint back to the second cone, go around it to the third, and weave back around the second.", "Sprint home through the start. Time it."],
+    mistakes: ["Rounding the turns wide", "Standing up tall around the cones"],
+    easier: "Half speed to learn the route", harder: "Start the other way, or react to a signal", swap: ["Pro agility shuttle (5-10-5)", "5-10-5 shuttle"]
+  },
+  "Carioca": {
+    muscles: "Hips, adductors, core", why: "Loosens the hips and trains quick side-to-side feet — a staple of any baseball warm-up.",
+    steps: ["Stand sideways with your feet shoulder-width.", "Cross your back leg in front, then step the front foot out.", "Cross the back leg behind, then step out again.", "Let your hips turn while your shoulders stay facing sideways."],
+    mistakes: ["Turning the shoulders with the hips", "Slow, heavy feet"],
+    easier: "Walk it slowly", harder: "Faster, with a high knee on the front cross", swap: ["Lateral shuffles", "Agility ladder drills"]
+  },
+  "Repeat 30-yard sprints": {
+    muscles: "Whole body, heart and lungs", why: "Baseball is short bursts with rest. This trains you to sprint just as fast on the last one as the first.",
+    steps: ["Mark 30 yards.", "Sprint 30 yards, walk back, and start the next sprint 30 seconds after the last one started.", "Do 6 in a row — that's one set.", "Rest 3 minutes between sets."],
+    mistakes: ["Jogging the sprints to get through them", "Skipping the warm-up"],
+    easier: "4 sprints a set, or 45 seconds between them", harder: "A third set", swap: ["Bike intervals", "Tempo runs"]
+  },
+  "Tempo runs": {
+    muscles: "Legs, heart and lungs", why: "Builds an aerobic base without the pounding of long jogs — you recover faster between sprints and games.",
+    steps: ["Mark 100 yards (a foul line to center field is about right).", "Run it at about 70% — smooth, relaxed and tall.", "Walk back to the start.", "Repeat for all your reps."],
+    mistakes: ["Running them as all-out sprints", "Long, slow jogging instead"],
+    easier: "Fewer reps, or 60 yards", harder: "More reps or shorter walks", swap: ["Bike intervals", "Easy cardio (bike or jog)"]
+  },
+  "Bike intervals": {
+    muscles: "Legs, heart and lungs", why: "Hard bursts with easy recovery on a bike — conditioning with zero impact on your joints.",
+    steps: ["Warm up on the bike for 3–5 minutes.", "Pedal hard for 20 seconds.", "Pedal easy for 70 seconds.", "Repeat for every round, then cool down."],
+    mistakes: ["Going easy on the hard parts", "Not slowing down enough on the easy parts"],
+    easier: "6 rounds", harder: "10 rounds or 30 seconds hard", swap: ["Jump rope", "Tempo runs"]
+  },
+  "Jump rope": {
+    muscles: "Calves, ankles, heart and lungs", why: "Quick, light feet and ankle spring plus cardio — anywhere you have a rope and a bit of space.",
+    steps: ["Hold the handles at hip height, elbows close to your sides.", "Turn the rope with your wrists, not your arms.", "Hop just high enough to clear it, landing on the balls of your feet.", "Mix two-foot bounces, alternating feet and side-to-side hops."],
+    mistakes: ["Jumping too high", "Big arm circles", "Landing on your heels"],
+    easier: "Shorter rounds", harder: "Double-unders or high knees", swap: ["Line hops", "Pogo hops"]
+  },
+  "Easy cardio (bike or jog)": {
+    muscles: "Heart and lungs", why: "Easy, steady cardio builds the base that speeds up recovery between sprints, innings and back-to-back games.",
+    steps: ["Bike, jog, swim or walk briskly.", "Keep it easy enough to talk in full sentences the whole time.", "Go for the full time without stopping.", "Finish with a few minutes of stretching."],
+    mistakes: ["Turning it into a hard workout", "Running long distances hard — that can cost speed"],
+    easier: "15 minutes", harder: "30–40 minutes, still easy", swap: ["Tempo runs", "Bike intervals"]
+  },
+  "Supine spinal twist": {
+    muscles: "Lower back, glutes, chest", why: "Relaxes the trunk after all the rotation in hitting and throwing.",
+    steps: ["Lie on your back with your arms out to the sides.", "Pull one knee up and across your body.", "Let it drop toward the floor while both shoulders stay down.", "Look the other way and breathe, then switch."],
+    mistakes: ["Shoulder lifting off the floor", "Forcing the knee down"],
+    easier: "Put a pillow under the knee", harder: "Straighten the top leg", swap: ["Thoracic open books", "Cat-cow + deep breathing"]
   }
 };
 
 // Categories for the exercise library (Plan tab → Exercise library). Every exercise above is listed once.
 const EXERCISE_GROUPS = [
   ["Warm-up & cool-down", ["Dynamic warm-up", "Warm-up + band arm care", "Warm-up + arm circles", "Cool-down walk + stretch", "Easy walk (optional)", "Light stretching (optional)"]],
-  ["Power & jumps", ["Box jumps", "Broad jumps", "Med ball chest pass", "Tuck jumps", "Jumping lunges", "Single-leg hops", "Plyo push-ups", "Med ball rotational scoop toss", "Med ball overhead slams", "Kettlebell swings"]],
+  ["Explosive: jumps", ["Pogo hops", "Squat jumps", "Box jumps", "Seated box jumps", "Broad jumps", "Tuck jumps", "Jumping lunges", "Single-leg hops", "Hurdle hops", "Depth jumps", "Trap bar jumps", "Kettlebell swings"]],
+  ["Explosive: throws", ["Med ball rotational scoop toss", "Med ball rotational shot put", "Med ball step-behind rotational throw", "Med ball overhead backward toss", "Med ball chest pass", "Med ball overhead slams", "Plyo push-ups"]],
   ["Legs", ["Leg press", "Single-leg leg press", "Goblet squat", "Bulgarian split squat", "Trap bar deadlift", "Romanian deadlift", "Walking lunges (dumbbells)", "Reverse lunges", "Lateral lunges", "Dumbbell step-ups", "Step-ups (chair or bench)", "Step-ups with backpack",
     "Seated leg curl", "Nordic hamstring curls", "Nordic curls (feet under couch)", "Leg extensions", "Hip thrust", "Single-leg glute bridge", "Single-leg hip thrust (couch)", "Single-leg RDL", "Single-leg RDL (backpack)", "Standing calf raises", "Single-leg calf raises"]],
   ["Upper body", ["Dumbbell bench press", "Incline dumbbell press", "Push-ups", "Decline push-ups", "Diamond push-ups", "Pike push-ups", "Pull-ups", "Chest-supported row", "Single-arm dumbbell row",
@@ -716,7 +958,11 @@ const EXERCISE_GROUPS = [
   ["Arms & grip", ["Hammer curls", "Incline dumbbell curls", "Backpack curls", "Cable triceps pushdown", "Wrist curls + reverse wrist curls", "Towel wringing", "Farmer's carry"]],
   ["Core & rotation", ["Pallof press", "Hanging knee raises", "Bear crawl", "Suitcase carry", "Cable woodchop (high to low)", "Landmine rotations", "Ab wheel rollouts", "Plank shoulder taps", "Dead bugs", "Russian twists (backpack)",
     "Superman hold", "Side plank hip dips", "Hollow body hold", "Copenhagen plank", "Copenhagen plank (couch)"]],
-  ["Speed & agility", ["A-skips & B-skips", "Agility ladder drills", "Pro agility shuttle (5-10-5)", "5-10-5 shuttle", "Sled push", "Lateral skater bounds", "Base-stealing starts (crossover)", "Crossover sprint starts", "Drop-step sprints", "Line hops", "Lateral shuffles"]],
-  ["Mobility & recovery", ["Foam roll", "Ball rolling (tennis or lacrosse ball)", "Hip airplanes", "Banded lateral walks", "90/90 hip switches", "World's greatest stretch", "Couch stretch (hip flexors)", "Thoracic open books", "Cross-body shoulder stretch",
-    "Lat stretch on rack", "Band hamstring stretch", "Towel hamstring stretch", "Pigeon stretch", "Wrist & forearm stretch", "Cat-cow + deep breathing", "Doorway chest stretch"]]
+  ["Speed & agility", ["A-skips & B-skips", "Carioca", "Wall drives", "Falling starts", "Flying sprints", "Hill sprints", "Base-running turns", "Shuffle-to-sprint", "L-drill (3-cone)", "Agility ladder drills", "Pro agility shuttle (5-10-5)", "5-10-5 shuttle", "Sled push", "Lateral skater bounds", "Base-stealing starts (crossover)", "Crossover sprint starts", "Drop-step sprints", "Line hops", "Lateral shuffles"]],
+  ["Throwing (throw harder)", ["Long toss: extension", "Long toss: pull-downs", "Max-intent crow-hop throws", "Recovery catch"]],
+  ["Conditioning (cardio)", ["Repeat 30-yard sprints", "Tempo runs", "Bike intervals", "Jump rope", "Easy cardio (bike or jog)"]],
+  ["Mobility (moving)", ["Inchworms", "90/90 hip switches", "World's greatest stretch", "Hip CARs", "Shoulder CARs", "Cossack squats", "Hip airplanes", "Banded lateral walks", "Thoracic open books", "Thread the needle",
+    "Band pass-throughs", "Knee-to-wall ankle mobility", "Cat-cow + deep breathing"]],
+  ["Stretching (holds) & recovery", ["Couch stretch (hip flexors)", "Half-kneeling hip flexor stretch", "Pigeon stretch", "Frog stretch", "Deep squat hold", "Band hamstring stretch", "Towel hamstring stretch", "Calf stretch (wall)",
+    "Supine spinal twist", "Cross-body shoulder stretch", "Lat stretch on rack", "Child's pose lat stretch", "Doorway chest stretch", "Wrist & forearm stretch", "Foam roll", "Ball rolling (tennis or lacrosse ball)"]]
 ];

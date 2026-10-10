@@ -121,11 +121,74 @@ const VIDEOS = {
   "Wall slides": "https://www.youtube.com/watch?v=tWDGEyMWv10", // Jack Hanrahan Fitness  — Easy fix for rounded shoulders - Scapula Wall Slides #mobility
   "External rotation hold (doorway)": "https://www.youtube.com/watch?v=Srthrc0W1S8", // Medbridge — Standing Isometric Shoulder External Rotation with Doorway | MedBridge
   "Towel wringing": "https://www.youtube.com/watch?v=qvxf9uBHNUw", // Old School Strength — FOREARM TRAINING ( TOWEL WRINGING )
-  "Up-downs (plank to push-up)": "https://www.youtube.com/watch?v=L4oFJRDAU4Q" // oxygenmagazine — Up and Down Plank
+  "Up-downs (plank to push-up)": "https://www.youtube.com/watch?v=L4oFJRDAU4Q", // oxygenmagazine — Up and Down Plank
+
+  // Library exercises (exercises.js, added in 2.1)
+  "Goblet squat": "https://www.youtube.com/watch?v=CkFzgR55gho", // Physique Development — How to Perform Dumbbell Goblet Squat
+  "Bulgarian split squat": "https://www.youtube.com/watch?v=SkNsa3eBwLA", // Max Euceda — How to do the BULGARIAN SPLIT SQUAT! | 2 Minute Tutorial
+  "Band pull-aparts": "https://www.youtube.com/watch?v=stwYTTPXubo", // Tangelo - Seattle Chiropractor + Rehab — How To Do Banded Pull-Aparts
+  "Scap push-ups": "https://www.youtube.com/watch?v=NKekqeudgWs", // The Active Life — Scap Push ups
+  "Med ball chest pass": "https://www.youtube.com/watch?v=e-zHTwXA8mE", // Viking Strength Systems — Standing Medicine Ball Chest Pass
+  "Bear crawl": "https://www.youtube.com/watch?v=4d52Y9W2M0g", // [P]rehab — Core strength: Bear Crawl
+  "Hip airplanes": "https://www.youtube.com/watch?v=9svtEV4vkp0", // Dr. Carl Baird — Hip Airplane Exercise For Improved Balance, Mobility, And Glute Med Strength
+  "Banded lateral walks": "https://www.youtube.com/watch?v=DkaQ1mmfErA", // Seriously Strong Training — How to do Lateral Band Walks
+  "Suitcase carry": "https://www.youtube.com/watch?v=y-hn_Ha1-RE", // Dr. Carl Baird — How To Perform The Suitcase Carry
+  "Band 90/90 external rotation": "https://www.youtube.com/watch?v=67dz9MJ63xc", // E3 Rehab Exercise Library — Standing Banded External Rotation (90/90)
+
+  // Explosive power (added in 2.6)
+  "Pogo hops": "https://www.youtube.com/watch?v=j0nl5dWuqN4", // Runna — Pogo Jumps Tutorial - Proper Form and Technique
+  "Squat jumps": "https://www.youtube.com/watch?v=A-cFYWvaHr0", // Well+Good — How To Do A Squat Jump | The Right Way
+  "Seated box jumps": "https://www.youtube.com/watch?v=Mvz7REfKWiE", // Swift Movement Academy — How To Do a Seated Box Jump
+  "Depth jumps": "https://www.youtube.com/watch?v=egnoXByP6ck", // Pearman Fitness — Depth Jumps
+  "Hurdle hops": "https://www.youtube.com/watch?v=SuddHMMcK5I", // Runna — Hurdle Hops Tutorial - Proper Form and Technique
+  "Trap bar jumps": "https://www.youtube.com/watch?v=qQwvRCIp-fw", // Mike Boyle Strength & Conditioning — Trap Bar Jump
+  "Med ball rotational shot put": "https://www.youtube.com/watch?v=EXV9UhUMTiY", // Champion Physical Therapy and Performance — Med Ball Rotational Shotput
+  "Med ball step-behind rotational throw": "https://www.youtube.com/watch?v=y_HBO76IQhg", // Advanced Therapy and Performance — Step Behind Rotational Med Ball Throw
+  "Med ball overhead backward toss": "https://www.youtube.com/watch?v=j2iNY9aLmys", // Elite Performance Institute — Backward Med Ball Throw
+  "Wall drives": "https://www.youtube.com/watch?v=CRAlymzmpHQ", // Parisi Speed School — Wall Drive Drill
+  "Falling starts": "https://www.youtube.com/watch?v=EK8jLSC8CaY", // Blake Brashear — Falling Starts
+  "Flying sprints": "https://www.youtube.com/watch?v=qF88X_wLGlg", // Simple Speed Coach — Flying Sprints (Flying Start) - Sprint Float | Speed Training
+
+  // Mobility and stretching (added in 2.6)
+  "Inchworms": "https://www.youtube.com/watch?v=Z19gpqxQBwo", // Twin Cities Orthopedics — Dynamic Warmup Exercises | How to do Inch Worm
+  "Cossack squats": "https://www.youtube.com/watch?v=tpczTeSkHz0", // FitnessFAQs — How to Cossack Squat Mobility Exercise: Tutorial & Progressions
+  "Deep squat hold": "https://www.youtube.com/watch?v=IHApHfNA2Ag", // Hinge Health — How to Do a Deep Squat According to Physical Therapists
+  "Knee-to-wall ankle mobility": "https://www.youtube.com/watch?v=ElrpduJn92Y", // Dr. Jess Harvey — Knee To Wall Exercise for Ankle Mobility
+  "Hip CARs": "https://www.youtube.com/watch?v=hRMrq6G81p8", // Cleveland Clinic — Controlled Articular Rotations (CARs) for Your Hips
+  "Shoulder CARs": "https://www.youtube.com/watch?v=kI0XzmjYuZU", // Tom Morrison — Shoulder CARs - Simple Shoulder Mobility Exercise
+  "Thread the needle": "https://www.youtube.com/watch?v=UomKzkyp6kQ", // Well+Good — How to Thread-the-Needle | The Right Way
+  "Band pass-throughs": "https://www.youtube.com/watch?v=7GSSVK8iXU0", // moveSKILL — Demo: Band Pass Through
+  "Frog stretch": "https://www.youtube.com/watch?v=1wpyPsr0Rx0", // VIGEO — Frog Stretch: The Secret to Inner Thigh & Groin Flexibility
+  "Calf stretch (wall)": "https://www.youtube.com/watch?v=tUA4MO1kXV8", // The Running PTs — Wall calf stretch for calf pain
+  "Half-kneeling hip flexor stretch": "https://www.youtube.com/watch?v=gqoPYLUgP48", // [P]rehab — Step-by-step Guide to the Half Kneeling Hip Flexor Stretch
+  "Child's pose lat stretch": "https://www.youtube.com/watch?v=2pkLUbN34GI", // Functional Bodybuilding — Childs Pose with Lat Stretch
+  "Supine spinal twist": "https://www.youtube.com/watch?v=mNdJti7ZwKI", // Vive Health — Supine Spinal Twist for Spine Mobility
+
+  // Conditioning and agility for the mobility plan (added in 2.6)
+  "Tempo runs": "https://www.youtube.com/watch?v=TpmzpMui9do", // Will Ratelle — Tempo Runs For Team Sport Athletes
+  "Bike intervals": "https://www.youtube.com/watch?v=PHReR7tC_tw", // Live Lean TV — How To Do An Assault Air Bike Sprint
+  "Jump rope": "https://www.youtube.com/watch?v=vEJ7XbbAMAg", // Dayan Kole — Jump Rope Like a Pro in 2 Minutes
+  "Base-running turns": "https://www.youtube.com/watch?v=g4EpLm1XzXg", // Baseball Canada — Rounding 1st Base
+  "Repeat 30-yard sprints": "https://www.youtube.com/watch?v=Gs9eKZANYik", // overtimeathletes — Speed Training for Baseball
+  "L-drill (3-cone)": "https://www.youtube.com/watch?v=_KtUvR2zcNU", // Simple Speed Coach — L Drill - 3 Cone Drill Technique
+  "Carioca": "https://www.youtube.com/watch?v=CMeuCmzKf84", // StrengthRunning — Carioca Running Form Drill Demonstration
+  "Easy cardio (bike or jog)": "https://www.youtube.com/watch?v=Mh5oNMDCucQ", // The Movement System — How to Train with Heart Rate Zones
+  "Hill sprints": "https://www.youtube.com/watch?v=-lMeXFoWSOQ", // Trainwright Performance — Hill Sprints for Developing Acceleration
+  "Shuffle-to-sprint": "https://www.youtube.com/watch?v=Vu-2wL-dt7Q", // Simple Speed Coach — Lateral Shuffle to Sprint
+
+  // Throwing program (added in 2.6)
+  "Long toss: extension": "https://www.youtube.com/watch?v=T5bQXpGpjYs", // Jaeger Sports — Long Toss Demonstration (Stretching Out & Pulling Down)
+  "Long toss: pull-downs": "https://www.youtube.com/watch?v=P8-9V0utUko", // RobbyRow12 — Robby Rowland's 400ft Long Toss with Pull Downs
+  "Max-intent crow-hop throws": "https://www.youtube.com/watch?v=I82azUpnqeE", // Summers Method — Throw Harder From the Outfield
+  "Recovery catch": "https://www.youtube.com/watch?v=bDEXVfchUGg" // ARM Pitching Development — Arm Cooldown and Recovery Drills For Baseball Throwers
 };
 
+// The first time an exercise is written out below, it's remembered so like() can reuse its cues anywhere after.
+const FIRST = {};
 function ex(name, sets, reps, rest, track, cues, search) {
-  return { name, sets, reps, rest, track, cues, video: VIDEOS[name] || ytSearch(search || name + " proper form") };
+  const e = { name, sets, reps, rest, track, cues, video: VIDEOS[name] || ytSearch(search || name + " proper form") };
+  if (!FIRST[name]) FIRST[name] = e;
+  return e;
 }
 
 // Shared pieces that appear on several days
@@ -144,93 +207,187 @@ const REST_DAY = {
   ]
 };
 
+/* ============================ EXERCISE CATALOG ============================
+   How every other exercise is set up when it lands in a workout: the explosive jumps, throws and sprints and the
+   mobility drills and stretches, plus a few that used to be in the starting week. The programs below use them with
+   like(), and Build my plan, the presets and the exercise library start from these sets, reps and cues. */
+const CATALOG = [
+  /* ----- Explosive: jumps, throws and sprints ----- */
+  ex("Pogo hops", 2, "15", 45, "check", "Stiff ankles, quick little bounces off the balls of your feet. The less time on the ground, the better — it wakes up your legs for jumping and sprinting."),
+  ex("Squat jumps", 3, "5", 60, "reps", "Quick dip, swing your arms and jump as high as you can. Land soft and quiet, reset, and make every rep a max-height jump."),
+  ex("Seated box jumps", 3, "3", 90, "reps", "Sit on a bench in front of the box, feet flat. Swing your arms and jump straight from sitting onto the box, then step down. No bounce = pure starting power."),
+  ex("Depth jumps", 3, "3", 120, "reps", "Step (don't jump) off a 12–18 inch box, land on both feet and bounce straight up as high as you can. Spend as little time on the ground as possible."),
+  ex("Hurdle hops", 3, "5", 90, "reps", "Two-foot hops over a row of mini hurdles or cones, bouncing quickly off the ground between them. Knees up, arms swing, stay tall."),
+  ex("Trap bar jumps", 3, "3", 120, "weight", "Light load — about 20–30% of your trap bar deadlift. Quick dip, jump as high as you can, land soft with bent knees and reset between reps."),
+  ex("Med ball rotational shot put", 3, "5/side", 60, "reps", "Stand sideways to a wall, ball at your back shoulder. Load the back hip, then hips, torso and arm drive the ball into the wall like a shot put. Every throw all-out."),
+  ex("Med ball step-behind rotational throw", 3, "4/side", 75, "reps", "Step the back foot behind the front (like a crow hop), land and throw hard into the wall in one motion. Hips lead, arms follow. 4–8 lb ball."),
+  ex("Med ball overhead backward toss", 3, "4", 75, "reps", "Outside or under a high ceiling. Ball between your legs, dip, then explode through your hips and throw it back over your head as far as you can."),
+  ex("Wall drives", 3, "5/leg", 45, "check", "Hands on a wall, body leaning about 45° in a straight line. Drive one knee up and punch that foot back down under your hip. Quick, sharp switches — the first-step position."),
+  ex("Falling starts", 4, "10 yd", 60, "check", "Stand tall, lean forward until you have to step, then sprint 10 yards. Push the ground back behind you — don't reach out in front."),
+  ex("Flying sprints", 3, "10 yd fly", 120, "check", "Build up over 20 yards, then sprint 10 yards at top speed — tall, relaxed, fast arms. Walk back and rest fully; this is pure speed."),
+  ex("Hill sprints", 6, "10 sec", 90, "check", "A moderate hill. Lean into it, drive your knees and arms, then walk down slowly. Acceleration that's easy on the hamstrings."),
+  ex("Base-running turns", 5, "home to 2nd", 90, "check", "Sprint out of the box, bow out a step before first, hit the inside corner of the bag and drive straight to second. Walk back."),
+  ex("Shuffle-to-sprint", 5, "5 yd + 10 yd", 60, "check", "Two quick shuffles one way, then open your hips and sprint 10 yards — like reacting to a ball hit to your side. Alternate sides."),
+  ex("L-drill (3-cone)", 4, "1", 90, "time", "Cones in an L, 5 yards apart: sprint, touch, back, around the middle cone and weave the corner. Stay low on every turn. Log your time."),
+  ex("Carioca", 2, "20 yd each way", 30, "check", "Hips turn side to side as the back leg crosses in front, then behind. Quick feet, shoulders facing sideways."),
+
+  /* ----- Throwing (position players: throw harder) ----- */
+  ex("Long toss: extension", 1, "out to 150 ft", 0, "check", "Back up a few steps every couple of throws, with an arc on the ball and a long, loose arm, until you reach your max comfortable distance. Hold it for 4–6 throws."),
+  ex("Long toss: pull-downs", 1, "10 throws", 0, "check", "Walk back in a few steps after each throw, throwing harder and on a line as you get closer. Aim chest-high to your partner."),
+  ex("Max-intent crow-hop throws", 1, "8 throws", 0, "check", "Crow hop and throw as hard as you can on a line to a partner or net 60–90 ft away. Full rest (about a minute) between throws. Stop if your arm feels off."),
+  ex("Recovery catch", 1, "25 easy throws", 0, "check", "Easy catch at 60–90 ft, about 50% effort with good mechanics. Your arm should feel better when you finish."),
+
+  /* ----- Conditioning: baseball cardio ----- */
+  ex("Repeat 30-yard sprints", 2, "6 × 30 yd", 180, "check", "Baseball conditioning: a 30-yard sprint every 30 seconds, 6 in a row, then 3 minutes off. Keeps you just as fast in the 7th inning."),
+  ex("Tempo runs", 6, "100 yd", 45, "check", "About 70% speed — smooth and relaxed, breathing hard but in control. Walk back to the start and go again."),
+  ex("Bike intervals", 8, "20 sec", 70, "check", "20 seconds hard on a bike (air bike or spin bike), then 70 seconds of easy pedaling. Builds the engine that recovers you between sprints."),
+  ex("Jump rope", 5, "1 min", 30, "check", "Light and quick on the balls of your feet, wrists turn the rope. Mix two-foot bounces, alternating feet and side to side."),
+  ex("Easy cardio (bike or jog)", 1, "20 min", 0, "check", "Easy enough to talk the whole time. Builds the aerobic base that helps you recover between sprints, innings and games."),
+
+  /* ----- Mobility drills and stretches ----- */
+  ex("Inchworms", 2, "6", 20, "check", "Hinge down, walk your hands out to a push-up position, then walk your feet up to your hands with your legs as straight as you can. Slow and controlled."),
+  ex("Cossack squats", 2, "6/side", 30, "reps", "Wide stance. Sit into one hip with the other leg straight and its toes up. Chest tall, heel down — go only as low as you can control."),
+  ex("Deep squat hold", 2, "45 sec", 15, "check", "Sit into your deepest squat, heels down, chest up. Press your knees out with your elbows and breathe. Hold a post if you need to."),
+  ex("Knee-to-wall ankle mobility", 2, "10/side", 15, "check", "Foot a few inches from a wall, drive your knee forward to touch the wall without your heel lifting. Slide the foot back as it gets easier."),
+  ex("Hip CARs", 2, "5/side", 15, "check", "Hold something for balance. Draw the biggest, slowest circle you can with your knee — up, out to the side, back — without your pelvis moving. Then reverse."),
+  ex("Shoulder CARs", 2, "5/arm", 15, "check", "Make a fist and brace your core. Slowly circle a straight arm as big as you can — forward, up, back and down — without your body twisting. Then reverse."),
+  ex("Thread the needle", 2, "8/side", 15, "check", "On hands and knees, reach one arm under your body as far as you can, then rotate it open to the sky. Follow your hand with your eyes."),
+  ex("Band pass-throughs", 2, "10", 20, "check", "Hold a light band (or a broomstick) wide with straight arms. Slowly bring it over your head and behind you, then back. Widen your grip if it pinches."),
+  ex("Frog stretch", 2, "45 sec", 15, "check", "On hands and knees, slide your knees wide with your ankles in line with them. Rock your hips back until you feel your inner thighs stretch. Breathe."),
+  ex("Calf stretch (wall)", 1, "30 sec/side", 0, "check", "Hands on a wall, back leg straight, heel down, and lean in. Then bend the back knee a little to stretch lower down."),
+  ex("Half-kneeling hip flexor stretch", 2, "45 sec/side", 15, "check", "Kneel on one knee, tuck your hips under and squeeze that glute, then shift forward a little. Reach the same-side arm up for more."),
+  ex("Child's pose lat stretch", 2, "30 sec/side", 15, "check", "Sit back on your heels with your arms reaching forward. Walk both hands to one side and sink your hips back. Breathe into your side."),
+  ex("Supine spinal twist", 2, "30 sec/side", 15, "check", "Lie on your back, pull one knee across your body and let it drop toward the floor. Keep both shoulders down and look the other way."),
+
+  /* ----- Library exercises used in the programs ----- */
+  ex("Bulgarian split squat", 3, "8/leg", 90, "weight", "Back foot on the bench, lower straight down, drive through the front foot."),
+  ex("Med ball chest pass", 3, "6", 60, "reps", "Step and throw the ball into the wall as hard as you can."),
+  ex("Bear crawl", 3, "15 yd", 45, "check", "Knees an inch off the floor, opposite hand and foot move together."),
+  ex("Band 90/90 external rotation", 2, "12/arm", 30, "reps", "Elbow at shoulder height, rotate up slowly, control it back."),
+  ex("Band pull-aparts", 3, "15", 30, "reps", "Straight arms, pull the band to your chest, squeeze your shoulder blades."),
+  ex("Scap push-ups", 2, "12", 30, "reps", "Arms stay straight — only your shoulder blades move."),
+
+  /* ----- From the earlier starting week (still in Build my plan, the presets and the library) ----- */
+  ex("Seated leg curl", 3, "10", 60, "weight", "Pull heels down and back, squeeze 1 second, take 3 seconds on the way up."),
+  ex("Hanging knee raises", 3, "12", 45, "reps", "No swinging. Curl your hips up toward your ribs, lower slowly."),
+  ex("Leg extensions", 3, "12", 60, "weight", "Pause and squeeze at the top, 3 seconds down."),
+  ex("Single-leg leg press", 3, "10/leg", 90, "weight", "Same cues as leg press, one leg at a time. Evens out left/right differences."),
+  ex("Single-arm dumbbell row", 3, "10/arm", 60, "weight", "Flat back, pull the dumbbell to your hip, no twisting."),
+  ex("Incline dumbbell curls", 3, "10", 60, "weight", "Let your arms hang behind you and curl without moving the elbows."),
+  ex("Agility ladder drills", 4, "1 pattern", 30, "check", "In-in-out-out, lateral shuffle, Ickey shuffle. Light on the balls of your feet, eyes up."),
+  ex("Plank shoulder taps", 3, "20 taps", 45, "reps", "Feet wide, hips still — don't let them rock side to side."),
+  ex("Superman hold", 3, "30 sec", 30, "time", "Lift arms, chest and legs off the floor. Squeeze glutes and upper back."),
+  ex("Tuck jumps", 3, "6", 60, "reps", "Jump, pull your knees to your chest, land soft and go again."),
+  ex("Lateral shuffles", 4, "10 yd each way", 45, "check", "Stay low, feet never cross or click together, push off the trailing leg."),
+  ex("Step-ups with backpack", 3, "10/leg", 60, "weight", "Whole foot on a sturdy chair, drive through that heel, no push from the back leg."),
+  ex("Up-downs (plank to push-up)", 3, "10", 45, "reps", "From elbows to hands and back down, hips steady.")
+];
+
+/* like(name, sets, reps, rest) copies an exercise (cues, video, what to log) from the first time it was written out —
+   in the catalog above or earlier in the plans. */
+function like(name, sets, reps, rest) {
+  const e = FIRST[name];
+  if (!e) throw new Error("plan.js: no exercise named " + name);
+  return { ...e, sets, reps, rest: rest ?? e.rest };
+}
+// A 1–2 stretch finisher at the end of a training day: one round of each, held, no rest.
+const hold = (name, reps) => like(name, 1, reps, 0);
+
 const DEFAULT_PLAN = {
   /* ============================ GYM (Lifetime) ============================ */
   gym: [
     { // Monday
       title: "Legs & Core — Power",
       type: "strength",
-      focus: "Explosive lower body and heavy leg press. Jumps first while you're fresh.",
+      focus: "Jumps first while you're fresh — every rep fast and all-out, with full rest — then heavy legs. Ends with a quick hip and hamstring stretch.",
       exercises: [
         WARMUP(8),
-        ex("Box jumps", 4, "4", 90, "reps", "Swing your arms, explode up, land soft and quiet in an athletic stance. Step down — don't jump down."),
-        ex("Leg press", 5, "5", 180, "weight", "Feet shoulder-width, middle of the platform. Lower until knees reach about 90° without your lower back peeling off the pad. Drive through the whole foot; don't slam into lockout."),
+        like("Pogo hops", 2, "15", 45),
+        ex("Box jumps", 4, "3", 90, "reps", "Swing your arms, explode up, land soft and quiet in an athletic stance. Step down — don't jump down. Rest fully: every jump should be your best."),
         ex("Trap bar deadlift", 4, "5", 150, "weight", "Hips back, chest tall, lats tight. Push the floor away and finish tall with glutes squeezed."),
-        ex("Walking lunges (dumbbells)", 3, "10/leg", 90, "weight", "Long step, back knee lightly touches the floor, torso tall. Drive through the front heel."),
+        ex("Leg press", 3, "8", 120, "weight", "Feet shoulder-width, middle of the platform. Lower until knees reach about 90° without your lower back peeling off the pad. Drive through the whole foot; don't slam into lockout."),
+        ex("Walking lunges (dumbbells)", 3, "8/leg", 90, "weight", "Long step, back knee lightly touches the floor, torso tall. Drive through the front heel."),
         ex("Lateral lunges", 3, "8/side", 60, "weight", "Hold a dumbbell at your chest. Sit back into one hip with the other leg straight, toes forward. Builds side-to-side range for fielding."),
-        ex("Seated leg curl", 3, "10", 60, "weight", "Pull heels down and back, squeeze 1 second, take 3 seconds on the way up."),
-        ex("Standing calf raises", 3, "15", 45, "weight", "Full stretch at the bottom, pause 1 second at the top."),
+        ex("Standing calf raises", 3, "12", 45, "weight", "Full stretch at the bottom, pause 1 second at the top."),
         ex("Pallof press", 3, "10/side", 45, "weight", "Stand sideways to the cable, press straight out and hold 2 seconds. Don't let your torso twist."),
-        ex("Hanging knee raises", 3, "12", 45, "reps", "No swinging. Curl your hips up toward your ribs, lower slowly.")
+        ex("Couch stretch (hip flexors)", 1, "45 sec/side", 0, "check", "Back knee against a bench or wall, squeeze that glute, stay tall."),
+        ex("Band hamstring stretch", 1, "45 sec/side", 0, "check", "On your back, band around your foot, raise the straight leg until you feel a stretch.")
       ]
     },
     { // Tuesday
-      title: "Chest & Back — Upper Strength",
+      title: "Chest & Back — Upper Power",
       type: "strength",
-      focus: "Upper-body strength plus rotational power for bat speed and arm strength.",
+      focus: "Med ball throws and plyo push-ups first, while you're fresh — rotational power for bat speed and arm speed. Then pressing, plenty of pulling and a shoulder stretch.",
       exercises: [
         ex("Warm-up + band arm care", 1, "8 min", 0, "check", "Arm circles, band pull-aparts, band external rotations and scap push-ups. Get the shoulders warm.", "baseball arm care band warm up"),
-        ex("Med ball rotational scoop toss", 4, "5/side", 60, "reps", "Load your back hip like your swing, then rotate hard and throw into the wall. Hips lead, arms follow."),
+        ex("Med ball rotational scoop toss", 3, "5/side", 60, "reps", "Load your back hip like your swing, then rotate hard and throw into the wall. Hips lead, arms follow."),
+        like("Med ball rotational shot put", 3, "5/side", 60),
+        ex("Plyo push-ups", 3, "5", 60, "reps", "Push hard enough that your hands leave the floor. Land soft with bent elbows."),
         ex("Dumbbell bench press", 4, "6-8", 120, "weight", "Shoulder blades pinched, elbows about 45° from your body. Lower to chest level, press up and slightly in."),
         ex("Pull-ups", 4, "6-8", 120, "weight", "Dead hang, pull your chest to the bar, elbows drive down to your ribs. Log added weight (leave blank for bodyweight)."),
         ex("Chest-supported row", 4, "8-10", 90, "weight", "Chest on the pad, pull elbows to your back pockets, squeeze shoulder blades together, lower slowly."),
         ex("Incline dumbbell press", 3, "10", 90, "weight", "Bench at about 30°. Take 2 seconds down, press without flaring your elbows."),
-        ex("Single-arm dumbbell row", 3, "10/arm", 60, "weight", "Flat back, pull the dumbbell to your hip, no twisting."),
-        ex("Plyo push-ups", 3, "6", 60, "reps", "Push hard enough that your hands leave the floor. Land soft with bent elbows."),
         ex("Cable woodchop (high to low)", 3, "10/side", 45, "weight", "Arms long, rotate through your hips and upper back, pivot the back foot like your swing."),
-        ex("Face pulls", 3, "15", 45, "weight", "Rope to your forehead, elbows high, pull the rope apart and squeeze. Keeps throwing shoulders healthy.")
+        ex("Face pulls", 3, "15", 45, "weight", "Rope to your forehead, elbows high, pull the rope apart and squeeze. Keeps throwing shoulders healthy."),
+        ex("Lat stretch on rack", 1, "30 sec/side", 0, "check", "Hold a post, sit your hips back and let the lat stretch. Breathe into it."),
+        ex("Cross-body shoulder stretch", 1, "30 sec/side", 0, "check", "Pull the arm across your chest below the chin. Gentle — feel it in the back of the shoulder.")
       ]
     },
     { // Wednesday
       title: "Agility & Speed",
       type: "agility",
-      focus: "Quick feet, first-step speed and change of direction. Rest fully between reps — speed work is about quality, not getting tired. Use the turf area.",
+      focus: "Acceleration, top speed and change of direction. Rest fully between reps — speed is built fresh, not tired. Use the turf area.",
       exercises: [
         WARMUP(10),
         ex("A-skips & B-skips", 3, "20 yd", 45, "check", "Tall posture, drive the knee up, toes up, strike the ground under your hips. Quick arms."),
-        ex("Agility ladder drills", 6, "1 pattern", 30, "check", "In-in-out-out, lateral shuffle, Ickey shuffle. Light on the balls of your feet, eyes up."),
-        ex("Pro agility shuttle (5-10-5)", 6, "1", 75, "time", "Stay low on each turn, touch the line, push off the outside leg. Log your time in seconds."),
-        ex("Sled push", 4, "20 yd", 90, "weight", "Low body angle, arms locked, drive your knees and push through the balls of your feet."),
-        ex("Lateral skater bounds", 4, "6/side", 60, "reps", "Push off the outside leg and stick each landing for a second with the knee over the toes."),
-        ex("Base-stealing starts (crossover)", 6, "15 yd", 60, "time", "From your lead-off, crossover step and drive low. The first 3 steps are everything. Log a time if someone can clock you."),
-        ex("Drop-step sprints", 6, "20 yd", 45, "check", "Open the hips, turn and run like you're chasing a fly ball over your shoulder. Don't backpedal."),
+        like("Wall drives", 3, "5/leg", 45),
+        like("Falling starts", 4, "10 yd", 60),
+        ex("Pro agility shuttle (5-10-5)", 5, "1", 75, "time", "Stay low on each turn, touch the line, push off the outside leg. Log your time in seconds."),
+        ex("Base-stealing starts (crossover)", 4, "15 yd", 60, "time", "From your lead-off, crossover step and drive low. The first 3 steps are everything. Log a time if someone can clock you."),
+        like("Flying sprints", 3, "10 yd fly", 120),
+        ex("Drop-step sprints", 4, "20 yd", 45, "check", "Open the hips, turn and run like you're chasing a fly ball over your shoulder. Don't backpedal."),
+        ex("Lateral skater bounds", 3, "5/side", 60, "reps", "Push off the outside leg and stick each landing for a second with the knee over the toes."),
+        ex("Sled push", 3, "20 yd", 90, "weight", "Low body angle, arms locked, drive your knees and push through the balls of your feet."),
         ex("Copenhagen plank", 3, "20 sec/side", 45, "time", "Top leg on a bench, lift your hips into a straight line and hold. Builds groin strength for lateral moves."),
         COOLDOWN
       ]
     },
     { // Thursday
-      title: "Stretching & Mobility",
+      title: "Flexibility & Mobility",
       type: "mobility",
-      focus: "Active recovery. Move slowly and breathe deep. You should feel a stretch — never pain.",
+      focus: "Active recovery that makes you move better: moving drills first to loosen the joints, then longer holds. Breathe slowly and relax into each stretch — you should feel a stretch, never pain.",
       exercises: [
         ex("Foam roll", 1, "8 min", 0, "check", "Quads, outer thighs, glutes, lats and upper back. About 45 seconds per area; pause on tight spots.", "foam rolling routine athletes"),
         ex("90/90 hip switches", 2, "10", 30, "check", "Sit tall and rotate both knees side to side without using your hands."),
         ex("World's greatest stretch", 2, "5/side", 30, "check", "Lunge, drop your elbow to the inside of the front foot, then rotate and reach to the sky."),
-        ex("Couch stretch (hip flexors)", 2, "60 sec/side", 15, "check", "Back knee against a bench or wall, squeeze that glute, stay tall."),
+        like("Cossack squats", 2, "6/side", 30),
         ex("Thoracic open books", 2, "10/side", 15, "check", "Lie on your side, knees stacked, open the top arm across like a book. Rotation for your swing and throw."),
-        ex("Cross-body shoulder stretch", 2, "30 sec/side", 15, "check", "Pull the arm across your chest below the chin. Gentle — feel it in the back of the shoulder."),
-        ex("Lat stretch on rack", 2, "30 sec/side", 15, "check", "Hold a post, sit your hips back and let the lat stretch. Breathe into it."),
-        ex("Band hamstring stretch", 2, "45 sec/side", 15, "check", "On your back, band around your foot, raise the straight leg until you feel a stretch."),
+        like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
+        like("Frog stretch", 2, "45 sec", 15),
         ex("Pigeon stretch", 2, "45 sec/side", 15, "check", "Front shin across, back leg long, hips square. Lean forward for more."),
+        like("Band hamstring stretch", 2, "45 sec/side", 15),
+        like("Cross-body shoulder stretch", 2, "30 sec/side", 15),
+        like("Lat stretch on rack", 2, "30 sec/side", 15),
         ex("Wrist & forearm stretch", 2, "30 sec each", 15, "check", "Palm up, then palm down, gently pull the fingers back. Big for hitters and throwers."),
         ex("Cat-cow + deep breathing", 1, "3 min", 0, "check", "Slow spine waves, then child's pose with long exhales.")
       ]
     },
     { // Friday
-      title: "Glutes, Hamstrings & Core",
+      title: "Glutes, Hamstrings & Core — Power",
       type: "strength",
-      focus: "Posterior-chain strength, single-leg power and rotational core. Adds sprint speed and protects your hamstrings.",
+      focus: "Explosive hips first, then posterior-chain strength and rotational core. Adds sprint speed and protects your hamstrings.",
       exercises: [
         WARMUP(8),
-        ex("Kettlebell swings", 4, "10", 60, "weight", "Hinge, don't squat: hips back, then snap them forward so the bell floats to chest height. Arms are just ropes."),
-        ex("Romanian deadlift", 4, "8", 120, "weight", "Soft knees, push hips back, bar slides down your thighs to mid-shin with a flat back. Drive your hips through to stand."),
-        ex("Single-leg leg press", 3, "10/leg", 90, "weight", "Same cues as leg press, one leg at a time. Evens out left/right differences."),
-        ex("Hip thrust", 4, "8-10", 90, "weight", "Upper back on the bench, chin tucked, drive through your heels and squeeze glutes 1 second at the top. Ribs down."),
+        ex("Broad jumps", 3, "3", 75, "reps", "Swing your arms, jump forward as far as you can, stick the landing for 2 seconds. Rest fully between jumps."),
+        ex("Kettlebell swings", 4, "8", 60, "weight", "Hinge, don't squat: hips back, then snap them forward so the bell floats to chest height. Arms are just ropes."),
+        ex("Romanian deadlift", 3, "8", 120, "weight", "Soft knees, push hips back, bar slides down your thighs to mid-shin with a flat back. Drive your hips through to stand."),
+        ex("Hip thrust", 3, "8-10", 90, "weight", "Upper back on the bench, chin tucked, drive through your heels and squeeze glutes 1 second at the top. Ribs down."),
         ex("Dumbbell step-ups", 3, "8/leg", 75, "weight", "Box about knee height. Push through the top foot only — no bouncing off the back leg."),
         ex("Nordic hamstring curls", 3, "5", 90, "reps", "Feet anchored, lower yourself as slowly as you can, catch with your hands, push back up. Top hamstring-injury protector."),
-        ex("Leg extensions", 3, "12", 60, "weight", "Pause and squeeze at the top, 3 seconds down."),
         ex("Landmine rotations", 3, "8/side", 60, "weight", "Arms long, rotate from the hips and pivot the back foot like your swing. Control the bar."),
-        ex("Ab wheel rollouts", 3, "10", 60, "reps", "Squeeze glutes, ribs down, roll out only as far as you can without your back arching.")
+        ex("Ab wheel rollouts", 3, "10", 60, "reps", "Squeeze glutes, ribs down, roll out only as far as you can without your back arching."),
+        hold("Pigeon stretch", "45 sec/side"),
+        hold("Half-kneeling hip flexor stretch", "45 sec/side")
       ]
     },
     { // Saturday
@@ -239,16 +396,17 @@ const DEFAULT_PLAN = {
       focus: "Strong, durable shoulders and arms. The arm-care work keeps your throwing arm healthy.",
       exercises: [
         ex("Warm-up + band arm care", 1, "8 min", 0, "check", "Arm circles, band pull-aparts, band external rotations and scap push-ups.", "baseball arm care band warm up"),
-        ex("Med ball overhead slams", 4, "6", 45, "reps", "Reach tall, then slam the ball down as hard as you can using your abs."),
+        ex("Med ball overhead slams", 3, "6", 45, "reps", "Reach tall, then slam the ball down as hard as you can using your abs."),
         ex("Half-kneeling landmine press", 4, "8/arm", 90, "weight", "Squeeze the down-knee glute, brace, press up and slightly forward. Shoulder-friendly for throwers."),
         ex("Dumbbell lateral raises", 3, "12-15", 60, "weight", "Lead with your elbows, stop at shoulder height, lower slowly."),
         ex("Rear delt fly", 3, "15", 60, "weight", "Light weight, slight bend in the elbows, squeeze your shoulder blades. Pinkies lead."),
         ex("Hammer curls", 3, "10", 60, "weight", "Elbows pinned to your sides, no swinging. Builds forearms for bat control."),
         ex("Cable triceps pushdown", 3, "12", 60, "weight", "Elbows locked at your sides, fully straighten and squeeze."),
-        ex("Incline dumbbell curls", 3, "10", 60, "weight", "Let your arms hang behind you and curl without moving the elbows."),
         ex("Cable external rotation", 3, "12/arm", 30, "weight", "Towel under the elbow, rotate out slowly and control it back. Rotator cuff = throwing health."),
         ex("Wrist curls + reverse wrist curls", 2, "15 each", 45, "weight", "Forearms on your thighs, move only at the wrist. Grip strength for hitting."),
-        ex("Farmer's carry", 3, "40 yd", 60, "weight", "Heavy dumbbells, stand tall, shoulders down, tight grip, quick steps.")
+        ex("Farmer's carry", 3, "40 yd", 60, "weight", "Heavy dumbbells, stand tall, shoulders down, tight grip, quick steps."),
+        hold("Cross-body shoulder stretch", "30 sec/side"),
+        ex("Wrist & forearm stretch", 1, "30 sec each", 0, "check", "Palm up, then palm down, gently pull the fingers back.")
       ]
     },
     REST_DAY // Sunday
@@ -259,89 +417,96 @@ const DEFAULT_PLAN = {
     { // Monday
       title: "Legs & Core — Power",
       type: "strength",
-      focus: "No equipment needed. Wear a backpack loaded with books to make it harder.",
+      focus: "No equipment needed. Jumps first while you're fresh, then single-leg strength — wear a backpack loaded with books to make it harder.",
       exercises: [
         WARMUP(8),
-        ex("Broad jumps", 4, "5", 60, "reps", "Swing your arms, jump forward as far as you can, stick the landing for 2 seconds."),
-        ex("Jumping lunges", 3, "6/leg", 60, "reps", "Switch legs in the air, land soft, stay tall."),
+        like("Pogo hops", 2, "15", 45),
+        like("Broad jumps", 4, "3", 75),
+        ex("Jumping lunges", 3, "5/leg", 60, "reps", "Switch legs in the air, land soft, stay tall."),
         ex("Step-ups (chair or bench)", 4, "10/leg", 60, "weight", "Whole foot on a sturdy chair, drive through that heel. Don't push off the back leg. Log backpack weight if you use one."),
-        ex("Reverse lunges", 3, "12/leg", 60, "weight", "Step back, back knee lightly touches, push through the front heel. Backpack for extra load."),
+        ex("Reverse lunges", 3, "10/leg", 60, "weight", "Step back, back knee lightly touches, push through the front heel. Backpack for extra load."),
         ex("Single-leg RDL", 3, "10/leg", 45, "weight", "Hinge at the hip, back leg in line with your body, hips square. Reach toward the floor."),
         ex("Single-leg glute bridge", 3, "12/leg", 45, "reps", "Drive through the heel, squeeze glutes 1 second at the top, keep your hips level."),
-        ex("Single-leg calf raises", 3, "15/leg", 45, "reps", "On a stair edge for full range. Pause at the top."),
-        ex("Plank shoulder taps", 3, "20 taps", 45, "reps", "Feet wide, hips still — don't let them rock side to side."),
-        ex("Dead bugs", 3, "10/side", 45, "reps", "Low back glued to the floor. Move slowly and exhale fully.")
+        ex("Dead bugs", 3, "10/side", 45, "reps", "Low back glued to the floor. Move slowly and exhale fully."),
+        ex("Couch stretch (hip flexors)", 1, "45 sec/side", 0, "check", "Back knee against the couch, squeeze that glute, stay tall."),
+        ex("Towel hamstring stretch", 1, "45 sec/side", 0, "check", "On your back, towel around your foot, raise the straight leg.")
       ]
     },
     { // Tuesday
-      title: "Chest & Back — Upper Strength",
+      title: "Chest & Back — Upper Power",
       type: "strength",
-      focus: "Uses a sturdy table, a chair and a backpack loaded with books.",
+      focus: "Explosive push-ups first, then strength. Uses a sturdy table, a chair and a backpack loaded with books.",
       exercises: [
         ex("Warm-up + arm circles", 1, "8 min", 0, "check", "Jumping jacks, arm circles, wall slides and scap push-ups.", "baseball arm care warm up no equipment"),
-        ex("Plyo push-ups", 4, "6", 60, "reps", "Push hard enough that your hands leave the floor. Land soft with bent elbows."),
+        like("Plyo push-ups", 4, "5", 60),
         ex("Push-ups", 4, "12-15", 60, "reps", "3 seconds down, 1 second pause, explode up. Body in a straight line."),
         ex("Table inverted rows", 4, "8-12", 75, "reps", "Lie under a sturdy table, grab the edge, pull your chest up with a straight body. Test that the table is solid first!"),
         ex("Backpack bent-over rows", 3, "12", 60, "weight", "Load a backpack with books, hinge forward with a flat back and row it to your belly."),
         ex("Decline push-ups", 3, "10", 60, "reps", "Feet on the couch, hands on the floor. Hits upper chest and shoulders."),
         ex("Prone Y-T-W raises", 3, "8 each", 45, "reps", "Lie face down and lift your arms into a Y, then a T, then a W. Thumbs up, squeeze shoulder blades."),
         ex("Russian twists (backpack)", 3, "20", 45, "weight", "Lean back, feet up if you can, rotate the backpack side to side. Rotational power for your swing."),
-        ex("Superman hold", 3, "30 sec", 30, "time", "Lift arms, chest and legs off the floor. Squeeze glutes and upper back."),
-        ex("Chair dips", 3, "12", 60, "reps", "Hands on the chair edge, shoulders down, lower until elbows are about 90°.")
+        ex("Chair dips", 3, "12", 60, "reps", "Hands on the chair edge, shoulders down, lower until elbows are about 90°."),
+        ex("Doorway chest stretch", 1, "30 sec/side", 0, "check", "Forearm on the door frame at shoulder height, step through gently."),
+        hold("Child's pose lat stretch", "30 sec/side")
       ]
     },
     { // Wednesday
       title: "Agility & Speed",
       type: "agility",
-      focus: "Driveway, park or an open room. Use shoes or water bottles as cones. Rest fully between reps.",
+      focus: "Driveway, park or an open room. Use shoes or water bottles as cones. Rest fully between reps — speed is built fresh.",
       exercises: [
         WARMUP(10),
-        ex("A-skips & B-skips", 3, "20 yd", 45, "check", "Tall posture, drive the knee up, toes up, strike the ground under your hips. Quick arms."),
-        ex("Line hops", 4, "20 sec", 30, "check", "Quick two-foot hops over a line: forward/back, then side to side. Small and fast."),
-        ex("5-10-5 shuttle", 6, "1", 75, "time", "Set 3 markers 5 yards apart. Stay low on the turns and touch each line. Log your time."),
-        ex("Lateral skater bounds", 4, "6/side", 60, "reps", "Push off the outside leg and stick each landing for a second with the knee over the toes."),
-        ex("Crossover sprint starts", 6, "15 yd", 60, "check", "From a base-stealing lead-off, crossover step and drive low for 15 yards."),
-        ex("Drop-step sprints", 6, "20 yd", 45, "check", "Open the hips, turn and run like you're chasing a fly ball. Don't backpedal."),
-        ex("Tuck jumps", 3, "6", 60, "reps", "Jump, pull your knees to your chest, land soft and go again."),
-        ex("Lateral shuffles", 4, "10 yd each way", 45, "check", "Stay low, feet never cross or click together, push off the trailing leg."),
+        like("A-skips & B-skips", 3, "20 yd", 45),
+        like("Wall drives", 3, "5/leg", 45),
+        ex("Line hops", 3, "20 sec", 30, "check", "Quick two-foot hops over a line: forward/back, then side to side. Small and fast."),
+        ex("5-10-5 shuttle", 5, "1", 75, "time", "Set 3 markers 5 yards apart. Stay low on the turns and touch each line. Log your time."),
+        like("Falling starts", 4, "10 yd", 60),
+        ex("Crossover sprint starts", 4, "15 yd", 60, "check", "From a base-stealing lead-off, crossover step and drive low for 15 yards."),
+        like("Flying sprints", 3, "10 yd fly", 120),
+        ex("Drop-step sprints", 4, "20 yd", 45, "check", "Open the hips, turn and run like you're chasing a fly ball. Don't backpedal."),
+        like("Lateral skater bounds", 3, "5/side", 60),
         ex("Copenhagen plank (couch)", 3, "20 sec/side", 45, "time", "Top leg on the couch, lift your hips into a straight line and hold."),
         COOLDOWN
       ]
     },
     { // Thursday
-      title: "Stretching & Mobility",
+      title: "Flexibility & Mobility",
       type: "mobility",
-      focus: "Active recovery on the floor. Move slowly and breathe deep. Stretch — never pain.",
+      focus: "Active recovery on the floor: moving drills first, then longer holds. Move slowly and breathe deep. Stretch — never pain.",
       exercises: [
         ex("Ball rolling (tennis or lacrosse ball)", 1, "8 min", 0, "check", "Roll your feet, glutes, chest and upper back against the floor or a wall. Pause on tight spots.", "lacrosse ball self massage athletes"),
-        ex("90/90 hip switches", 2, "10", 30, "check", "Sit tall and rotate both knees side to side without using your hands."),
-        ex("World's greatest stretch", 2, "5/side", 30, "check", "Lunge, drop your elbow to the inside of the front foot, then rotate and reach to the sky."),
-        ex("Couch stretch (hip flexors)", 2, "60 sec/side", 15, "check", "Back knee against the couch, squeeze that glute, stay tall."),
-        ex("Thoracic open books", 2, "10/side", 15, "check", "Lie on your side, knees stacked, open the top arm across like a book."),
-        ex("Cross-body shoulder stretch", 2, "30 sec/side", 15, "check", "Pull the arm across your chest below the chin. Gentle — feel it in the back of the shoulder."),
-        ex("Doorway chest stretch", 2, "30 sec/side", 15, "check", "Forearm on the door frame at shoulder height, step through gently."),
-        ex("Towel hamstring stretch", 2, "45 sec/side", 15, "check", "On your back, towel around your foot, raise the straight leg."),
-        ex("Pigeon stretch", 2, "45 sec/side", 15, "check", "Front shin across, back leg long, hips square. Lean forward for more."),
-        ex("Wrist & forearm stretch", 2, "30 sec each", 15, "check", "Palm up, then palm down, gently pull the fingers back."),
-        ex("Cat-cow + deep breathing", 1, "3 min", 0, "check", "Slow spine waves, then child's pose with long exhales.")
+        like("Hip CARs", 2, "5/side", 15),
+        like("90/90 hip switches", 2, "10", 30),
+        like("World's greatest stretch", 2, "5/side", 30),
+        like("Cossack squats", 2, "6/side", 30),
+        like("Thread the needle", 2, "8/side", 15),
+        like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
+        like("Frog stretch", 2, "45 sec", 15),
+        like("Pigeon stretch", 2, "45 sec/side", 15),
+        like("Towel hamstring stretch", 2, "45 sec/side", 15),
+        like("Cross-body shoulder stretch", 2, "30 sec/side", 15),
+        like("Doorway chest stretch", 2, "30 sec/side", 15),
+        like("Wrist & forearm stretch", 2, "30 sec each", 15),
+        like("Cat-cow + deep breathing", 1, "3 min", 0)
       ]
     },
     { // Friday
-      title: "Glutes, Hamstrings & Core",
+      title: "Glutes, Hamstrings & Core — Power",
       type: "strength",
-      focus: "A backpack loaded with books adds weight. Nordics need a heavy couch to hook your feet under.",
+      focus: "Jumps first, then hamstrings and core. A backpack loaded with books adds weight. Nordics need a heavy couch to hook your feet under.",
       exercises: [
         WARMUP(8),
-        ex("Single-leg hops", 3, "5/leg", 60, "reps", "Hop forward on one leg and stick each landing. Knee stays over the toes."),
-        ex("Single-leg RDL (backpack)", 4, "10/leg", 60, "weight", "Hold the backpack, hinge at the hip, hips square, flat back."),
-        ex("Single-leg hip thrust (couch)", 4, "12/leg", 60, "reps", "Shoulders on the couch, drive through the heel, squeeze 1 second at the top."),
-        ex("Step-ups with backpack", 3, "10/leg", 60, "weight", "Whole foot on a sturdy chair, drive through that heel, no push from the back leg."),
+        like("Squat jumps", 3, "5", 60),
+        ex("Single-leg hops", 3, "4/leg", 60, "reps", "Hop forward on one leg and stick each landing. Knee stays over the toes."),
+        ex("Single-leg RDL (backpack)", 3, "10/leg", 60, "weight", "Hold the backpack, hinge at the hip, hips square, flat back."),
+        ex("Single-leg hip thrust (couch)", 3, "12/leg", 60, "reps", "Shoulders on the couch, drive through the heel, squeeze 1 second at the top."),
         ex("Nordic curls (feet under couch)", 3, "5", 90, "reps", "Kneel on a pillow, feet hooked under a heavy couch. Lower slowly, catch yourself, push back up."),
         ex("Lateral lunges", 3, "10/side", 45, "reps", "Sit back into one hip, other leg straight. Hold the backpack to make it harder."),
         ex("Single-leg calf raises", 3, "15/leg", 45, "reps", "On a stair edge for full range. Pause at the top."),
         ex("Side plank hip dips", 3, "12/side", 45, "reps", "Feet stacked, lower your hip toward the floor and lift back up."),
         ex("Hollow body hold", 3, "30 sec", 45, "time", "Low back pressed down, arms and legs long and just off the floor."),
-        ex("Russian twists (backpack)", 3, "20", 45, "weight", "Lean back, feet up if you can, rotate the backpack side to side.")
+        hold("Pigeon stretch", "45 sec/side"),
+        hold("Supine spinal twist", "30 sec/side")
       ]
     },
     { // Saturday
@@ -359,7 +524,8 @@ const DEFAULT_PLAN = {
         ex("Wall slides", 3, "10", 30, "reps", "Back and arms against the wall, slide up and down keeping contact."),
         ex("External rotation hold (doorway)", 3, "20 sec/arm", 30, "time", "Elbow bent 90° at your side, press the back of your hand into the door frame. Rotator-cuff health."),
         ex("Towel wringing", 3, "30 sec", 30, "check", "Wring a rolled towel hard one way, then the other. Forearms and grip."),
-        ex("Up-downs (plank to push-up)", 3, "10", 45, "reps", "From elbows to hands and back down, hips steady.")
+        hold("Cross-body shoulder stretch", "30 sec/side"),
+        hold("Wrist & forearm stretch", "30 sec each")
       ]
     },
     REST_DAY // Sunday
@@ -367,32 +533,25 @@ const DEFAULT_PLAN = {
 };
 
 /* ============================ OTHER PROGRAMS ============================
-   Switch in the app: Plan tab → Programs. Each program has a gym and a home version.
-   like(name, sets, reps, rest) copies an exercise (cues, video, what to log) from the plan above. */
-function like(name, sets, reps, rest) {
-  for (const mode of ["gym", "home"]) for (const day of DEFAULT_PLAN[mode]) {
-    const e = day.exercises.find(x => x.name === name);
-    if (e) return { ...e, sets, reps, rest: rest ?? e.rest };
-  }
-  throw new Error("plan.js: no exercise named " + name);
-}
+   Switch in the app: Plan tab → Programs. Each program has a gym and a home version. */
 
 // In-season: keep strength and speed with two short lifts, and protect the arm around games.
 const IN_SEASON_PLAN = {
   gym: [
-    { title: "Total Body Strength A", type: "strength", focus: "Short and heavy — keep your strength without leaving you sore for games. Stop 1–2 reps short of failure.",
+    { title: "Total Body Strength A", type: "strength", focus: "Short and heavy — keep your strength and pop without leaving you sore for games. Stop 1–2 reps short of failure.",
       exercises: [WARMUP(8), like("Box jumps", 3, "3", 90), like("Trap bar deadlift", 3, "4", 150), like("Dumbbell bench press", 3, "6", 120),
-        like("Chest-supported row", 3, "8", 90), like("Walking lunges (dumbbells)", 2, "6/leg", 90), like("Pallof press", 2, "10/side", 45), like("Cable external rotation", 2, "12/arm", 30)] },
+        like("Chest-supported row", 3, "8", 90), like("Walking lunges (dumbbells)", 2, "6/leg", 90), like("Pallof press", 2, "10/side", 45), like("Cable external rotation", 2, "12/arm", 30),
+        hold("Couch stretch (hip flexors)", "45 sec/side")] },
     { title: "Arm Care + Mobility", type: "mobility", focus: "15–20 easy minutes that keep your shoulder and hips moving well between games.",
       exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Face pulls", 2, "15", 45), like("Thoracic open books", 2, "10/side", 15),
         like("90/90 hip switches", 2, "10", 30), like("Cross-body shoulder stretch", 2, "30 sec/side", 15), like("Wrist & forearm stretch", 2, "30 sec each", 15)] },
     { title: "Speed Tune-Up", type: "agility", focus: "Low volume, full speed. A few fast reps keep you quick without draining your legs.",
-      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Base-stealing starts (crossover)", 4, "10 yd", 60),
+      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Falling starts", 2, "10 yd", 60), like("Base-stealing starts (crossover)", 4, "10 yd", 60),
         like("Pro agility shuttle (5-10-5)", 3, "1", 90), like("Copenhagen plank", 2, "20 sec/side", 45), COOLDOWN] },
-    { title: "Total Body Strength B", type: "strength", focus: "Posterior chain, pulling and rotational power. Skip it if you have a game tomorrow and feel beat up.",
+    { title: "Total Body Strength B", type: "strength", focus: "Rotational power, posterior chain and pulling. Skip it if you have a game tomorrow and feel beat up.",
       exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Med ball rotational scoop toss", 3, "4/side", 60), like("Romanian deadlift", 3, "6", 120),
         like("Half-kneeling landmine press", 3, "6/arm", 90), like("Pull-ups", 3, "5", 120), like("Dumbbell step-ups", 2, "6/leg", 75),
-        like("Cable woodchop (high to low)", 2, "8/side", 45), like("Nordic hamstring curls", 2, "4", 90)] },
+        like("Cable woodchop (high to low)", 2, "8/side", 45), like("Nordic hamstring curls", 2, "4", 90), hold("Pigeon stretch", "45 sec/side")] },
     { title: "Game Prep: Mobility", type: "mobility", focus: "Loosen up for the weekend. Nothing hard.",
       exercises: [like("Foam roll", 1, "6 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
         like("Band hamstring stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
@@ -403,16 +562,18 @@ const IN_SEASON_PLAN = {
   home: [
     { title: "Total Body Strength A", type: "strength", focus: "No equipment in-season lift. Stop 1–2 reps short of failure so you're fresh for games.",
       exercises: [WARMUP(8), like("Broad jumps", 3, "3", 60), like("Single-leg RDL (backpack)", 3, "6/leg", 60), like("Push-ups", 3, "10", 60),
-        like("Table inverted rows", 3, "8", 75), like("Reverse lunges", 2, "8/leg", 60), like("Dead bugs", 2, "8/side", 45), like("External rotation hold (doorway)", 2, "20 sec/arm", 30)] },
+        like("Table inverted rows", 3, "8", 75), like("Reverse lunges", 2, "8/leg", 60), like("Dead bugs", 2, "8/side", 45), like("External rotation hold (doorway)", 2, "20 sec/arm", 30),
+        hold("Couch stretch (hip flexors)", "45 sec/side")] },
     { title: "Arm Care + Mobility", type: "mobility", focus: "15–20 easy minutes for your shoulder and hips between games.",
       exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("Prone Y-T-W raises", 2, "8 each", 45), like("Wall slides", 2, "10", 30),
         like("Thoracic open books", 2, "10/side", 15), like("90/90 hip switches", 2, "10", 30), like("Wrist & forearm stretch", 2, "30 sec each", 15)] },
     { title: "Speed Tune-Up", type: "agility", focus: "A few fast reps in the driveway or park. Rest fully between them.",
-      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Crossover sprint starts", 4, "10 yd", 60),
+      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Falling starts", 2, "10 yd", 60), like("Crossover sprint starts", 4, "10 yd", 60),
         like("5-10-5 shuttle", 3, "1", 90), like("Copenhagen plank (couch)", 2, "20 sec/side", 45), COOLDOWN] },
     { title: "Total Body Strength B", type: "strength", focus: "Hamstrings, pulling and core. Skip it if you have a game tomorrow and feel beat up.",
       exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("Single-leg hops", 2, "4/leg", 60), like("Nordic curls (feet under couch)", 2, "4", 90),
-        like("Pike push-ups", 3, "6", 60), like("Backpack bent-over rows", 3, "10", 60), like("Step-ups with backpack", 2, "6/leg", 60), like("Russian twists (backpack)", 2, "16", 45)] },
+        like("Pike push-ups", 3, "6", 60), like("Backpack bent-over rows", 3, "10", 60), like("Step-ups with backpack", 2, "6/leg", 60), like("Russian twists (backpack)", 2, "16", 45),
+        hold("Pigeon stretch", "45 sec/side")] },
     { title: "Game Prep: Mobility", type: "mobility", focus: "Loosen up for the weekend. Nothing hard.",
       exercises: [like("Ball rolling (tennis or lacrosse ball)", 1, "6 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
         like("Towel hamstring stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
@@ -425,43 +586,109 @@ const IN_SEASON_PLAN = {
 // Pre-season: the ~6 weeks before opening day. Heavy but lower-rep strength, more power and speed, arm ramp-up.
 const PRE_SEASON_PLAN = {
   gym: [
-    { title: "Lower Power + Strength", type: "strength", focus: "Fewer reps, more speed. Move every rep as fast as you can with good form.",
-      exercises: [WARMUP(8), like("Box jumps", 4, "3", 90), like("Trap bar deadlift", 4, "3", 180), like("Walking lunges (dumbbells)", 3, "6/leg", 90),
-        like("Lateral skater bounds", 3, "4/side", 60), like("Nordic hamstring curls", 2, "5", 90), like("Pallof press", 2, "10/side", 45)] },
-    { title: "Speed + Base Running", type: "agility", focus: "Game-speed starts and cuts. Full rest between reps — every rep should be your fastest.",
-      exercises: [WARMUP(10), like("A-skips & B-skips", 3, "20 yd", 45), like("Base-stealing starts (crossover)", 6, "15 yd", 75), like("Pro agility shuttle (5-10-5)", 5, "1", 90),
-        like("Drop-step sprints", 5, "20 yd", 60), like("Copenhagen plank", 2, "25 sec/side", 45), COOLDOWN] },
+    { title: "Lower Power + Strength", type: "strength", focus: "Fewer reps, more speed. Heavy trap bar sets, then light trap bar jumps right after — the heavy sets make the jumps more explosive.",
+      exercises: [WARMUP(8), like("Pogo hops", 2, "15", 45), like("Box jumps", 4, "3", 90), like("Trap bar deadlift", 4, "3", 180), like("Trap bar jumps", 3, "3", 120),
+        like("Walking lunges (dumbbells)", 3, "6/leg", 90), like("Lateral skater bounds", 3, "4/side", 60), like("Nordic hamstring curls", 2, "5", 90), like("Pallof press", 2, "10/side", 45),
+        hold("Couch stretch (hip flexors)", "45 sec/side")] },
+    { title: "Speed + Base Running", type: "agility", focus: "Game-speed starts, top speed and cuts. Full rest between reps — every rep should be your fastest.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 3, "20 yd", 45), like("Wall drives", 2, "5/leg", 45), like("Falling starts", 3, "10 yd", 60),
+        like("Base-stealing starts (crossover)", 5, "15 yd", 75), like("Pro agility shuttle (5-10-5)", 4, "1", 90), like("Flying sprints", 3, "10 yd fly", 120),
+        like("Drop-step sprints", 4, "20 yd", 60), like("Copenhagen plank", 2, "25 sec/side", 45), COOLDOWN] },
     { title: "Arm Care + Mobility", type: "mobility", focus: "Your arm is ramping up for the season. Take care of it every week.",
-      exercises: [like("Warm-up + band arm care", 1, "10 min", 0), like("Face pulls", 3, "15", 45), like("Cable external rotation", 2, "12/arm", 30),
+      exercises: [like("Warm-up + band arm care", 1, "10 min", 0), like("Face pulls", 3, "15", 45), like("Cable external rotation", 2, "12/arm", 30), like("Shoulder CARs", 2, "5/arm", 15),
         like("Thoracic open books", 2, "10/side", 15), like("90/90 hip switches", 2, "10", 30), like("Cross-body shoulder stretch", 2, "30 sec/side", 15)] },
-    { title: "Upper Power + Strength", type: "strength", focus: "Rotational power and pulling strength for bat speed and a healthy arm.",
-      exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Med ball rotational scoop toss", 4, "5/side", 60), like("Plyo push-ups", 3, "5", 60),
-        like("Dumbbell bench press", 4, "5", 120), like("Pull-ups", 4, "5", 120), like("Chest-supported row", 3, "8", 90), like("Landmine rotations", 3, "6/side", 60)] },
+    { title: "Upper Power + Strength", type: "strength", focus: "Rotational throws and plyo push-ups first, then heavy pressing and pulling — bat speed and a healthy arm.",
+      exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Med ball rotational scoop toss", 3, "5/side", 60), like("Med ball rotational shot put", 3, "4/side", 60), like("Plyo push-ups", 3, "5", 60),
+        like("Dumbbell bench press", 4, "5", 120), like("Pull-ups", 4, "5", 120), like("Chest-supported row", 3, "8", 90), like("Landmine rotations", 3, "6/side", 60),
+        hold("Lat stretch on rack", "30 sec/side")] },
     { title: "Speed Tune-Up", type: "agility", focus: "Short and sharp. Stay fresh for scrimmages.",
-      exercises: [WARMUP(10), like("Agility ladder drills", 4, "1 pattern", 30), like("Crossover sprint starts", 4, "10 yd", 60), like("Lateral shuffles", 3, "10 yd each way", 45), COOLDOWN] },
+      exercises: [WARMUP(10), like("Pogo hops", 2, "10", 45), like("Agility ladder drills", 4, "1 pattern", 30), like("Crossover sprint starts", 4, "10 yd", 60), like("Lateral shuffles", 3, "10 yd each way", 45), COOLDOWN] },
     { title: "Scrimmage Prep: Mobility", type: "mobility", focus: "Loosen up before the weekend. Nothing hard.",
       exercises: [like("Foam roll", 1, "8 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
         like("Pigeon stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
     REST_DAY
   ],
   home: [
-    { title: "Lower Power + Strength", type: "strength", focus: "Fewer reps, more speed. A loaded backpack makes it harder.",
-      exercises: [WARMUP(8), like("Broad jumps", 4, "3", 60), like("Jumping lunges", 3, "4/leg", 60), like("Single-leg RDL (backpack)", 3, "6/leg", 60),
-        like("Lateral skater bounds", 3, "4/side", 60), like("Nordic curls (feet under couch)", 2, "5", 90), like("Dead bugs", 2, "8/side", 45)] },
-    { title: "Speed + Base Running", type: "agility", focus: "Game-speed starts and cuts in the driveway or park. Rest fully between reps.",
-      exercises: [WARMUP(10), like("A-skips & B-skips", 3, "20 yd", 45), like("Crossover sprint starts", 6, "15 yd", 75), like("5-10-5 shuttle", 5, "1", 90),
-        like("Drop-step sprints", 5, "20 yd", 60), like("Copenhagen plank (couch)", 2, "25 sec/side", 45), COOLDOWN] },
+    { title: "Lower Power + Strength", type: "strength", focus: "Fewer reps, more speed. A loaded backpack makes the strength work harder.",
+      exercises: [WARMUP(8), like("Pogo hops", 2, "15", 45), like("Broad jumps", 4, "3", 75), like("Jumping lunges", 3, "4/leg", 60), like("Single-leg RDL (backpack)", 3, "6/leg", 60),
+        like("Lateral skater bounds", 3, "4/side", 60), like("Nordic curls (feet under couch)", 2, "5", 90), like("Dead bugs", 2, "8/side", 45), hold("Couch stretch (hip flexors)", "45 sec/side")] },
+    { title: "Speed + Base Running", type: "agility", focus: "Game-speed starts, top speed and cuts in the driveway or park. Rest fully between reps.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 3, "20 yd", 45), like("Wall drives", 2, "5/leg", 45), like("Falling starts", 3, "10 yd", 60),
+        like("Crossover sprint starts", 5, "15 yd", 75), like("5-10-5 shuttle", 4, "1", 90), like("Flying sprints", 3, "10 yd fly", 120),
+        like("Drop-step sprints", 4, "20 yd", 60), like("Copenhagen plank (couch)", 2, "25 sec/side", 45), COOLDOWN] },
     { title: "Arm Care + Mobility", type: "mobility", focus: "Your arm is ramping up for the season. Take care of it every week.",
-      exercises: [like("Warm-up + arm circles", 1, "10 min", 0), like("Prone Y-T-W raises", 3, "8 each", 45), like("External rotation hold (doorway)", 2, "20 sec/arm", 30),
+      exercises: [like("Warm-up + arm circles", 1, "10 min", 0), like("Prone Y-T-W raises", 3, "8 each", 45), like("External rotation hold (doorway)", 2, "20 sec/arm", 30), like("Shoulder CARs", 2, "5/arm", 15),
         like("Wall slides", 2, "10", 30), like("Thoracic open books", 2, "10/side", 15), like("90/90 hip switches", 2, "10", 30)] },
     { title: "Upper Power + Strength", type: "strength", focus: "Explosive pushing plus pulling strength for your swing and throw.",
       exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("Plyo push-ups", 4, "5", 60), like("Pike push-ups", 3, "6", 60),
-        like("Table inverted rows", 4, "8", 75), like("Backpack bent-over rows", 3, "10", 60), like("Russian twists (backpack)", 3, "16", 45)] },
+        like("Table inverted rows", 4, "8", 75), like("Backpack bent-over rows", 3, "10", 60), like("Russian twists (backpack)", 3, "16", 45), hold("Child's pose lat stretch", "30 sec/side")] },
     { title: "Speed Tune-Up", type: "agility", focus: "Short and sharp. Stay fresh for scrimmages.",
-      exercises: [WARMUP(10), like("Line hops", 3, "20 sec", 30), like("Crossover sprint starts", 4, "10 yd", 60), like("Lateral shuffles", 3, "10 yd each way", 45), COOLDOWN] },
+      exercises: [WARMUP(10), like("Pogo hops", 2, "10", 45), like("Line hops", 3, "20 sec", 30), like("Crossover sprint starts", 4, "10 yd", 60), like("Lateral shuffles", 3, "10 yd each way", 45), COOLDOWN] },
     { title: "Scrimmage Prep: Mobility", type: "mobility", focus: "Loosen up before the weekend. Nothing hard.",
       exercises: [like("Ball rolling (tennis or lacrosse ball)", 1, "8 min", 0), like("World's greatest stretch", 2, "5/side", 30), like("Couch stretch (hip flexors)", 2, "45 sec/side", 15),
         like("Pigeon stretch", 2, "45 sec/side", 15), like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    REST_DAY
+  ]
+};
+
+// Power & speed block: 4–6 off-season weeks aimed at getting more explosive — jumps and throws in every lift, heavy lifts
+// followed by jumps, two days of sprinting and jumping, a long flexibility day and an easy recovery flow.
+const POWER_FOCUS = "Heavy sets, then the jump right after — the heavy work wakes up more muscle so the jumps get more explosive. Every jump and throw all-out, with full rest.";
+const POWER_PLAN = {
+  gym: [
+    { title: "Lower Power: Lift + Jump", type: "strength", focus: POWER_FOCUS,
+      exercises: [WARMUP(10), like("Pogo hops", 2, "15", 45), like("Seated box jumps", 3, "3", 90), like("Trap bar deadlift", 4, "3", 150), like("Trap bar jumps", 3, "3", 120),
+        like("Bulgarian split squat", 3, "6/leg", 90), like("Lateral skater bounds", 3, "4/side", 60), like("Nordic hamstring curls", 2, "5", 90), like("Copenhagen plank", 2, "20 sec/side", 45),
+        hold("Couch stretch (hip flexors)", "45 sec/side"), hold("Band hamstring stretch", "45 sec/side")] },
+    { title: "Upper Power: Throw + Press", type: "strength", focus: "Rotational throws first — the closest thing in the gym to your swing and throw — then heavy pressing followed by chest passes, and plenty of pulling.",
+      exercises: [like("Warm-up + band arm care", 1, "8 min", 0), like("Med ball step-behind rotational throw", 3, "4/side", 75), like("Med ball rotational shot put", 3, "5/side", 60),
+        like("Dumbbell bench press", 4, "5", 120), like("Med ball chest pass", 3, "5", 60), like("Pull-ups", 4, "5", 120), like("Chest-supported row", 3, "8", 90),
+        like("Face pulls", 2, "15", 45), like("Cable external rotation", 2, "12/arm", 30), hold("Lat stretch on rack", "30 sec/side"), hold("Cross-body shoulder stretch", "30 sec/side")] },
+    { title: "Speed: Acceleration + Top Speed", type: "agility", focus: "The first three steps and top-end speed, plus bounce. Full rest between reps — if you slow down, you're done for the day.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Wall drives", 3, "5/leg", 45), like("Falling starts", 4, "10 yd", 60),
+        like("Base-stealing starts (crossover)", 4, "15 yd", 75), like("Flying sprints", 4, "10 yd fly", 150), like("Hurdle hops", 3, "5", 90),
+        like("Lateral skater bounds", 3, "4/side", 60), hold("Calf stretch (wall)", "30 sec/side"), COOLDOWN] },
+    { title: "Flexibility & Mobility", type: "mobility", focus: "Explosive athletes move through full range. Moving drills first, then long, relaxed holds — breathe out into each stretch.",
+      exercises: [like("Foam roll", 1, "8 min", 0), like("Hip CARs", 2, "5/side", 15), like("Shoulder CARs", 2, "5/arm", 15), like("World's greatest stretch", 2, "5/side", 30),
+        like("Cossack squats", 2, "6/side", 30), like("Deep squat hold", 2, "45 sec", 15), like("Thoracic open books", 2, "10/side", 15), like("Half-kneeling hip flexor stretch", 2, "45 sec/side", 15),
+        like("Frog stretch", 2, "45 sec", 15), like("Pigeon stretch", 2, "45 sec/side", 15), like("Band hamstring stretch", 2, "45 sec/side", 15), like("Lat stretch on rack", 2, "30 sec/side", 15),
+        like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    { title: "Total-Body Power", type: "strength", focus: "Jumps and throws through the hips, then the hinge and single-leg strength behind them.",
+      exercises: [WARMUP(8), like("Broad jumps", 4, "3", 75), like("Med ball overhead backward toss", 3, "4", 75), like("Kettlebell swings", 4, "8", 60), like("Romanian deadlift", 3, "6", 120),
+        like("Walking lunges (dumbbells)", 3, "6/leg", 90), like("Landmine rotations", 3, "6/side", 60), like("Pallof press", 2, "10/side", 45),
+        hold("Pigeon stretch", "45 sec/side"), hold("Supine spinal twist", "30 sec/side")] },
+    { title: "Recovery Flow", type: "mobility", focus: "20 easy minutes to loosen up after a hard week. You should feel better when you finish than when you started.",
+      exercises: [like("Inchworms", 2, "5", 20), like("Hip CARs", 1, "5/side", 0), like("90/90 hip switches", 2, "8/side", 20), like("Thread the needle", 2, "8/side", 15),
+        like("Band pass-throughs", 2, "10", 20), like("Knee-to-wall ankle mobility", 2, "10/side", 15), like("Deep squat hold", 2, "45 sec", 15), like("Supine spinal twist", 1, "30 sec/side", 0),
+        like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    REST_DAY
+  ],
+  home: [
+    { title: "Lower Power: Jump + Strength", type: "strength", focus: "No equipment needed. Every jump all-out with full rest, then single-leg strength with a loaded backpack.",
+      exercises: [WARMUP(10), like("Pogo hops", 2, "15", 45), like("Squat jumps", 4, "4", 60), like("Broad jumps", 3, "3", 75), like("Bulgarian split squat", 3, "8/leg", 60),
+        like("Single-leg hops", 3, "4/leg", 60), like("Lateral skater bounds", 3, "4/side", 60), like("Nordic curls (feet under couch)", 2, "5", 90), like("Copenhagen plank (couch)", 2, "20 sec/side", 45),
+        hold("Couch stretch (hip flexors)", "45 sec/side"), hold("Towel hamstring stretch", "45 sec/side")] },
+    { title: "Upper Power", type: "strength", focus: "Explosive push-ups first, then pushing and pulling strength and rotation.",
+      exercises: [like("Warm-up + arm circles", 1, "8 min", 0), like("Plyo push-ups", 4, "5", 60), like("Push-ups", 3, "12", 60), like("Table inverted rows", 4, "8", 75),
+        like("Backpack bent-over rows", 3, "10", 60), like("Russian twists (backpack)", 3, "16", 45), like("Prone Y-T-W raises", 2, "8 each", 30), like("External rotation hold (doorway)", 2, "20 sec/arm", 30),
+        hold("Doorway chest stretch", "30 sec/side"), hold("Child's pose lat stretch", "30 sec/side")] },
+    { title: "Speed: Acceleration + Top Speed", type: "agility", focus: "Driveway, park or a field. Full rest between reps — if you slow down, you're done for the day.",
+      exercises: [WARMUP(10), like("A-skips & B-skips", 2, "20 yd", 45), like("Wall drives", 3, "5/leg", 45), like("Falling starts", 4, "10 yd", 60),
+        like("Crossover sprint starts", 4, "15 yd", 75), like("Flying sprints", 4, "10 yd fly", 150), like("5-10-5 shuttle", 3, "1", 90),
+        like("Lateral skater bounds", 3, "4/side", 60), hold("Calf stretch (wall)", "30 sec/side"), COOLDOWN] },
+    { title: "Flexibility & Mobility", type: "mobility", focus: "Explosive athletes move through full range. Moving drills first, then long, relaxed holds — breathe out into each stretch.",
+      exercises: [like("Ball rolling (tennis or lacrosse ball)", 1, "8 min", 0), like("Hip CARs", 2, "5/side", 15), like("Shoulder CARs", 2, "5/arm", 15), like("World's greatest stretch", 2, "5/side", 30),
+        like("Cossack squats", 2, "6/side", 30), like("Deep squat hold", 2, "45 sec", 15), like("Thread the needle", 2, "8/side", 15), like("Half-kneeling hip flexor stretch", 2, "45 sec/side", 15),
+        like("Frog stretch", 2, "45 sec", 15), like("Pigeon stretch", 2, "45 sec/side", 15), like("Towel hamstring stretch", 2, "45 sec/side", 15), like("Child's pose lat stretch", 2, "30 sec/side", 15),
+        like("Cat-cow + deep breathing", 1, "3 min", 0)] },
+    { title: "Total-Body Power", type: "strength", focus: "Jumps first, then the hinge, single-leg strength and core behind them.",
+      exercises: [WARMUP(8), like("Broad jumps", 4, "3", 75), like("Tuck jumps", 3, "5", 60), like("Single-leg RDL (backpack)", 3, "8/leg", 60), like("Reverse lunges", 3, "8/leg", 60),
+        like("Single-leg glute bridge", 3, "10/leg", 45), like("Side plank hip dips", 2, "10/side", 45), like("Hollow body hold", 2, "30 sec", 45),
+        hold("Pigeon stretch", "45 sec/side"), hold("Supine spinal twist", "30 sec/side")] },
+    { title: "Recovery Flow", type: "mobility", focus: "20 easy minutes to loosen up after a hard week. You should feel better when you finish than when you started.",
+      exercises: [like("Inchworms", 2, "5", 20), like("Hip CARs", 1, "5/side", 0), like("90/90 hip switches", 2, "8/side", 20), like("Thread the needle", 2, "8/side", 15),
+        like("Band pass-throughs", 2, "10", 20), like("Knee-to-wall ankle mobility", 2, "10/side", 15), like("Deep squat hold", 2, "45 sec", 15), like("Supine spinal twist", 1, "30 sec/side", 0),
+        like("Cat-cow + deep breathing", 1, "3 min", 0)] },
     REST_DAY
   ]
 };
@@ -482,7 +709,8 @@ const LIGHT_WORKOUT = {
       easy("Cable external rotation", 2, "12/arm", 30, "Very light weight. Elbow tucked at your side, rotate out slowly and control it back."),
       easy("Dead bugs", 2, "8/side", 30),
       easy("Single-leg glute bridge", 2, "10/leg", 30),
-      easy("Foam roll", 1, "6 min", 0, "Calves, quads, glutes, lats and upper back — about 45 seconds each. Easy pressure.")
+      easy("Foam roll", 1, "6 min", 0, "Calves, quads, glutes, lats and upper back — about 45 seconds each. Easy pressure."),
+      easy("Supine spinal twist", 1, "30 sec/side", 0)
     ] },
   home: { title: "Light Day: Recover + Move", type: "mobility",
     focus: "Easy pace, nothing heavy. You should feel better when you finish than when you started.",
@@ -494,15 +722,18 @@ const LIGHT_WORKOUT = {
       easy("External rotation hold (doorway)", 2, "20 sec/arm", 20, "Elbow bent 90° at your side, press the back of your hand gently into the door frame. Easy effort."),
       easy("Dead bugs", 2, "8/side", 30),
       easy("Single-leg glute bridge", 2, "10/leg", 30),
-      easy("Ball rolling (tennis or lacrosse ball)", 1, "6 min", 0, "Roll your feet, calves, glutes and the back of your shoulder. Slow, easy pressure.")
+      easy("Ball rolling (tennis or lacrosse ball)", 1, "6 min", 0, "Roll your feet, calves, glutes and the back of your shoulder. Slow, easy pressure."),
+      easy("Supine spinal twist", 1, "30 sec/side", 0)
     ] }
 };
 
 const PROGRAMS = {
   offseason: { name: "Off-season build", tag: "5 training days", plan: DEFAULT_PLAN,
-    about: "Late summer to winter, when you're not playing games: build strength, power and speed with 3 lifts, a speed day and a mobility day each week." },
+    about: "Late summer to winter, when you're not playing games: build strength, power and speed with 3 lifts (jumps and throws first), a speed day and a flexibility day each week. Every lift ends with a quick stretch." },
+  power: { name: "Power & speed block", tag: "Explosive + flexibility", plan: POWER_PLAN,
+    about: "4–6 off-season weeks to get more explosive: jumps and med ball throws in every lift, heavy lifts followed right away by jumps, a sprint day with top-speed work, a long flexibility day and a recovery flow. Best once you've lifted for a few months." },
   preseason: { name: "Pre-season sharpen", tag: "Power + speed", plan: PRE_SEASON_PLAN,
-    about: "The last ~6 weeks before opening day: heavy but lower-rep lifting, more power and game-speed sprinting, and a steady arm-care ramp-up." },
+    about: "The last ~6 weeks before opening day: heavy but lower-rep lifting followed by jumps, more game-speed and top-speed sprinting, and a steady arm-care ramp-up." },
   inseason: { name: "In-season maintain", tag: "2 lifts + speed", plan: IN_SEASON_PLAN,
-    about: "Keep your strength and speed during the season without being sore for games: 2 short lifts, a speed tune-up, arm care and mobility. Move days around your game schedule." }
+    about: "Keep your strength, pop and speed during the season without being sore for games: 2 short lifts, a speed tune-up, arm care and mobility. Move days around your game schedule." }
 };

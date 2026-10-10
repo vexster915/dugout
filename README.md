@@ -7,25 +7,64 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 ## What's inside
 
 **Train**
-- Weekly gym and home (no equipment) plans — **off-season** build, **pre-season** sharpen and **in-season** maintain programs
+- Weekly gym and home (no equipment) plans — **off-season** build, **power & speed** block, **pre-season** sharpen and **in-season**
+  maintain programs. Every lift starts with jumps or med ball throws while you're fresh and ends with 1–2 stretches you hold;
+  the off-season week has a full flexibility & mobility day
+- **Explosive power**: pogo hops, squat jumps, seated box jumps, hurdle hops, depth jumps, trap bar jumps, rotational shot puts,
+  step-behind throws, backward tosses, wall drives, falling starts and flying sprints. The **Power & speed block** pairs heavy
+  lifts with jumps right after them, adds a top-speed sprint day, a long flexibility day and a recovery flow
+- **Flexibility**: 13 mobility drills and stretches (CARs, Cossack squats, frog stretch, thread the needle…), a Stretching option in
+  Make me a workout, flexibility presets (full-body holds, hips for hitters, shoulders for throwers, a 10-minute daily stretch,
+  a post-workout stretch), and a timer for "45 sec/side" holds that does one side, gives you 5 seconds to switch, then the other
+- **Explosive start / Stretch finisher** in Plan → Edit day add a jump and a throw after the warm-up, or two stretches at the end,
+  picked for what the day works and your position and equipment — Programs → Stretch finishers adds them to every training day
 - **Build my plan**: answer a few questions — position (pitcher, catcher, infield, outfield, two-way), build (smaller,
-  average, bigger), lifting experience, main goal (all-around, strength & size, speed, power, arm health), the part of the
+  average, bigger), lifting experience, main goal (all-around, strength & size, speed, power, arm health, mobility & flexibility), the part of the
   season, which days you train, how long you have and what you have at home — and Dugout builds a gym week, a home week
   and a Light workout for you from the exercise library. Pitchers get arm care in every lift and no overhead pressing;
   catchers get hip, groin and leg strength for the crouch; infielders side-to-side quickness; outfielders sprint speed
   and healthy hamstrings. Smaller players get more muscle-building work, bigger players more mobility and easier
   landings, newer (and younger) lifters simpler lifts — and each workout is trimmed to fit your time. Preview it, "mix
   it up" for different exercises, then edit any day
-- **Presets & custom workouts**: 17 ready-made workouts (pitcher arm care, catcher legs & hips, infield first step,
-  outfield speed, bat speed, lower/upper strength, a 20-minute workout, a hotel-room workout, a game-day primer,
-  post-game recovery, mobility…), **Make me a workout** (pick up to 3 of full body, lower, upper, power, speed, core,
-  arm care or mobility, how long and where), and **My workouts** (save any of them, or any day of your plan). Start one
+- **12-week plan — muscle, power & bat speed** (Plan → 12-week plan): answer questions about your position, how you hit and
+  throw, age, height, weight, how much you want to add (5–15 lb), lifting experience, the part of the season, 3–5 lifting days,
+  time, gym or home, sore spots, your hitting setup and current test numbers. Dugout analyzes them — a realistic gain range for
+  your frame and experience (and how much of it can be muscle), calories and macros, week-by-week weight targets, power and
+  speed gaps against strong high-school marks, and what changes for your position, height, age and sore spots — then builds
+  12 weeks: Build (weeks 1–4, sets of 8–12), Strength (5–8, sets of 5–8 with jumps after heavy leg lifts) and Power (9–12,
+  sets of 4–6, more sprinting and game-speed hitting), with lighter weeks 4 and 8 and a test week 12. Every lift starts with a
+  mobility drill, a jump and a rotational med ball throw and ends with stretches; off days are hitting sessions with drills for
+  your Swing lab priorities, mobility and sprints. Each week goes into your plan automatically, and a dashboard shows your
+  weight against the target and your numbers start → now. Once a week the first hitting day starts with a **Swing lab check**:
+  film one swing, and the problems it finds pick the first drills on the next week's hitting days
+- **Throwing program** (Plan → Throwing program): throw harder from the outfield, infield or behind the plate — not a pitching
+  program. 12-week cycles that keep going: a ramp-up (1–3 weeks depending on how long you've been off), long toss with an arc
+  out to your comfortable max and pull-downs back in on a line, position throws (crow hops and do-or-die balls, throws across the
+  diamond, catcher transfers), easy recovery catch, max-intent crow-hop throws from week 7, and a test week. Long toss grows
+  about 4% a week, and each new cycle starts from your longest logged throw. No weighted balls; arm care before and after every
+  session. Each session goes into the throwing log, and how your arm feels decides the next one (sore → recovery catch, pain →
+  no throwing)
+- **Complete player plan** (Plan → Complete player plan): one set of questions starts the 12-week plan, the mobility plan and
+  the throwing program on the same Monday. None is cut down for another — each keeps its full sessions; Dugout only picks the
+  days (hard throwing on upper-body or hitting days and never two in a row, sprints only on fresh legs, one full rest day) and
+  shows the order on busy days (throw, then lift, then mobility). It's long term: after week 12 the next cycle starts by itself
+  with your new weight, test numbers, swing scan and long-toss distance
+- **Mobility plan** (Plan → Mobility plan): agility, sprinting, stretching and baseball conditioning in 8-week waves (Base,
+  Build, Sharpen), 3–6 sessions of 20–45 minutes — speed & acceleration, agility & quickness (with your position's footwork),
+  baseball conditioning (repeat 30-yard sprints, tempo runs, bike or jump-rope intervals), flexibility, and recovery cardio —
+  for a field, a gym or a driveway. Its sessions show on Today next to your planned workout and never change your plan. With
+  the 12-week plan on, it schedules around it: sprints, agility and conditioning only on days your legs are fresh, stretching
+  and recovery on leg days, nothing on the 12-week rest day, and never the same exercise twice in a day
+- **Presets & custom workouts**: 25 ready-made workouts (pitcher arm care, catcher legs & hips, infield first step,
+  outfield speed, bat speed, explosive legs, rotational throws, explosive at home, lower/upper strength, a 20-minute workout,
+  a hotel-room workout, a game-day primer, post-game recovery, five flexibility sessions…), **Make me a workout** (pick up to
+  3 of full body, lower, upper, explosive power, speed, core, arm care, mobility or stretching, how long and where), and **My workouts** (save any of them, or any day of your plan). Start one
   right now or put it on a day. Edit day also has quick changes for the whole day (a set more or less, shorter or longer
   rests) and swapping two days
 - **Light / Moderate / Heavy** switch on the Today screen: pick how hard to go each day. Moderate trims the sets and
   starts weights at about 90% of last time; Light swaps in an easy recovery workout (mobility, arm care, core — every
   exercise has a form video) that you can edit in Plan → Light workout
-- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 113 exercises, plus a searchable exercise library
+- Workout mode with set logging, rest timer, form videos and step-by-step how-tos for 152 exercises, plus a searchable exercise library
 - Next-weight suggestions, warm-up sets, plate calculator, exercise swaps, effort rating and notes
 - Daily readiness check-in (sleep, energy, soreness)
 
@@ -72,7 +111,7 @@ unless you turn on the optional Claude features with your own Anthropic API key 
   comparisons with your last swing and drills picked for your priorities (they become your drill plan).
   Works with 30/60 fps video and slow motion (auto-detected).
 - Game log with season AVG / OBP / SLG / OPS and ERA / WHIP / K/9
-- Baseball tests: 60-yard dash, exit velocity, throwing velocity, pop time and more
+- Baseball tests: 60-yard dash, vertical and broad jump, rotational med ball throw, exit velocity, throwing velocity, pop time and more
 - Arm care: throwing log, live pitch counter and Pitch Smart rest days by age, sprint stopwatch, practice log
 
 **Track**
@@ -87,12 +126,15 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 | --- | --- |
 | `index.html` | The page that loads everything |
 | `app.js` | All the screens and features |
-| `plan.js` | Starting workout programs, the Light workout and tutorial video links |
+| `plan.js` | Starting workout programs, the exercise catalog (default sets, reps and cues), the Light workout and tutorial video links |
 | `exercises.js` | How-to details for every exercise |
 | `builder.js` | Build my plan, Make me a workout and the presets: which exercises fit each position, build, experience and goal |
 | `meals.js` | Recipes and eating tips |
 | `foods.js` | Built-in food list |
 | `drills.js` | Baseball drills for every position and the swing problems they fix |
+| `block.js` | The 12-week plan: the questions, the analysis and every week's workouts |
+| `throw.js` | The throwing program: its cycles, sessions and how they fit around your other plans |
+| `move.js` | The mobility plan: its sessions and how they fit around your other plans |
 | `swing.js` | Swing lab: runs the body tracking on your video and measures the swing |
 | `pantry.js` | Pantry: the food catalog (names and brands), what each recipe needs, quick plates and the matching |
 | `scan.js` | Pantry: reads your kitchen photos — on the phone, or with Claude if you added an API key |
