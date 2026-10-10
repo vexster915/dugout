@@ -1025,3 +1025,9 @@ i.t-rest { background: var(--muted); }
 .ing-row b { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 15px; }
 .ing-row small { display: block; font-size: 12px; line-height: 1.35; margin-top: 2px; }
 .ing-row .badge { flex: none; }
+.ing-row { align-items: flex-start; }
+.ing-row .ing-buy { font-weight: 700; color: var(--text); }
+.ing-btns { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+.ing-more summary { font-size: 12px; font-weight: 700; color: var(--accent); cursor: pointer; margin-top: 4px; list-style: none; }
+.ing-more summary::-webkit-details-marker { display: none; }
+.ing-more small { margin-top: 4px; }

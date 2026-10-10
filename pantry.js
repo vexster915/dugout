@@ -362,6 +362,153 @@ const PANTRY_PICKS = {
   'chia-seeds': ['Chia seeds — a spoonful thickens overnight oats and adds fiber.', 'Pantry 1+ year']
 };
 
+// What to buy on Amazon for each ingredient: [the product, what to search for, nutrition from its label, what to check].
+// Picked for real, minimally processed food with good numbers — checked against the brands' own labels (Oct 2026).
+// Numbers are per the serving shown; brands change recipes, so the label in your hand wins. Links are Amazon searches
+// for the exact product (fresh food shows up through Amazon Fresh or Whole Foods where they deliver).
+const PANTRY_BUY = {
+  /* proteins */
+  eggs: ['Eggland\'s Best Large Eggs (18 ct)', 'Eggland\'s Best large eggs 18 count', '1 egg: 60 cal · 6 g protein · 6 mcg vitamin D (30% DV)',
+    'Any Grade A large eggs are great. Pasture-raised is better for the hens, not more protein — don\'t pay extra for that alone.'],
+  'egg-whites': ['AllWhites 100% Liquid Egg Whites', 'AllWhites 100% liquid egg whites', '3 tbsp: 25 cal · 5 g protein · 0 g fat',
+    'The ingredients should say only "egg whites." Egg substitutes (like Egg Beaters) add gums and color.'],
+  chicken: ['365 by Whole Foods Market Boneless Skinless Chicken Breast', '365 Whole Foods boneless skinless chicken breast', '4 oz raw: about 135 cal · 25 g protein · 3 g fat',
+    'Skip any pack that says "enhanced" or "up to X% solution/broth" — that\'s salt water pumped in (450–1,000 mg sodium instead of about 75). Whole Foods chicken has no added solution, antibiotics or hormones.'],
+  'ground-meat': ['Jennie-O 93% Lean Ground Turkey (or 93/7 ground beef)', 'Jennie-O 93% lean ground turkey', '4 oz raw: 170 cal · 22 g protein · 8 g fat (93/7 beef: about 170 cal · 23 g protein)',
+    '93/7 is the sweet spot: 99% lean is dry, 80/20 has about twice the fat. The label should be the meat and little or nothing else.'],
+  'deli-meat': ['Applegate Naturals Oven Roasted Turkey Breast', 'Applegate Naturals oven roasted turkey breast', '2 oz: 60 cal · 14 g protein · 290 mg sodium',
+    'Deli meat is the saltiest thing here — get low-sodium with no added nitrites. Deli-counter pick: Boar\'s Head 47% Lower Sodium Turkey (60 cal · 12 g protein · 340 mg).'],
+  tuna: ['StarKist Chunk Light Tuna in Water', 'StarKist chunk light tuna in water', '1 can, drained: about 90–110 cal · 20+ g protein',
+    'Chunk LIGHT, not albacore: about a third of the mercury (FDA "Best Choice" — 2–3 servings a week is fine). Packed in water, not oil.'],
+  salmon: ['Wild Alaskan Sockeye Salmon, frozen fillets', 'wild Alaskan sockeye salmon frozen fillets', '4 oz raw: about 130–150 cal · 22–24 g protein',
+    'Wild sockeye is leaner; farmed Atlantic has more fat and omega-3s. Both are real salmon and both are good. Frozen at sea is as fresh as it gets.'],
+  steak: ['Top sirloin steak (365 by Whole Foods Market)', '365 Whole Foods top sirloin steak', '4 oz raw, trimmed: about 150 cal · 25 g protein · 5 g fat',
+    'Lean cuts: top sirloin, flank, round. Trim the fat cap — it about triples the fat.'],
+  shrimp: ['365 by Whole Foods Market frozen shrimp, peeled & deveined', '365 Whole Foods frozen shrimp peeled deveined', '4 oz cooked: about 110 cal · 25 g protein',
+    'The ingredients should be shrimp (maybe salt). Skip bags with "sodium tripolyphosphate" (STPP) — it soaks shrimp with water you pay for. Whole Foods doesn\'t allow STPP.'],
+  'protein-powder': ['Optimum Nutrition Gold Standard 100% Whey', 'Optimum Nutrition Gold Standard 100% Whey Double Rich Chocolate', '1 scoop: 120 cal · 24 g protein · 1 g sugar',
+    'The FDA doesn\'t check supplements, so only buy one a third party tests for banned substances. ON Gold Standard is Informed Choice tested. If you\'ll ever be drug tested, get Klean Athlete Klean Isolate (20 g protein, NSF Certified for Sport).'],
+  'choc-milk': ['Fairlife 2% Chocolate Ultra-Filtered Milk', 'Fairlife 2% chocolate ultra-filtered milk', '1 cup: 140 cal · 13 g protein · 12 g sugar (6 g added)',
+    'About 50% more protein and half the sugar of regular chocolate milk (brand claim, matches the labels). A classic after-practice drink.'],
+  'cottage-cheese': ['Good Culture 2% Classic Cottage Cheese', 'Good Culture 2% classic cottage cheese', '½ cup: about 100 cal · 14 g protein',
+    'Ingredients: milk, cream, salt and cultures — no gums or thickeners like a lot of cottage cheese.'],
+  edamame: ['Seapoint Farms Shelled Edamame (frozen)', 'Seapoint Farms shelled edamame frozen', '½ cup: 90 cal · 9 g protein · 10 mg sodium',
+    'Ingredient: soybeans. That\'s it.'],
+  hummus: ['Sabra Classic Hummus', 'Sabra classic hummus', '2 tbsp: 70 cal · 2 g protein · 6 g fat',
+    'A spread, not a protein food — it\'s mostly fat. Has a preservative (potassium sorbate); harmless, but that\'s what it is.'],
+  chickpeas: ['Goya Organics Garbanzos (Chickpeas)', 'Goya organic chickpeas garbanzos', '½ cup: 110 cal · 6 g protein · 4 g fiber · 135 mg sodium',
+    'The organic can is just chickpeas, water and sea salt with about ⅓ the sodium; regular Goya adds disodium EDTA. Rinse either one.'],
+  /* dairy */
+  milk: ['Fairlife 2% Ultra-Filtered Milk', 'Fairlife 2% reduced fat ultra-filtered milk', '1 cup: 120 cal · 13 g protein · 6 g sugar',
+    'Filtered to concentrate the protein and take out the lactose — about 50% more protein than regular milk. Regular 2% (8 g protein a cup) is fine and cheaper.'],
+  yogurt: ['FAGE Total 2% Plain Greek Yogurt (32 oz)', 'FAGE Total 2% plain Greek yogurt 32 oz', '¾ cup: 120 cal · 17 g protein · 5 g sugar (0 added)',
+    'Plain, not flavored (flavored cups can have 15+ g added sugar). Ingredients: milk, cream, live cultures — sweeten it yourself with honey or fruit.'],
+  cheese: ['Tillamook Medium Cheddar (block)', 'Tillamook medium cheddar cheese block', '1 oz: about 115 cal · 7 g protein',
+    'A block is just milk, salt, cultures and enzymes. Pre-shredded adds potato starch and an anti-mold agent — fine for convenience, but shred a block for the pure stuff.'],
+  parmesan: ['BelGioioso Parmesan (wedge)', 'BelGioioso parmesan cheese wedge', '1 tbsp grated: 20 cal · 2 g protein',
+    'Grate a wedge yourself — the shaker tubs (even good brands) add cellulose so it doesn\'t clump.'],
+  'cream-cheese': ['Philadelphia Original Cream Cheese (brick)', 'Philadelphia original cream cheese brick', '2 tbsp: about 100 cal · 2 g protein · 9 g fat',
+    'It\'s a fat, not a protein — use a thin layer.'],
+  /* grains */
+  oats: ['Quaker Old Fashioned Oats', 'Quaker old fashioned oats 100% whole grain', '½ cup dry: 150 cal · 5 g protein · 4 g fiber · 1 g sugar',
+    'Plain old-fashioned (rolled) oats, not flavored instant packets — those add a lot of sugar.'],
+  rice: ['Mahatma Jasmine Rice (+ Ben\'s Original Ready Rice Jasmine pouches)', 'Mahatma jasmine rice', '¼ cup dry (about ¾ cup cooked): 160 cal · 3 g protein',
+    'White rice is the go-to carb around training — easy on the stomach. Pouches (420 cal each) for when there\'s no time.'],
+  pasta: ['Barilla Protein+ Penne', 'Barilla Protein+ penne pasta', '2 oz dry: 190 cal · 10 g protein · 5 g fiber',
+    'Wheat plus lentil, chickpea and pea flour — tastes like regular pasta with about 40% more protein.'],
+  bread: ['Dave\'s Killer Bread 21 Whole Grains and Seeds', 'Dave\'s Killer Bread 21 Whole Grains and Seeds', '1 slice: 110 cal · 6 g protein · 4 g fiber',
+    'The first ingredient should be a whole grain, with 3+ g fiber a slice. The thin-sliced version is 60–70 cal a slice.'],
+  bagels: ['Dave\'s Killer Bread Epic Everything Bagels', 'Dave\'s Killer Bread Epic Everything bagels', '1 bagel: 280 cal · 13 g protein',
+    'Whole grain, with more protein and fiber than a plain white bagel.'],
+  tortilla: ['Mission Burrito Size Flour Tortillas (or TortillaLand uncooked)', 'Mission burrito size flour tortillas', '1 tortilla (10"): 210 cal · 6 g protein · 590 mg sodium',
+    'Burrito size = 10 inches. TortillaLand uncooked (flour, water, canola oil, salt, sugar — no preservatives) taste better: 30 seconds a side in a pan.'],
+  'english-muffins': ['Dave\'s Killer Bread Rockin\' Grains English Muffins', 'Dave\'s Killer Bread Rockin Grains English muffins', '1 muffin: 140 cal · 6 g protein · 3 g fiber',
+    'Whole grain — about twice the fiber of a white English muffin.'],
+  buns: ['100% whole-wheat hamburger buns', '100% whole wheat hamburger buns', '1 bun: about 140 cal · 5 g protein',
+    'Look for "100% whole wheat" (whole wheat flour listed first).'],
+  pita: ['Whole-wheat pita', 'whole wheat pita bread', '1 pita (6½"): about 170 cal · 6 g protein · 5 g fiber',
+    'Whole wheat flour listed first.'],
+  granola: ['Purely Elizabeth Original Ancient Grain Granola', 'Purely Elizabeth original ancient grain granola', '⅓ cup: 130 cal · 3 g protein · 7 g sugar',
+    'Granola is a topping, not a bowl — the sugar adds up. Under 8 g sugar per serving is the bar.'],
+  cereal: ['Kashi GO Original', 'Kashi GO original cereal', '1¼ cups: 210 cal · 12 g protein · 12 g fiber · 8 g sugar',
+    'A lot of protein and fiber for a cereal. Plain Cheerios is the cheap, low-sugar backup.'],
+  crackers: ['Triscuit Original', 'Triscuit original crackers', '6 crackers: 120 cal · 3 g protein · 3 g fiber · 0 g sugar',
+    'Three ingredients: whole grain wheat, oil, sea salt.'],
+  pretzels: ['Pretzels (any brand)', 'pretzels twists', '1 oz: about 110 cal · 3 g protein · 1 g fat',
+    'Salty, low-fat carbs — good on hot game days when you sweat a lot.'],
+  'rice-cakes': ['Lundberg Lightly Salted Brown Rice Cakes', 'Lundberg lightly salted brown rice cakes', '1 cake: about 60 cal',
+    'Whole-grain brown rice and salt. Top with peanut butter and banana.'],
+  potato: ['Russet potatoes (5 lb) + sweet potatoes', 'russet potatoes 5 lb', '1 medium potato: about 160 cal · 4 g protein · 37 g carbs',
+    'Real food, cheap carbs, more potassium than a banana. Keep them somewhere cool and dark, not the fridge.'],
+  /* fruit & veg */
+  bananas: ['Bananas', 'fresh bananas', '1 medium: 105 cal · 27 g carbs · 420 mg potassium',
+    'Buy some green and some yellow so they don\'t all ripen at once.'],
+  berries: ['Frozen mixed berries (no sugar added)', 'frozen mixed berries no sugar added', '1 cup: about 70 cal · 4 g fiber',
+    'The ingredients should be only berries — no syrup or sugar.'],
+  apples: ['Apples (Honeycrisp, Gala or Fuji)', 'fresh Honeycrisp apples', '1 medium: 95 cal · 4 g fiber', ''],
+  'dried-fruit': ['Sun-Maid Raisins', 'Sun-Maid raisins', '¼ cup: about 120 cal · 29 g carbs',
+    'Ingredient: raisins. Skip yogurt-covered or sweetened dried fruit.'],
+  applesauce: ['GoGo SqueeZ Apple Apple pouches', 'GoGo SqueeZ apple apple applesauce pouches', '1 pouch: 60 cal · 12 g sugar (0 added)',
+    'Apples and a little lemon juice — nothing else.'],
+  pineapple: ['Dole Pineapple Chunks in 100% Juice', 'Dole pineapple chunks in 100% juice', '½ cup: about 70 cal',
+    'In juice, never "heavy syrup."'],
+  'orange-juice': ['Tropicana Pure Premium (100% juice)', 'Tropicana Pure Premium orange juice', '1 cup: about 110 cal · lots of vitamin C',
+    '100% juice — not "drink," "cocktail" or "beverage."'],
+  broccoli: ['Birds Eye Steamfresh Broccoli Florets', 'Birds Eye Steamfresh broccoli florets', '1⅓ cups: 30 cal · 2 g fiber',
+    'Ingredient: broccoli. Steams in the bag in 5 minutes.'],
+  'bell-peppers': ['Bell peppers (red, orange or yellow)', 'fresh red bell peppers', '1 cup chopped: about 30 cal',
+    'Red peppers have more vitamin C than an orange.'],
+  greens: ['Baby spinach (tub)', 'baby spinach', '3 cups: about 20 cal', ''],
+  spinach: ['Baby spinach (tub)', 'baby spinach', '3 cups: about 20 cal', ''],
+  tomatoes: ['Grape tomatoes', 'fresh grape tomatoes', '1 cup: about 30 cal', ''],
+  onions: ['Yellow onions', 'yellow onions', '', ''],
+  avocados: ['Hass avocados', 'Hass avocados', '⅓ avocado: 80 cal · 6 g healthy fat', ''],
+  /* cans, jars & sauces */
+  beans: ['Bush\'s Black Beans', 'Bush\'s Best black beans', '½ cup: 110 cal · 7 g protein · 5 g fiber · 450 mg sodium',
+    'Ingredients: black beans, water, salt. Rinsing them cuts the sodium by about 40%.'],
+  'nut-butter': ['Smucker\'s Natural Creamy Peanut Butter', 'Smucker\'s Natural creamy peanut butter', '2 tbsp: 190 cal · 8 g protein · 2 g sugar',
+    'Ingredients: peanuts and salt. Skip regular no-stir kinds (like Jif or Skippy) — they add sugar and hydrogenated oil. Stir it once, then keep it in the fridge.'],
+  jam: ['Bonne Maman Strawberry Preserves', 'Bonne Maman strawberry preserves', '1 tbsp: 50 cal',
+    'Strawberries, sugar, lemon juice and pectin — no high-fructose corn syrup.'],
+  honey: ['Nate\'s 100% Pure Raw & Unfiltered Honey', 'Nature Nate\'s raw unfiltered honey', '1 tbsp: 70 cal · 17 g carbs',
+    'One ingredient: honey. Fast carbs before a game.'],
+  'soy-sauce': ['Kikkoman Less Sodium Soy Sauce', 'Kikkoman less sodium soy sauce', '1 tbsp: 590 mg sodium (regular: 960 mg)', ''],
+  marinara: ['Rao\'s Homemade Marinara', 'Rao\'s Homemade marinara sauce', '½ cup: 100 cal · 0 g added sugar · 420 mg sodium',
+    'Tomatoes, olive oil, onions, garlic, basil — no added sugar (most jars add some).'],
+  'crushed-tomatoes': ['Muir Glen Organic Fire Roasted Crushed Tomatoes', 'Muir Glen organic fire roasted crushed tomatoes', '¼ cup: 20 cal · 90 mg sodium',
+    'Tomatoes, citric acid and sea salt.'],
+  pesto: ['Barilla Rustic Basil Pesto', 'Barilla rustic basil pesto', '¼ cup: 190 cal · 19 g fat · 600 mg sodium',
+    'Mostly oil — 1–2 tbsp per plate of pasta is plenty.'],
+  alfredo: ['Rao\'s Homemade Alfredo', 'Rao\'s Homemade alfredo sauce', '¼ cup: 100 cal · 9 g fat · 3 g protein',
+    'Real cream, butter and Parmesan. Heavy — a sauce, not a soup.'],
+  salsa: ['Herdez Salsa Casera (mild)', 'Herdez salsa casera mild', '2 tbsp: 10 cal · about 250 mg sodium',
+    'Basically vegetables — the easiest flavor there is.'],
+  /* spices */
+  'chili-powder': ['McCormick Chili Powder', 'McCormick chili powder', '', ''],
+  'curry-powder': ['McCormick Curry Powder', 'McCormick curry powder', '', ''],
+  'taco-seasoning': ['McCormick Original Taco Seasoning', 'McCormick original taco seasoning mix', '2 tsp: 15 cal · 380 mg sodium',
+    'Mostly spices with a little corn starch and salt. Or mix chili powder, cumin, garlic powder and salt yourself.'],
+  'garlic-powder': ['McCormick Garlic Powder', 'McCormick garlic powder', '', 'The label should say just garlic.'],
+  cinnamon: ['McCormick Ground Cinnamon', 'McCormick ground cinnamon', '', ''],
+  mustard: ['French\'s Classic Yellow Mustard', 'French\'s classic yellow mustard', '1 tsp: 0 cal', ''],
+  /* snacks */
+  nuts: ['Blue Diamond Whole Natural Almonds', 'Blue Diamond whole natural almonds', '1 oz (about 23): 160 cal · 6 g protein · 3 g fiber',
+    'Ingredient: almonds. Raw or dry-roasted, not candied or "honey roasted."'],
+  'chia-seeds': ['Chia seeds', 'chia seeds', '1 tbsp: about 60 cal · 4 g fiber · 2 g protein', ''],
+  /* extras */
+  carrots: ['Baby carrots', 'baby carrots', '', ''],
+  'chocolate-chips': ['Semi-sweet chocolate chips', 'semi-sweet chocolate chips', '', 'A treat — a tablespoon goes a long way.'],
+  cumin: ['McCormick Ground Cumin', 'McCormick ground cumin', '', ''],
+  garlic: ['Fresh garlic', 'fresh garlic bulbs', '', ''],
+  'green-beans': ['Birds Eye Steamfresh Whole Green Beans', 'Birds Eye Steamfresh whole green beans', '', 'Plain frozen green beans — no sauce.'],
+  'green-onions': ['Green onions', 'fresh green onions', '', ''],
+  lemons: ['Lemons', 'fresh lemons', '', ''],
+  mayo: ['Mayonnaise (made with avocado or olive oil)', 'avocado oil mayonnaise', '1 tbsp: about 90–100 cal', 'All fat — or swap half for plain Greek yogurt.'],
+  pickles: ['Dill pickles', 'dill pickle spears', '', ''],
+  teriyaki: ['Kikkoman Teriyaki Marinade & Sauce', 'Kikkoman teriyaki marinade and sauce', '', 'Salty and a little sweet — 1–2 tbsp a serving.']
+};
+const amazonLink = q => `https://www.amazon.com/s?k=${encodeURIComponent(q)}`;
+
 /* ---------------------------- Matching (used by the Pantry screen) ---------------------------- */
 const PANTRY = (() => {
   const GROUP_NAMES = { cheese: 'Cheese', yogurt: 'Yogurt', milk: 'Milk', chicken: 'Chicken', 'ground-meat': 'Ground turkey or beef',
@@ -472,7 +619,7 @@ const PANTRY = (() => {
     }
     const makes = list.filter(r => RECIPE_NEEDS[r.id].need.every(n => hasNeed(kit, n)));
     const usedBy = id => list.filter(r => RECIPE_NEEDS[r.id].need.some(n => [].concat(n).some(x => x === id || (members[x] || []).includes(id)))).map(r => r.id);
-    return { items: order.map((id, i) => ({ id, rank: i + 1, name: nameOf(id), cat: shelfOf(id), recipes: usedBy(id), pick: PANTRY_PICKS[id] || null })), makes: makes.map(r => r.id) };
+    return { items: order.map((id, i) => ({ id, rank: i + 1, name: nameOf(id), cat: shelfOf(id), recipes: usedBy(id), pick: PANTRY_PICKS[id] || null, buy: PANTRY_BUY[id] || null })), makes: makes.map(r => r.id) };
   }
   // Nice-to-haves that show up in a lot of these recipes (sauces, spices, toppings), most used first.
   function extras(recipes, skip, max = 10) {
@@ -480,7 +627,7 @@ const PANTRY = (() => {
     recipes.forEach(r => (RECIPE_NEEDS[r.id] || { nice: [] }).nice.forEach(x => [].concat(x).forEach(y => { if (!skip.has(y)) n[y] = (n[y] || 0) + 1; })));
     const inGroup = y => { const g = (PANTRY_BY_ID[y] || {}).group; return g && (skip.has(g) || n[g]); };   // spinach when "lettuce or spinach" is there
     return Object.entries(n).filter(([y, c]) => c >= 2 && !inGroup(y)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max)
-      .map(([id, c]) => ({ id, name: nameOf(id), cat: shelfOf(id), count: c, pick: PANTRY_PICKS[id] || null }));
+      .map(([id, c]) => ({ id, name: nameOf(id), cat: shelfOf(id), count: c, pick: PANTRY_PICKS[id] || null, buy: PANTRY_BUY[id] || null }));
   }
   return { rank, plates, match, findInText, search, has: (ids, id) => has(withBasics(ids), id), nameOf, needName, members, staples, extras };
 })();
