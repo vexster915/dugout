@@ -19,7 +19,7 @@
 
 'use strict';
 
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.6.1';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
@@ -281,6 +281,7 @@ const S = {
   coach: null,         // the Coach chat (section 8c), loaded at sign-in
   coachDraft: '',      // what's typed in the Coach box but not sent yet
   pantryMeal: '',      // Pantry view: meal filter ('' = any)
+  ingScope: 'week',    // Recommended ingredients: 'week' (your meal plan), 'core' (the best 25) or 'all' (every recipe)
   panAll: false,       // Pantry view: show every ready recipe
   progEx: null,
   progMetric: null,
@@ -3834,7 +3835,8 @@ actions.weekMeals = () => openSheet('The week ahead', `${nextWeek().map((d, i) =
   <div>${planForDate(d).map(x => `<button class="lib-row" data-action="openRecipe" data-id="${x.r.id}" data-slot="${x.slot}" data-servings="${x.servings}">
     <span class="grow"><b>${esc(x.r.name)}</b><small>${MEAL_LABEL[x.slot]} · ${servingsText(x.servings)} · ${fmt(x.r.cal * x.servings)} cal</small></span>${icon('right', 'sm')}</button>`).join('')}</div>`).join('')}
   <p class="hint">Days follow your workout plan (training or rest). Game days and swaps are set day by day in the Meals view.</p>
-  <button class="btn btn-primary btn-block" data-action="shopList">${icon('check', 'sm')} Shopping list for the week</button>`);
+  <button class="btn btn-primary btn-block" data-action="shopList">${icon('check', 'sm')} Shopping list for the week</button>
+  <button class="btn btn-ghost btn-block" data-action="ingredients">${icon('diet', 'sm')} Ingredients by aisle</button>`);
 function weekShopping() {
   const need = {};
   for (const d of nextWeek()) for (const x of planForDate(d)) need[x.r.id] = (need[x.r.id] || 0) + x.servings;
@@ -3850,6 +3852,77 @@ actions.shopList = () => {
     </div>`).join('')}
     <button class="btn btn-ghost btn-block" data-action="copyShopList">${icon('copy', 'sm')} Copy list (paste into Notes)</button>`);
 };
+// ----- Recommended ingredients: the staples that make the meals (pantry.js picks them and says what to buy) -----
+const ING_SCOPES = [['week', 'My meal plan'], ['core', 'Best 25'], ['all', 'Every recipe']];
+const ING_CORE = 25;
+function ingredientList(scope) {
+  if (scope === 'week') {
+    const wk = weekShopping(), weight = Object.fromEntries(wk.map(x => [x.r.id, x.servings]));
+    const L = PANTRY.staples(wk.map(x => x.r), { weight }), meals = id => sum(L.items.find(x => x.id === id).recipes, r => weight[r] || 0);
+    return { ...L, items: L.items.slice().sort((a, b) => meals(b.id) - meals(a.id) || a.rank - b.rank), of: wk.length };
+  }
+  return { ...PANTRY.staples(RECIPES, scope === 'core' ? { limit: ING_CORE } : {}), of: RECIPES.length };
+}
+// In your kitchen (only when you've set up the Pantry), on the shopping list, or neither.
+const ingHave = id => panIds().length > 0 && PANTRY.has(panIds(), id);
+actions.ingredients = () => {
+  if (typeof PANTRY === 'undefined') { toast('Still loading — try again in a moment'); return; }
+  const scope = ING_SCOPES.some(([k]) => k === S.ingScope) ? S.ingScope : 'week', L = ingredientList(scope);
+  const picked = new Set(L.items.map(x => x.id)), extra = PANTRY.extras(RECIPES.filter(r => scope !== 'week' || L.makes.includes(r.id)), picked);
+  const names = ids => { const n = ids.map(id => RECIPE_BY_ID[id].name); return n.length > 3 ? `${n.slice(0, 3).join(', ')} +${n.length - 3} more` : n.join(', '); };
+  const row = (x, top) => {
+    const have = ingHave(x.id), listed = onShop(x.name), b = x.buy;
+    const used = x.recipes ? `${scope === 'week' ? 'For' : `In ${plural(x.recipes.length, 'recipe')}:`} ${names(x.recipes)}` : `Goes with ${plural(x.count, 'recipe')}`;
+    const more = [b && b[3], x.pick && x.pick[0], x.pick && `Keeps: ${x.pick[1]}`, used].filter(Boolean);
+    return `<div class="ing-row">
+      <div class="grow"><b>${esc(x.name)}${top ? ' <span class="badge accent">Buy first</span>' : ''}</b>
+        ${b ? `<small class="ing-buy">${esc(b[0])}</small>${b[2] ? `<small class="muted">${esc(b[2])}</small>` : ''}` : x.pick ? `<small>${esc(x.pick[0])}</small>` : ''}
+        <details class="ing-more"><summary>${b && b[3] ? 'Why this one' : 'More'}</summary>${more.map(t => `<small>${esc(t)}</small>`).join('')}</details></div>
+      <div class="ing-btns">
+        ${b ? `<a class="btn btn-sm btn-ghost" href="${esc(amazonLink(b[1]))}" target="_blank" rel="noopener noreferrer" data-external aria-label="Find ${esc(b[0])} on Amazon">Amazon</a>` : ''}
+        ${have ? `<span class="badge good">${icon('check', 'sm')} Have</span>`
+          : listed ? '<span class="badge">On list</span>'
+          : `<button class="btn btn-icon sm btn-ghost" data-action="ingShop" data-id="${esc(x.id)}" aria-label="Add ${esc(x.name)} to the shopping list">${icon('plus', 'sm')}</button>`}
+      </div>
+    </div>`;
+  };
+  const shelves = list => PANTRY_CATS.filter(([k]) => list.some(x => x.cat === k)).map(([k, label]) => `<div class="section-title">${label}</div>
+    <div class="card">${list.filter(x => x.cat === k).map(x => row(x, scope !== 'week' && x.rank <= 8)).join('')}</div>`).join('');
+  const missing = L.items.filter(x => !ingHave(x.id) && !onShop(x.name)).length;
+  const intro = scope === 'week'
+    ? (L.of ? `Everything for the ${plural(L.of, 'different recipe')} in your meal plan for the next 7 days — ${plural(L.items.length, 'ingredient')}, most-used first in each aisle.` : 'Your meal plan is empty.')
+    : scope === 'core' ? `The ${L.items.length} ingredients that make the most recipes: together they make <b>${L.makes.length} of the ${L.of}</b>. Start with the "Buy first" ones.`
+    : `${L.items.length} ingredients make <b>all ${L.of} recipes</b>.`;
+  openSheet('Recommended ingredients', `<div class="stack">
+    <div class="chip-row" role="group" aria-label="Which meals">${ING_SCOPES.map(([k, l]) => `<button class="chip ${scope === k ? 'on' : ''}" data-action="ingScope" data-k="${k}" aria-pressed="${scope === k}">${l}</button>`).join('')}</div>
+    <p class="text-2 small">${intro}${panIds().length ? '' : ' Set up Diet → Pantry and Dugout marks what you already have.'}</p>
+    ${missing ? `<button class="btn btn-primary btn-block" data-action="ingShopAll">${icon('plus', 'sm')} ${missing === L.items.length ? `Add all ${missing} to my shopping list` : `Add the ${missing} I don't have`}</button>` : ''}
+    ${shelves(L.items)}
+    ${extra.length ? `<div class="section-title">Also handy — sauces, spices &amp; toppings</div><div class="card">${extra.map(x => row(x, false)).join('')}</div>` : ''}
+    <p class="hint">Plus the basics every recipe assumes: salt, pepper, cooking oil and cooking spray. Frozen fruit, vegetables and fish are as good as fresh and don't go bad.</p>
+    <p class="hint">Products were picked for real, minimally processed food and checked against each brand's nutrition label (October 2026) — brands change recipes, so the label in your hand wins. Amazon opens a search for that exact product; fresh food comes through Amazon Fresh or Whole Foods where they deliver. Dugout doesn't earn anything from these links.</p>
+    <button class="btn btn-ghost btn-block" data-action="ingCopy">${icon('copy', 'sm')} Copy the list</button>
+  </div>`);
+};
+actions.ingScope = el => { S.ingScope = el.dataset.k; actions.ingredients(); };
+actions.ingShop = el => {
+  const id = el.dataset.id;
+  if (addToShop(PANTRY.nameOf(id), id)) { savePantry(); toast(`${PANTRY.nameOf(id)} is on your shopping list (Diet → Pantry)`); }
+  actions.ingredients();
+};
+actions.ingShopAll = () => {
+  const add = ingredientList(S.ingScope).items.filter(x => !ingHave(x.id) && !onShop(x.name));
+  add.forEach(x => addToShop(x.name, x.id));
+  savePantry(); actions.ingredients();
+  toast(`${plural(add.length, 'ingredient')} added to your shopping list (Diet → Pantry)`);
+};
+actions.ingCopy = async () => {
+  const L = ingredientList(S.ingScope);
+  const text = PANTRY_CATS.filter(([k]) => L.items.some(x => x.cat === k)).map(([k, label]) => `${label}\n${L.items.filter(x => x.cat === k).map(x => `- ${x.name}${x.buy ? `: ${x.buy[0]}${x.buy[2] ? ` — ${x.buy[2]}` : ''}` : ''}`).join('\n')}`).join('\n\n');
+  try { await navigator.clipboard.writeText(text); toast('List copied'); }
+  catch (e) { toast("Couldn't copy — take a screenshot instead"); }
+};
+
 actions.copyShopList = async () => {
   const text = weekShopping().map(({ r, batches }) => `${r.name}${batches > 1 ? ` (×${batches})` : ''}\n${r.ing.map(g => `- ${g}`).join('\n')}`).join('\n\n');
   try { await navigator.clipboard.writeText(text); toast('Shopping list copied'); }
@@ -3892,6 +3965,8 @@ function dietMeals() {
       <button class="btn btn-ghost btn-block" data-action="weekMeals">${icon('plan', 'sm')} The week ahead + shopping list</button>
       <p class="hint">Sized to your goal of ${fmt(calGoal)} cal · ${fmt(proteinGoal)} g protein.${pro < proteinGoal - 15 ? ' Short on protein? Add a shake or a Greek yogurt bowl.' : ''} Tap a meal for the recipe and to log it; tap ${icon('refresh', 'sm')} to swap it.</p>
     </section>
+
+    <button class="banner as-btn goal-nudge" data-action="ingredients">${icon('check')}<span class="grow"><b>Recommended ingredients</b><br><span class="small">The staples that make these meals — what to buy and how long it keeps</span></span>${icon('right', 'sm')}</button>
 
     <div class="section-title">Recipes & meal ideas</div>
     <div class="chip-row">${[['all', 'All'], ...MEALS].map(([k, label]) => chip('recipeMeal', k, label, S.recipeMeal === k)).join('')}</div>
@@ -4157,6 +4232,7 @@ function pantryShop() {
         <button class="btn btn-ghost btn-sm" data-action="panShopCopy">${icon('copy', 'sm')} Copy list</button>
       </div>
       <p class="hint">Check off what you buy, then tap Got them to move it into your kitchen.</p>` : ''}
+      <button class="btn btn-ghost btn-sm btn-block" data-action="ingredients">${icon('diet', 'sm')} Recommended ingredients</button>
     </div>`;
 }
 
@@ -7200,7 +7276,8 @@ const HELP = [
     'Change the Light workout like any other day: Plan tab → Light workout.']],
   ['Logging food fast', ['Type a few letters to search 169 common foods, your favorites and anything you logged before. Change Servings and the numbers update.',
     'Use the Recent row, Favorites, the + on a meal, or "Copy yesterday\'s food" to log in one tap.',
-    'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.']],
+    'Diet → Meals has a daily plan sized to your goals, 45 recipes, a game-day timeline and a shopping list.',
+    'Diet → Meals → Recommended ingredients: the staples that make the meals, by aisle, with what to buy and how long each keeps — for your meal plan this week, the best 25 (they make 26 recipes) or every recipe. Each names a product picked from its nutrition label with an Amazon link. Tap + to put one on your shopping list.']],
   ['Coach (AI chat)', ['The Coach tab is a chat with an AI coach (Claude, by Anthropic). It sees your plan, workouts, food log, check-ins, goals, body weight, swing analyses, stats and kitchen, so its answers are about you.',
     'Ask anything: what to eat before a game, how hard to go today, why a lift stalled, what weight to use next, how to fix a swing problem, how many pitches you can throw, what a stat means.',
     'It looks things up while it answers (you\'ll see "Looked at your workouts"), and can offer buttons — log a meal it suggested, add things to your shopping list, switch today to Light, add drills to your plan, open a workout it made for you (start it, save it or put it on a day), or open a screen. Nothing changes unless you tap.',
@@ -7612,6 +7689,7 @@ function whatsNew() {
     ${item('sparkle', '12-week plan: muscle, power & bat speed', 'Plan → 12-week plan: tell Dugout your position, size, experience, schedule and numbers, get an analysis (what\'s realistic, what to eat, weekly weight targets) and 12 weeks of lifting, hitting, speed and flexibility built from it — with a dashboard to keep you on pace.')}
     ${item('baseball', 'Throwing program', 'Plan → Throwing program: throw harder from the field (not pitching) — ramp-up, long toss, pull-downs, max-intent and position throws in 12-week cycles, with arm care every session and your arm feel deciding the next day.')}
     ${item('sparkle', 'Complete player plan', 'Plan → Complete player plan: the 12-week plan, mobility and throwing together, year-round — each keeps its full sessions, and Today shows the order on busy days.')}
+    ${item('diet', 'Recommended ingredients', 'Diet → Meals → Recommended ingredients: the staples that make the meals, by aisle — the exact product to buy (nutrition checked, with an Amazon link), how long it keeps, and one tap to put what you\'re missing on your shopping list.')}
     ${item('timer', 'Mobility plan', 'Plan → Mobility plan: agility, sprints, stretching and baseball conditioning in 8-week waves. It shows on Today next to your workout and fits around the 12-week plan without changing it.')}
     ${item('plan', 'Keep your plan, add the new stuff', 'Your plan wasn\'t changed. Tap below to add stretch finishers to it, or use Plan → Edit day → Explosive start / Stretch finisher one day at a time. To get the whole new version, switch programs or rebuild your plan.')}
     <div class="grid2">
