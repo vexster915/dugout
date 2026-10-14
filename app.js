@@ -19,7 +19,7 @@
 
 'use strict';
 
-const APP_VERSION = '2.6.1';
+const APP_VERSION = '2.7.0';
 
 // If a data file didn't load (e.g. offline right after an update), run with empty data instead of crashing.
 if (typeof RECIPES === 'undefined') Object.assign(self, { RECIPES: [], RECIPE_BY_ID: {}, MEAL_TAGS: {}, DIET_GUIDE: [] });
@@ -255,6 +255,7 @@ const DEFAULT_SETTINGS = {
   throw: null,            // the throwing program: your answers (throw.js) + { start: Monday of week 1 } (section 7e)
   combo: null,            // the complete player plan (all three, long term): { start, cycle } (section 7f)
   move: null,             // the mobility plan: your answers (move.js) + { start: Monday of week 1 } (section 7d)
+  routine: null,          // your day with times: wake, school, practice, homework, sleep… (routine.js, section 7g)
   block: null,            // the 12-week plan: your answers (block.js) + { start: Monday of week 1, week: the week in your plan } (section 7c)
   aiKey: ''               // your own Anthropic API key (optional; never put in backups)
 };
@@ -567,6 +568,7 @@ function renderToday() {
       <h1 class="page-title">Today</h1>
     </div></div>
     ${modeToggle()}
+    ${routineCard()}
     ${blockCard()}
     ${todayOrderCard()}
     ${installBanner()}
@@ -2312,7 +2314,7 @@ const cleanSaved = list => (Array.isArray(list) ? list : []).filter(w => isObj(w
 
 // The plan files (block.js, move.js, throw.js). If one didn't load (an interrupted update), its plan is just off until
 // the next reload — your answers stay saved and nothing else breaks.
-const HAS = { block: typeof BLOCK !== 'undefined', move: typeof MOVE !== 'undefined', throw: typeof THROW !== 'undefined' };
+const HAS = { block: typeof BLOCK !== 'undefined', move: typeof MOVE !== 'undefined', throw: typeof THROW !== 'undefined', routine: typeof ROUTINE !== 'undefined' };
 const needsReload = k => { if (HAS[k]) return false; toast('Part of Dugout didn\'t finish updating — close and reopen the app'); return true; };
 const blockOn = () => !!(HAS.block && S.settings.block && S.settings.block.start);
 const blockWeekNow = () => (blockOn() ? BLOCK.weekOn(S.settings.block.start, ymd()) : 0);
@@ -3067,6 +3069,133 @@ function comboCard() {
   const w = blockWeekNow();
   return `<button class="banner as-btn goal-nudge" data-action="combo">${icon('sparkle')}<span class="grow"><b>Complete player plan</b> · ${w >= 1 ? `cycle ${S.settings.combo.cycle}, week ${Math.min(w, 12)}` : 'starts Monday'} — lift, throw, move</span>${icon('right', 'sm')}</button>`;
 }
+
+/* ============================== 7g. YOUR DAY (routine.js) ============================== */
+// The whole day with times: wake-up, school, practice or a game, training (throw → lift → mobility), every meal from the
+// meal plan, homework, a wind-down and lights-out counted back from tomorrow's wake-up. Your times are saved as
+// settings.routine; everything else comes from what's already in Dugout (the plan, the side plans, the meal plan).
+
+const routineOn = () => !!(HAS.routine && isObj(S.settings.routine));
+let routineDay = null;                       // which day the "Your day" sheet shows (0 = Monday), null = today
+const minsNow = (d = new Date()) => d.getHours() * 60 + d.getMinutes();
+const atTime = t => clockTime(ROUTINE.hhmm(t));
+
+// What's on a day (this week): sessions with their lengths, a game, and the meal plan's recipes.
+function routineInput(di) {
+  const today = di === dayIdx(), r = S.settings.routine, date = addDays(weekStart(), di);
+  const planned = dayPlan(di), level = today && planned.type !== 'rest' && planned.exercises.length ? todayLevel() : 'heavy';
+  const day = level === 'light' ? dayPlan(LIGHT) : levelDay(planned, level);
+  const lift = planned.type !== 'rest' && day.exercises.length ? { title: day.title.replace(/^Wk \d+ · /, ''), minutes: estMinutes(day) } : null;
+  let thr = null, mv = null;
+  if (throwOn() && throwWeekNow() >= 1) {
+    const s = today ? throwToday() : sideWeek().th.days[di];
+    if (s) thr = { title: s.title.replace('Throwing: ', ''), minutes: estMinutes(s), blocked: !!s.blocked };
+  }
+  if (moveOn() && moveWeekNow() >= 1) { const s = moveWeek().days[di]; if (s) mv = { title: s.title, minutes: estMinutes(s) }; }
+  const mp = today ? mealPlanToday() : null, items = today ? buildMealPlan(mp) : planForDate(ymd(date));
+  const game = mp && mp.kind === 'game' ? { time: /^\d{2}:\d{2}$/.test(mp.gameTime || '') ? mp.gameTime : S.settings.workoutTime } : null;
+  return { dow: di, nextWake: ROUTINE.wakeOn(r, (di + 1) % 7), lift, throw: thr, move: mv, rest: planned.type === 'rest', game,
+    meals: Object.fromEntries(items.map(x => [x.slot, x.r.name])), mealItems: items };
+}
+const routineFor = di => { const x = routineInput(di); return { ...ROUTINE.day(S.settings.routine, x), x }; };
+
+// Now and next, for the Today card.
+function routineNow(d) {
+  const t = minsNow(), list = d.items.filter(i => i.kind !== 'free');
+  const now = list.filter(i => i.at <= t && t < Math.max(i.end, i.at + 1) && i.kind !== 'school').pop() || (list.find(i => i.kind === 'school' && i.at <= t && t < i.end)) || null;
+  const next = list.filter(i => i.at > t && i !== now).slice(0, 2);
+  return { now, next };
+}
+const ROUTINE_ICONS = { wake: 'clock', meal: 'diet', school: 'plan', travel: 'right', practice: 'baseball', game: 'trophy', train: 'dumbbell', homework: 'edit', free: 'star', wind: 'refresh', sleep: 'clock' };
+
+function routineCard() {
+  if (!HAS.routine) return '';
+  if (!routineOn()) return `<button class="banner as-btn goal-nudge" data-action="routineSetup">${icon('clock')}<span class="grow"><b>Build your daily routine</b><br><span class="small">Your whole day with times — school, training, meals, homework and sleep</span></span>${icon('right', 'sm')}</button>`;
+  const d = routineFor(dayIdx()), { now, next } = routineNow(d);
+  const row = (i, label) => `<div class="tl-row"><span class="tl-time">${atTime(i.at)}</span><span class="grow"><b>${esc(i.title)}</b>${label ? ` <span class="badge accent">${label}</span>` : ''}</span></div>`;
+  return `<section class="card stack-sm">
+    <div class="spread"><div class="card-title row">${icon('clock', 'sm')} Your day</div><span class="small muted">Lights out ${atTime(d.lightsOut)}</span></div>
+    ${d.warn.length ? `<div class="banner warn">${icon('info')}<div class="small">${esc(d.warn[0])}</div></div>` : ''}
+    <div class="timeline" style="border-top:0;padding-top:0">${now ? row(now, 'Now') : ''}${next.map(i => row(i, '')).join('')}${!now && !next.length ? '<p class="small muted">That\'s the day — lights out and get your sleep.</p>' : ''}</div>
+    <button class="btn btn-ghost btn-block" data-action="routine" data-d="${dayIdx()}">${icon('plan', 'sm')} The whole day</button>
+  </section>`;
+}
+
+actions.routine = el => {
+  if (!HAS.routine) { needsReload('routine'); return; }
+  if (!routineOn()) { routineForm(); return; }
+  if (el && el.dataset && el.dataset.d != null) routineDay = clamp(Number(el.dataset.d) || 0, 0, 6);
+  const di = routineDay == null ? dayIdx() : routineDay, today = di === dayIdx(), d = routineFor(di), t = today ? minsNow() : -1;
+  const nowItem = today ? routineNow(d).now : null;
+  const btn = i => {
+    if (!today || !i.act) return '';
+    const a = i.act;
+    if (a.action === 'lift') return `<button class="btn btn-sm btn-ghost" data-action="startWorkout" data-day="${dayPlan(di).type !== 'rest' && todayLevel() === 'light' ? LIGHT : di}" ${S.active ? 'disabled' : ''}>${icon('play', 'sm')} Start</button>`;
+    if (a.action === 'throw') return `<button class="btn btn-sm btn-ghost" data-action="throwStartToday" ${S.active ? 'disabled' : ''}>${icon('play', 'sm')} Start</button>`;
+    if (a.action === 'move') return `<button class="btn btn-sm btn-ghost" data-action="moveStartToday" ${S.active ? 'disabled' : ''}>${icon('play', 'sm')} Start</button>`;
+    if (a.action === 'stretch') return `<button class="btn btn-sm btn-ghost" data-action="openPreset" data-id="flex-daily">${icon('play', 'sm')} Stretch</button>`;
+    if (a.action === 'meal') { const x = d.x.mealItems.find(m => m.slot === a.slot); return x ? `<button class="btn btn-sm btn-ghost" data-action="openRecipe" data-id="${x.r.id}" data-slot="${x.slot}" data-servings="${x.servings}">Recipe</button>` : ''; }
+    return '';
+  };
+  const date = addDays(weekStart(), di);
+  openSheet('Your day', `<div class="stack">
+    <div class="chip-row" role="group" aria-label="Day">${DAYS_SHORT.map((n, i) => `<button class="chip ${i === di ? 'on' : ''}" data-action="routine" data-d="${i}" aria-pressed="${i === di}">${n}${i === dayIdx() ? ' ·' : ''}</button>`).join('')}</div>
+    <div class="tiles two">
+      <div class="tile"><div class="tile-label">${today ? 'Today' : DAYS[di]}</div><div class="tile-value" style="font-size:18px">${d.game ? 'Game day' : d.practice ? 'Practice day' : d.x.rest ? 'Rest day' : d.x.lift ? 'Training day' : 'Easy day'}</div><div class="hint">${fmtDate(date, { month: 'short', day: 'numeric' })}${d.school ? ' · school' : ''}</div></div>
+      <div class="tile"><div class="tile-label">Sleep</div><div class="tile-value">${fmt(d.sleep, 1)}<small> h</small></div><div class="hint">lights out ${atTime(d.lightsOut)}</div></div>
+    </div>
+    ${d.warn.map(w => `<div class="banner warn">${icon('info')}<div class="small">${esc(w)}</div></div>`).join('')}
+    <div class="timeline routine-tl">${d.items.map(i => {
+      const on = i === nowItem, past = today && i.end <= t && i.kind !== 'sleep';
+      return `<div class="tl-row rt-${i.kind}${on ? ' rt-now' : ''}${past ? ' rt-past' : ''}">
+        <span class="tl-time">${atTime(i.at)}${i.end - i.at >= 20 && i.kind !== 'sleep' ? `<small>–${atTime(i.end)}</small>` : ''}</span>
+        <span class="grow"><b>${icon(ROUTINE_ICONS[i.kind] || 'clock', 'sm')} ${esc(i.title)}</b>${on ? ' <span class="badge accent">Now</span>' : ''}${i.detail ? `<small>${esc(i.detail)}</small>` : ''}</span>
+        ${btn(i)}
+      </div>`;
+    }).join('')}</div>
+    ${today ? '' : '<p class="hint">Other days use this week\'s plan and a fresh meal plan. A game shows up when you set Game day in Diet → Meals that day.</p>'}
+    <button class="btn btn-ghost btn-block" data-action="routineSetup">${icon('edit', 'sm')} Change my times</button>
+    <p class="hint">Built around ${S.settings.routine.sleep} hours of sleep — teen athletes need 8–10, and it's when you actually grow and recover. Lights-out is counted back from the next morning's wake-up, so the day bends before your sleep does.</p>
+  </div>`, { onClose: () => { routineDay = null; } });
+};
+
+actions.routineSetup = () => routineForm();
+function routineForm() {
+  if (!HAS.routine) { needsReload('routine'); return; }
+  const r = ROUTINE.answersOf(S.settings.routine || { train: S.settings.workoutTime }), first = !routineOn();
+  const time = (name, label, v) => `<label class="field"><span>${label}</span><input type="time" name="${name}" value="${esc(v)}"></label>`;
+  openSheet('Your daily routine', `<form class="form" novalidate data-submit="routineSave">
+    <p class="text-2 small">Your fixed times. Dugout fills in the rest every day from your plan — training, meals, homework — and counts lights-out back from the next morning so you get your sleep.</p>
+    <div class="section-title">Mornings</div>
+    <div class="form-grid">${time('wake', 'Wake up (school days)', r.wake)}${time('weekendWake', 'Wake up (no school)', r.weekendWake)}</div>
+    <label class="check-line"><input type="checkbox" name="amStretch" value="1" ${r.amStretch ? 'checked' : ''}> <span>5 minutes of mobility after waking</span></label>
+    <div class="section-title">School</div>
+    <div class="field"><span>School days</span>${optGrid('school', DAYS_SHORT.map((n, i) => [i, n]), r.school, { multi: true, cls: 'days' })}</div>
+    <div class="form-grid">${time('schoolStart', 'First bell', r.schoolStart)}${time('schoolEnd', 'Last bell', r.schoolEnd)}</div>
+    <div class="form-grid">${time('lunch', 'Lunch period', r.lunch)}<label class="field"><span>Drive to school (min)</span><input name="commute" inputmode="numeric" value="${r.commute}"></label></div>
+    <div class="field"><span>Homework on school nights</span>${optGrid('homework', [0, 30, 60, 90, 120, 150, 180].map(n => [n, n ? `${n >= 60 ? `${n / 60} h`.replace('.5 h', '½ h') : `${n} min`}` : 'None']), r.homework, { cls: 'wrap3' })}<small>Sunday gets the same, to plan the week.</small></div>
+    <div class="section-title">Team practice</div>
+    <div class="field"><span>Practice days</span>${optGrid('practice', DAYS_SHORT.map((n, i) => [i, n]), r.practice, { multi: true, cls: 'days' })}<small>Leave them all off in the off-season. Games: set Game day in Diet → Meals that day.</small></div>
+    <div class="form-grid">${time('practiceStart', 'Practice starts', r.practiceStart)}${time('practiceEnd', 'Practice ends', r.practiceEnd)}</div>
+    <div class="section-title">Training, dinner &amp; sleep</div>
+    <div class="form-grid">${time('train', 'Train (school days)', r.train)}${time('weekendTrain', 'Train (no school)', r.weekendTrain)}</div>
+    ${time('dinner', 'Family dinner', r.dinner)}
+    <div class="field"><span>Sleep I'm aiming for</span>${optGrid('sleep', ROUTINE.SLEEP, r.sleep)}<small>Teen athletes need 8–10 hours. 9 is the sweet spot.</small></div>
+    <button class="btn btn-primary btn-xl" type="submit">${icon(first ? 'play' : 'check')} ${first ? 'Build my day' : 'Save'}</button>
+  </form>`);
+}
+submits.routineSave = f => {
+  const d = formData(f), pick = k => DAYS.map((_, i) => i).filter(i => d[`${k}_${i}`]);
+  const r = ROUTINE.answersOf({ wake: d.wake, weekendWake: d.weekendWake, amStretch: !!d.amStretch, school: pick('school'), schoolStart: d.schoolStart, schoolEnd: d.schoolEnd,
+    lunch: d.lunch, commute: num(d.commute), homework: Number(d.homework), practice: pick('practice'), practiceStart: d.practiceStart, practiceEnd: d.practiceEnd,
+    train: d.train, weekendTrain: d.weekendTrain, dinner: d.dinner, sleep: Number(d.sleep) });
+  const was = routineOn();
+  S.settings.routine = r;
+  S.settings.workoutTime = r.train;                 // the Today countdown and the pre-workout tips use the same time
+  saveSettings(); render();
+  routineDay = null; actions.routine();
+  toast(was ? 'Your day is updated' : 'Your day is built — it changes with your plan every day');
+};
 
 /* ============================== 8. DIET TAB ============================== */
 
@@ -4779,6 +4908,7 @@ function coachContext() {
   else L.push(`Today's plan: ${day.title} (${TYPES[day.type]}${day.focus ? ` — ${day.focus}` : ''}), set to ${LEVELS[level].label}${level === 'light' ? ` → Light workout: ${exList(dayPlan(LIGHT))}` : `: ${exList(level === 'moderate' ? levelDay(day, 'moderate') : day)}`}.`);
   if (done) L.push(`Done today: ${done.title} (${LEVELS[done.intensity] ? LEVELS[done.intensity].label : 'Heavy'}, ${fmtDur((done.finishedAt || done.startedAt) - done.startedAt)}${done.rpe ? `, effort ${done.rpe}/10` : ''}).`);
   const c = checkinOf(today);
+  if (routineOn()) { const d = routineFor(dayIdx()); L.push(`Their day today (Your day, from their routine times): ${d.items.filter(i => i.kind !== 'free').map(i => `${ROUTINE.hhmm(i.at)} ${i.title}`).join('; ')}. Lights out ${ROUTINE.hhmm(d.lightsOut)} (${fmt(d.sleep, 1)} h of sleep).${d.warn.length ? ` Problems: ${d.warn.join(' ')}` : ''}`); }
   L.push(c ? `Check-in today: slept ${c.sleep} h, energy ${c.energy}/5, soreness ${c.sore}/5 → readiness ${readiness(c)} (${readyInfo(readiness(c))[2]}).` : 'Check-in today: not done.');
   const t = dayTotals(today), eaten = S.meals.filter(m => m.date === today).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   L.push(`Eaten today: ${fmt(t.cal)} cal, ${fmt(t.pro)} g protein, ${fmt(t.carb)} g carbs, ${fmt(t.fat)} g fat${eaten.length ? ` — ${eaten.map(m => `${MEAL_LABEL[m.meal] || m.meal}: ${m.name} (${fmt(m.cal)} cal, ${fmt(m.pro)} g protein)`).join('; ')}` : ' (nothing logged yet)'}. Water: ${waterText(waterOf(today))}.`);
@@ -6965,6 +7095,7 @@ function renderSettings() {
     <div class="section-title">Plan</div>
     <div class="set-list">
       <button class="set-item as-btn" data-action="buildPlan"><div class="grow"><div>Build my plan</div><div class="hint">${st.athlete ? esc(BUILDER.summary(BUILDER.profileOf(st.athlete))) : 'A week made for your position, build, experience and goal'}</div></div>${icon('sparkle')}</button>
+      <button class="set-item as-btn" data-action="routine" data-d="${dayIdx()}"><div class="grow"><div>Your daily routine</div><div class="hint">${routineOn() ? `Up ${clockTime(S.settings.routine.wake)} · lights out ${atTime(routineFor(dayIdx()).lightsOut)} tonight` : 'Your whole day with times — school, training, meals, sleep'}</div></div>${icon('clock')}</button>
       <button class="set-item as-btn" data-action="block"><div class="grow"><div>12-week plan</div><div class="hint">${blockOn() ? `Week ${clamp(blockWeekNow(), 1, 12)} of 12 — muscle, power and bat speed` : 'Add muscle, power and bat speed — analyzed for you'}</div></div>${icon('flame')}</button>
       <button class="set-item as-btn" data-action="combo"><div class="grow"><div>Complete player plan</div><div class="hint">${comboOn() ? `Cycle ${S.settings.combo.cycle} — lift, throw, move` : '12 weeks + mobility + throwing, year-round'}</div></div>${icon('sparkle')}</button>
       <button class="set-item as-btn" data-action="throwPlan"><div class="grow"><div>Throwing program</div><div class="hint">${throwOn() ? `${S.settings.throw.sessions} throwing days a week` : 'Throw harder from the field — not pitching'}</div></div>${icon('baseball')}</button>
@@ -7305,6 +7436,11 @@ const HELP = [
   ['Arm care and pitch counts', ['Log every throwing session with how your arm feels. Big week-to-week jumps in throwing are a common cause of arm trouble.',
     'During games use the pitch counter: it shows your Pitch Smart limit for your age and the rest days you\'ll need. Your league\'s rules come first.',
     'Soreness that fades in a day is normal. Pain, numbness or pain that lingers is not — stop throwing and tell a coach, athletic trainer or doctor.']],
+  ['Your day, with times', ['Today → Your day (or Settings → Your daily routine): enter your fixed times once — wake-up on school and non-school days, school days and bells, lunch, the drive, team practice, homework, when you like to train, dinner and how much sleep you want.',
+    'Every day Dugout fits the rest in: a snack 60–90 minutes before training, throwing → lifting → mobility in that order, recovery food right after, dinner, homework in the open time, an evening protein snack, a wind-down and lights-out.',
+    'Lights-out is counted back from the next morning\'s wake-up (Sunday night uses Monday\'s). If a day doesn\'t fit, it tells you what to move instead of cutting your sleep.',
+    'Practice days: lifting goes right after practice and practice throwing counts as your throwing for the day. Game days (set Game day in Diet → Meals) count back from first pitch.',
+    'Tap a day at the top to see the rest of the week. Today, the rows have Start and Recipe buttons.']],
   ['12-week plan: muscle, power and bat speed', ['Plan → 12-week plan: answer questions about your position, size, experience, schedule, hitting setup and numbers. Dugout analyzes them — how much weight is realistic for you, what to eat, your weekly weight targets and what needs the most work — then builds 12 weeks.',
     'Weeks 1–4 build muscle (sets of 8–12), 5–8 build strength (5–8 reps, jumps after heavy leg lifts), 9–12 turn it into power and speed. Weeks 4 and 8 are lighter; week 12 is a test week.',
     'Every lift starts with a mobility drill, a jump and a rotational med ball throw, and ends with stretches. Off days are hitting sessions with drills for your Swing lab priorities, mobility and sprints.',
@@ -7416,6 +7552,7 @@ function cleanSettings(st) {
   out.throw = !dated(out.throw) ? null : !HAS.throw ? out.throw : { ...THROW.answersOf(out.throw), start: out.throw.start };
   out.combo = dated(out.combo) ? { start: out.combo.start, cycle: Math.max(1, Number(out.combo.cycle) || 1) } : null;
   out.move = !dated(out.move) ? null : !HAS.move ? out.move : { ...MOVE.answersOf(out.move), start: out.move.start };
+  out.routine = !isObj(out.routine) ? null : !HAS.routine ? out.routine : ROUTINE.answersOf(out.routine);
   out.block = !dated(out.block) ? null : !HAS.block ? out.block : { ...BLOCK.answersOf(out.block), start: out.block.start, week: Number(out.block.week) || 0 };
   return out;
 }
@@ -7680,10 +7817,13 @@ async function openApp(newUsername) {
 }
 
 // ----- What's new (shown once after an update to people who already use the app) -----
-const WHATS_NEW = '2.6';
+const WHATS_NEW = '2.7';
 function whatsNew() {
   const item = (ic, title, text) => `<div class="new-item">${icon(ic)}<div><b>${title}</b><div class="small text-2">${text}</div></div></div>`;
-  openSheet("What's new in Dugout 2.6", `
+  openSheet("What's new in Dugout 2.7", `
+    ${item('clock', 'Your day, with times', 'Today → Your day: enter your wake-up, school, practice, homework and sleep times once, and Dugout lays out every day — training in the right order, every meal from your meal plan, homework, a wind-down and lights-out counted back from the next morning so you get your sleep. It changes with your plan every day and tells you when a day doesn\'t fit.')}
+    <button class="btn btn-primary btn-block" data-action="routineSetup">${icon('clock', 'sm')} Build my day</button>
+    <details class="table-toggle"><summary>New in 2.6</summary><div class="stack-sm">
     ${item('flame', 'More explosive', 'Every starting lift now opens with jumps or med ball throws while you\'re fresh. New: pogo hops, squat jumps, seated box jumps, hurdle hops, depth jumps, trap bar jumps, rotational shot puts, step-behind throws, backward tosses, wall drives, falling starts and flying sprints — each with a form video. Plus a Power & speed block program, explosive presets and a rotational med ball throw test.')}
     ${item('refresh', 'Flexibility everywhere', 'Every training day ends with 1–2 stretches you hold, the mobility day is now a full Flexibility & Mobility day, and there are 13 new mobility drills and stretches, a Stretching option in Make me a workout and five flexibility presets (including a 10-minute daily stretch). The timer for "45 sec/side" holds now does both sides.')}
     ${item('sparkle', '12-week plan: muscle, power & bat speed', 'Plan → 12-week plan: tell Dugout your position, size, experience, schedule and numbers, get an analysis (what\'s realistic, what to eat, weekly weight targets) and 12 weeks of lifting, hitting, speed and flexibility built from it — with a dashboard to keep you on pace.')}
@@ -7696,6 +7836,7 @@ function whatsNew() {
       <button class="btn btn-primary" data-action="addFinishersAll">Add stretch finishers</button>
       <button class="btn btn-ghost" data-action="${planBuilt() ? 'buildPlan' : 'programs'}">${planBuilt() ? 'Rebuild my plan' : 'See the programs'}</button>
     </div>
+    </div></details>
     <details class="table-toggle"><summary>New in 2.5</summary><div class="stack-sm">
     ${item('sparkle', 'Build my plan', 'Plan → Build my plan: tell Dugout your position, build, lifting experience, goal, season, training days and time, and it builds a week of gym and home workouts made for you.')}
     ${item('dumbbell', 'Presets and your own workouts', 'Plan → Presets & custom: ready-made workouts for every position, speed, bat speed, travel, game day and recovery — or make one to order in seconds. Start it now, save it, or put it on a day.')}
