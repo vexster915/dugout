@@ -72,6 +72,9 @@ unless you turn on the optional Claude features with your own Anthropic API key 
 - Food log with a built-in list of 169 common foods, favorites, servings, calories, protein, carbs and fat
 - Goal calculator for calories, protein, carbs, fat and water
 - Daily meal plan sized to your goals (training, rest and game days) and 45 athlete recipes
+- **Your day, with times** (Today): wake-up, school, practice or a game, training in order (throw → lift → mobility),
+  every meal from the meal plan, homework, a wind-down and lights-out counted back from the next morning's wake-up
+  (8–10 h of sleep). Built from your fixed times plus what's on each day; it says when a day doesn't fit
 - Recommended ingredients: the staples that make the meals, grouped by aisle, with what to buy and how long each keeps —
   for your meal plan this week, the best 25 (they make 26 of the recipes) or every recipe; one tap adds what you're
   missing to the Pantry shopping list. Each one names a researched product (real, minimally processed, nutrition checked
